@@ -1,0 +1,23 @@
+server:
+  port: "8080"
+
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "mt_backend"
+
+redis:
+  host: "localhost"
+  port: "6379"
+  password: ""
+  db: 0
+
+elasticsearch:
+  addresses:
+    - "http://localhost:9200"
+
+session:
+  secret: "your-secure-session-secret-change-this-to-random-string"  # Generate a secure 32+ character secret
+  max_age: 604800  # 7 days in seconds
+  secure_cookie: false  # Set to true in production with HTTPS
+  http_only: true
+  same_site: "Lax"
