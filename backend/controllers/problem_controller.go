@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -178,13 +179,13 @@ func SearchProblems(c *gin.Context) {
 func AddProblems(c *gin.Context) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized"})
+		utils.ForbiddenResponse(c, utils.MsgUnauthorized)
 		return
 	}
 
 	var req models.AddProblemsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.BadRequestResponse(c, err.Error())
 		return
 	}
 
@@ -211,8 +212,7 @@ func AddProblems(c *gin.Context) {
 	// TODO: Parse and store raw data in MongoDB
 	// TODO: Extract structured data and index in Elasticsearch
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":      "Parsed links queued successfully",
+	utils.SuccessResponse(c, "Parsed links queued successfully", gin.H{
 		"user_id":      userID.Hex(),
 		"count":        len(queueItems),
 		"upload_time":  uploadTime,
@@ -225,14 +225,14 @@ func AddProblems(c *gin.Context) {
 func GetProblemDetail(c *gin.Context) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized"})
+		utils.ForbiddenResponse(c, utils.MsgUnauthorized)
 		return
 	}
 
 	problemIDStr := c.Param("id")
 	problemID, err := primitive.ObjectIDFromHex(problemIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid problem ID"})
+		utils.BadRequestResponse(c, "invalid problem ID")
 		return
 	}
 
@@ -246,7 +246,7 @@ func GetProblemDetail(c *gin.Context) {
 		UpdatedAt:  time.Now(),
 	}
 
-	c.JSON(http.StatusOK, models.ProblemDetailResponse{
+	utils.SuccessResponse(c, "Problem details retrieved successfully", models.ProblemDetailResponse{
 		Problem: problem,
 	})
 }
@@ -255,14 +255,14 @@ func GetProblemDetail(c *gin.Context) {
 func GetRawProblem(c *gin.Context) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized"})
+		utils.ForbiddenResponse(c, utils.MsgUnauthorized)
 		return
 	}
 
 	problemIDStr := c.Param("id")
 	problemID, err := primitive.ObjectIDFromHex(problemIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid problem ID"})
+		utils.BadRequestResponse(c, "invalid problem ID")
 		return
 	}
 
@@ -272,11 +272,11 @@ func GetRawProblem(c *gin.Context) {
 	var rawProblem models.RawProblem
 	err = collection.FindOne(ctx, bson.M{"_id": problemID}).Decode(&rawProblem)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "raw problem not found"})
+		utils.NotFoundResponse(c, "raw problem not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	utils.SuccessResponse(c, "Raw problem retrieved successfully", gin.H{
 		"raw_problem": rawProblem,
 		"user_id":     userID.Hex(),
 	})
@@ -286,14 +286,13 @@ func GetRawProblem(c *gin.Context) {
 func ProcessRawProblems(c *gin.Context) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized"})
+		utils.ForbiddenResponse(c, utils.MsgUnauthorized)
 		return
 	}
 
 	// TODO: Implement manual processing trigger
 	// This would typically be an admin-only endpoint
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Processing triggered",
+	utils.SuccessResponse(c, "Processing triggered", gin.H{
 		"user_id": userID.Hex(),
 	})
 }

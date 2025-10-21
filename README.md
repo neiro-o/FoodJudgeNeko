@@ -17,10 +17,28 @@
 - `docs/`：项目文档，一些设计细节、示例题目
 - `agents/`: LLM Agent代码，提取用户意图和商户意图，以及客观的事实信息，推演评审结论（适合展示/不适合展示/适合退款/不适合退款）
 - `finetune/`: 微调代码，包含数据处理和模型训练脚本
+- `deploy/`: 部署代码，初始化数据库和复制配置到多端
 
 ## 项目部署说明
 
 使用Docker Compose. 可以直接在服务器部署一份服务。
+
+### 中文语言支持
+
+众所周知，在ES里查题目需要给ES装中文的模块。[详情](docs/Chinese_Language_Support.md)。
+
+#### 快速安装中文支持
+
+```bash
+# 安装中文分析插件
+sudo bin/elasticsearch-plugin install analysis-smartcn
+
+# 重启Elasticsearch
+sudo systemctl restart elasticsearch
+
+# 部署服务
+sh deploy.sh
+```
 
 
 ## 贡献指南

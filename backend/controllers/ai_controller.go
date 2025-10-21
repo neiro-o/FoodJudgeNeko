@@ -6,19 +6,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"mt-backend/middleware"
 	"mt-backend/models"
+	"mt-backend/utils"
 )
 
 // GetLLMAnswer generates AI answer for a problem using LLM
 func GetLLMAnswer(c *gin.Context) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized"})
+		utils.ForbiddenResponse(c, utils.MsgUnauthorized)
 		return
 	}
 
 	var req models.LLMAnswerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.BadRequestResponse(c, err.Error())
 		return
 	}
 
@@ -28,8 +29,7 @@ func GetLLMAnswer(c *gin.Context) {
 	// TODO: Index answer in Elasticsearch for search
 	// TODO: Return generated answer
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":    "GetLLMAnswer endpoint",
+	utils.SuccessResponse(c, "GetLLMAnswer endpoint", gin.H{
 		"user_id":    userID.Hex(),
 		"problem_id": req.ProblemID,
 	})

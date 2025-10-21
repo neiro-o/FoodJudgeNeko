@@ -51,6 +51,32 @@ def check_mongodb(uri="mongodb://localhost:27017", database="mt_backend", collec
         print("💡 Please ensure MongoDB is running on the specified URI")
         return False
 
+def check_chinese_analyzer_plugin(addresses=["http://localhost:9200"]):
+    """Check if Chinese analyzer plugin is installed"""
+    try:
+        for address in addresses:
+            try:
+                # Check if smartcn plugin is installed
+                plugins_response = requests.get(f"{address}/_cat/plugins", timeout=5)
+                if plugins_response.status_code == 200:
+                    plugins_text = plugins_response.text.lower()
+                    if "analysis-smartcn" in plugins_text or "smartcn" in plugins_text:
+                        print("✅ Chinese analyzer plugin (analysis-smartcn) is installed")
+                        return True
+                    else:
+                        print("⚠️  Chinese analyzer plugin (analysis-smartcn) is NOT installed")
+                        print("💡 To install Chinese language support, run:")
+                        print("   sudo bin/elasticsearch-plugin install analysis-smartcn")
+                        print("   Then restart Elasticsearch")
+                        return False
+            except requests.exceptions.RequestException as e:
+                print(f"⚠️  Failed to check plugins at {address}: {e}")
+                continue
+        return False
+    except Exception as e:
+        print(f"❌ Failed to check Chinese analyzer plugin: {e}")
+        return False
+
 def check_elasticsearch(addresses=["http://localhost:9200"]):
     """Check Elasticsearch connection and initialize if needed"""
     try:
@@ -62,16 +88,39 @@ def check_elasticsearch(addresses=["http://localhost:9200"]):
                 if response.status_code == 200:
                     print("✅ Elasticsearch connection successful")
                     
+                    # Check for Chinese analyzer plugin
+                    check_chinese_analyzer_plugin([address])
+                    
                     # Check if problems index exists
                     index_response = requests.get(f"{address}/problems", timeout=5)
                     if index_response.status_code == 404:
                         print("📁 Creating problems index...")
-                        # Create index with updated mapping
+                        # Create index with Chinese language support
                         index_mapping = {
+                            "settings": {
+                                "analysis": {
+                                    "analyzer": {
+                                        "chinese_analyzer": {
+                                            "type": "custom",
+                                            "tokenizer": "smartcn_tokenizer",
+                                            "filter": ["lowercase", "stop"]
+                                        },
+                                        "chinese_search_analyzer": {
+                                            "type": "custom",
+                                            "tokenizer": "smartcn_tokenizer",
+                                            "filter": ["lowercase", "stop"]
+                                        }
+                                    }
+                                }
+                            },
                             "mappings": {
                                 "properties": {
                                     "id": {"type": "keyword", "index": False},  # Not searched, only for filtering
-                                    "user_review": {"type": "text"},  # SEARCHED
+                                    "user_review": {
+                                        "type": "text",
+                                        "analyzer": "chinese_analyzer",
+                                        "search_analyzer": "chinese_search_analyzer"
+                                    },  # SEARCHED with Chinese support
                                     "review_pics": {"type": "keyword", "index": False},  # Not searched
                                     "timestamp": {"type": "long", "index": False},  # Not searched, only for sorting/filtering
                                     "replies": {
@@ -79,7 +128,11 @@ def check_elasticsearch(addresses=["http://localhost:9200"]):
                                         "properties": {
                                             "role": {"type": "keyword", "index": False},  # Not searched
                                             "timestamp": {"type": "long", "index": False},  # Not searched
-                                            "content": {"type": "text"}  # SEARCHED
+                                            "content": {
+                                                "type": "text",
+                                                "analyzer": "chinese_analyzer",
+                                                "search_analyzer": "chinese_search_analyzer"
+                                            }  # SEARCHED with Chinese support
                                         }
                                     },
                                     "appeals": {
@@ -87,7 +140,11 @@ def check_elasticsearch(addresses=["http://localhost:9200"]):
                                         "properties": {
                                             "role": {"type": "keyword", "index": False},  # Not searched
                                             "timestamp": {"type": "long", "index": False},  # Not searched
-                                            "content": {"type": "text"},  # SEARCHED
+                                            "content": {
+                                                "type": "text",
+                                                "analyzer": "chinese_analyzer",
+                                                "search_analyzer": "chinese_search_analyzer"
+                                            },  # SEARCHED with Chinese support
                                             "pics": {"type": "keyword", "index": False}  # Not searched
                                         }
                                     },
@@ -101,7 +158,11 @@ def check_elasticsearch(addresses=["http://localhost:9200"]):
                                         "type": "object",
                                         "enabled": False  # Store but don't index at all
                                     },
-                                    "others": {"type": "text", "index": False}  # Not searched
+                                    "others": {
+                                        "type": "text",
+                                        "analyzer": "chinese_analyzer",
+                                        "search_analyzer": "chinese_search_analyzer"
+                                    }  # SEARCHED with Chinese support
                                 }
                             }
                         }
