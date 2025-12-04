@@ -1,0 +1,11 @@
+mongodb:
+  connection_string: "mongodb://localhost:27017"
+  database_name: "mtv2"
+  collections:
+    accounts: "accounts"
+    invitations: "invitations"
+
+server:
+  port: 8080
+  jwt_secret: "gGCLachWP5Rfz8MxN6MpTdTPu3LPT9tK1KbDHQrhI+Vw0Demqlsn0D6hxhglAIxkYB+1Rsp+jDLLLUfNJZvM1A=="
+
