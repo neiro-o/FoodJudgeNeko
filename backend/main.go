@@ -7,13 +7,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 	"mtv2/backend/config"
 	"mtv2/backend/database"
 	"mtv2/backend/handlers"
 	"mtv2/backend/middleware"
 	"mtv2/backend/utils"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -33,6 +34,18 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Disconnect()
+
+	// Connect to Redis
+	if err := database.ConnectRedis(); err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer database.DisconnectRedis()
+
+	// Connect to Elasticsearch
+	if err := database.ConnectElasticsearch(); err != nil {
+		log.Fatalf("Failed to connect to Elasticsearch: %v", err)
+	}
+	defer database.DisconnectElasticsearch()
 
 	// Setup router
 	r := gin.Default()
@@ -67,6 +80,12 @@ func main() {
 		protected.POST("/change-password", handlers.ChangePassword)
 		protected.POST("/invitations/generate", handlers.GenerateInvitationCode)
 		protected.GET("/invitations", handlers.ListInvitations)
+		protected.POST("/problem/upload", handlers.UploadProblem)
+		protected.POST("/problem/upload-multiple", handlers.UploadMultipleProblems)
+		protected.GET("/problem/search", handlers.Search)
+		protected.GET("/problem/recent", handlers.GetRecentProblems)
+		protected.GET("/problem/by-esid/:id", handlers.SearchByESID)
+		protected.GET("/problem/by-mongoid/:id", handlers.SearchByMongoID)
 	}
 
 	// Start server
@@ -76,4 +95,3 @@ func main() {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
-

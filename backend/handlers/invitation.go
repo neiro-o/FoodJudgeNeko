@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"time"
 
 	"mtv2/backend/database"
@@ -12,6 +14,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+// generateSecureInviteCode generates a cryptographically secure random invite code
+func generateSecureInviteCode() (string, error) {
+	// Generate 32 random bytes (256 bits of entropy)
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	// Encode to base64 URL-safe format and remove padding
+	// This gives us a 43-character string with high entropy
+	code := base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(bytes)
+	return code, nil
+}
 
 type GenerateInviteRequest struct {
 	Count int `json:"count" binding:"min=1,max=10"`
@@ -78,7 +93,20 @@ func GenerateInvitationCode(c *gin.Context) {
 	invitations := make([]interface{}, 0, req.Count)
 
 	for i := 0; i < req.Count; i++ {
-		inviteCode := primitive.NewObjectID().Hex()
+		inviteCode, err := generateSecureInviteCode()
+		if err != nil {
+			// If invitation creation fails, we should rollback points deduction
+			if !account.IsAdmin {
+				// Attempt to restore points
+				_, _ = database.Accounts.UpdateOne(
+					ctx,
+					bson.M{"_id": objID},
+					bson.M{"$set": bson.M{"points": account.Points}},
+				)
+			}
+			utils.InternalServerErrorResponse(c, "Failed to generate secure invite code")
+			return
+		}
 		codes = append(codes, inviteCode)
 
 		invitation := models.Invitation{

@@ -12,10 +12,26 @@ type Config struct {
 		ConnectionString string `yaml:"connection_string"`
 		DatabaseName     string `yaml:"database_name"`
 		Collections      struct {
-			Accounts    string `yaml:"accounts"`
-			Invitations string `yaml:"invitations"`
+			Accounts      string `yaml:"accounts"`
+			Invitations   string `yaml:"invitations"`
+			ProcessedList string `yaml:"processed_list"`
 		} `yaml:"collections"`
 	} `yaml:"mongodb"`
+	Redis struct {
+		Host     string `yaml:"host"`
+		Port     int    `yaml:"port"`
+		Password string `yaml:"password"`
+		DB       int    `yaml:"db"`
+		Fields   struct {
+			ProblemsQueue string `yaml:"problems_queue"`
+		} `yaml:"fields"`
+	} `yaml:"redis"`
+	Elasticsearch struct {
+		Hosts     []string `yaml:"hosts"`
+		IndexName string   `yaml:"index_name"`
+		Username  string   `yaml:"username"`
+		Password  string   `yaml:"password"`
+	} `yaml:"elasticsearch"`
 	Server struct {
 		Port      int    `yaml:"port"`
 		JWTSecret string `yaml:"jwt_secret"`

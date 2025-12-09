@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	Client     *mongo.Client
-	DB         *mongo.Database
-	Accounts   *mongo.Collection
-	Invitations *mongo.Collection
+	Client        *mongo.Client
+	DB            *mongo.Database
+	Accounts      *mongo.Collection
+	Invitations   *mongo.Collection
+	ProcessedList *mongo.Collection
 )
 
 func Connect() error {
@@ -36,6 +37,7 @@ func Connect() error {
 	DB = client.Database(config.AppConfig.MongoDB.DatabaseName)
 	Accounts = DB.Collection(config.AppConfig.MongoDB.Collections.Accounts)
 	Invitations = DB.Collection(config.AppConfig.MongoDB.Collections.Invitations)
+	ProcessedList = DB.Collection(config.AppConfig.MongoDB.Collections.ProcessedList)
 
 	fmt.Println("Connected to MongoDB successfully")
 	return nil

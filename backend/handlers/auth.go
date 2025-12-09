@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"mtv2/backend/database"
@@ -13,6 +14,29 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+// getClientIP extracts the client IP address from the request
+func getClientIP(c *gin.Context) string {
+	// Check X-Forwarded-For header (for proxies/load balancers)
+	ip := c.GetHeader("X-Forwarded-For")
+	if ip != "" {
+		// X-Forwarded-For can contain multiple IPs, take the first one
+		ips := strings.Split(ip, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// Check X-Real-IP header
+	ip = c.GetHeader("X-Real-IP")
+	if ip != "" {
+		return strings.TrimSpace(ip)
+	}
+
+	// Fall back to RemoteAddr
+	ip = c.ClientIP()
+	return ip
+}
 
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
@@ -57,7 +81,23 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateToken(account.ID.Hex(), account.Username)
+	// Get client IP
+	clientIP := getClientIP(c)
+
+	// Increment token version to invalidate all previous tokens
+	newTokenVersion := account.TokenVersion + 1
+	_, err = database.Accounts.UpdateOne(
+		ctx,
+		bson.M{"_id": account.ID},
+		bson.M{"$set": bson.M{"token_version": newTokenVersion}},
+	)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to update token version")
+		return
+	}
+
+	// Generate new token with updated version and IP
+	token, err := utils.GenerateToken(account.ID.Hex(), account.Username, clientIP, newTokenVersion)
 	if err != nil {
 		utils.InternalServerErrorResponse(c, "Failed to generate token")
 		return
@@ -121,17 +161,36 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
+	// Increment token version to invalidate all existing tokens
+	newTokenVersion := account.TokenVersion + 1
 	_, err = database.Accounts.UpdateOne(
 		ctx,
 		bson.M{"_id": objID},
-		bson.M{"$set": bson.M{"password": hashedPassword}},
+		bson.M{"$set": bson.M{
+			"password":            hashedPassword,
+			"token_version":       newTokenVersion,
+			"password_changed_at": time.Now(),
+		}},
 	)
 	if err != nil {
 		utils.InternalServerErrorResponse(c, "Failed to update password")
 		return
 	}
 
-	utils.SuccessResponse(c, gin.H{"message": "Password changed successfully"})
+	// Get the current token from Authorization header to blacklist it
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		parts := strings.Split(authHeader, " ")
+		if len(parts) == 2 && parts[0] == "Bearer" {
+			token := parts[1]
+			// Blacklist the current token in Redis (expire after 24 hours to match token expiry)
+			blacklistCtx, blacklistCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer blacklistCancel()
+			database.RedisClient.Set(blacklistCtx, "blacklist:token:"+token, "1", 24*time.Hour)
+		}
+	}
+
+	utils.SuccessResponse(c, gin.H{"message": "Password changed successfully. Please login again."})
 }
 
 func Register(c *gin.Context) {
