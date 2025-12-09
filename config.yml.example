@@ -4,6 +4,19 @@ mongodb:
   collections:
     accounts: "accounts"
     invitations: "invitations"
+    problems: "problems"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+
+elasticsearch:
+  hosts:
+    - "http://localhost:9200"
+  index_name: "problems"
+  username: ""
+  password: ""
 
 server:
   port: 8080
