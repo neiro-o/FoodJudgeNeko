@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Elasticsearch initialization functions for mtv2 backend.
-Creates index with proper mappings for ES8 with IK Analyzer.
+Creates index with proper mappings for ES8 with N-gram analyzer for Chinese text.
+Uses character-level n-gram indexing for OCR robustness (handles typos, missing chars, order issues).
 """
 
 import urllib3
@@ -12,64 +13,77 @@ from elasticsearch.exceptions import RequestError, ConnectionError, SSLError, Au
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-def check_ik_analyzer(es: Elasticsearch) -> bool:
-    """Check if IK Analyzer plugin is installed"""
-    try:
-        # Try to use IK analyzer in a test request
-        es.indices.analyze(body={
-            "analyzer": "ik_max_word",
-            "text": "测试"
-        })
-        return True
-    except:
-        return False
-
-
-def print_ik_installation_instructions():
-    """Print IK Analyzer installation instructions for ES8"""
-    print("\n" + "=" * 60)
-    print("IK Analyzer Plugin Not Found")
-    print("=" * 60)
-    print("\nTo install IK Analyzer for Elasticsearch 8.x:")
-    print("\n1. Find your Elasticsearch version:")
-    print("   curl http://localhost:9200")
-    print("\n2. Download IK Analyzer plugin:")
-    print("   # For ES 8.11.0:")
-    print("   wget https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v8.11.0/elasticsearch-analysis-ik-8.11.0.zip")
-    print("\n   # Or for other versions, check:")
-    print("   https://github.com/medcl/elasticsearch-analysis-ik/releases")
-    print("\n3. Install the plugin:")
-    print("   cd /path/to/elasticsearch")
-    print("   bin/elasticsearch-plugin install file:///path/to/elasticsearch-analysis-ik-8.x.x.zip")
-    print("\n4. Restart Elasticsearch")
-    print("\n5. Verify installation:")
-    print("   curl -X GET 'http://localhost:9200/_cat/plugins'")
-    print("\n" + "=" * 60 + "\n")
-
-
 def get_es_mapping():
-    """Get Elasticsearch index mapping with IK Analyzer for Chinese text"""
+    """
+    Get Elasticsearch index mapping with N-gram analyzer for Chinese text.
+    
+    Uses character-level n-gram (2-3 chars) for indexing to handle:
+    - OCR errors (typos, missing characters)
+    - Character order issues
+    - Partial matches
+    
+    Search strategy:
+    - Prioritizes exact phrase matches
+    - Falls back to n-gram matches for fuzzy/partial queries
+    """
     return {
+        "settings": {
+            "number_of_shards": 1,
+            "number_of_replicas": 0,
+            "analysis": {
+                "analyzer": {
+                    "chinese_ngram": {
+                        "type": "custom",
+                        "tokenizer": "chinese_ngram_tokenizer",
+                        "filter": ["lowercase"]
+                    },
+                    "chinese_search": {
+                        "type": "custom",
+                        "tokenizer": "chinese_ngram_tokenizer",  # Use same n-gram tokenizer for search
+                        "filter": ["lowercase"]
+                    }
+                },
+                "tokenizer": {
+                    "chinese_ngram_tokenizer": {
+                        "type": "ngram",
+                        "min_gram": 2,
+                        "max_gram": 3,
+                        "token_chars": [
+                            "letter",
+                            "digit",
+                            "punctuation",
+                            "symbol"
+                        ]
+                    }
+                }
+            }
+        },
         "mappings": {
             "properties": {
                 "id": {"type": "keyword"},
                 "mongo_id": {"type": "keyword"},
                 "user_review": {
                     "type": "text",
-                    "analyzer": "ik_max_word",
-                    "search_analyzer": "ik_smart"
+                    "analyzer": "chinese_ngram",
+                    "search_analyzer": "chinese_search",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                        }
+                    }
                 },
                 "searchable_content": {
                     "type": "text",
-                    "analyzer": "ik_max_word",
-                    "search_analyzer": "ik_smart"
+                    "analyzer": "chinese_ngram",
+                    "search_analyzer": "chinese_search"
                 },
                 "review_pics": {"type": "keyword"},
                 "timestamp": {"type": "long"},
                 "others": {
                     "type": "text",
-                    "analyzer": "ik_max_word",
-                    "search_analyzer": "ik_smart"
+                    "analyzer": "chinese_ngram",
+                    "search_analyzer": "chinese_search"
                 },
                 "problem_type": {"type": "integer"},
                 "answer": {"type": "integer"},
@@ -86,8 +100,8 @@ def get_es_mapping():
                         "timestamp": {"type": "long"},
                         "content": {
                             "type": "text",
-                            "analyzer": "ik_max_word",
-                            "search_analyzer": "ik_smart"
+                            "analyzer": "chinese_ngram",
+                            "search_analyzer": "chinese_search"
                         }
                     }
                 },
@@ -98,37 +112,36 @@ def get_es_mapping():
                         "timestamp": {"type": "long"},
                         "content": {
                             "type": "text",
-                            "analyzer": "ik_max_word",
-                            "search_analyzer": "ik_smart"
+                            "analyzer": "chinese_ngram",
+                            "search_analyzer": "chinese_search"
                         },
                         "pics": {"type": "keyword"}
                     }
                 },
                 "order_info": {
-                    "type": "text",
-                    "analyzer": "ik_max_word",
-                    "search_analyzer": "ik_smart"
+                    "type": "object",
+                    "enabled": True
                 },
                 "orders": {
                     "type": "nested",
                     "properties": {
                         "name": {
                             "type": "text",
-                            "analyzer": "ik_max_word",
-                            "search_analyzer": "ik_smart"
+                            "analyzer": "chinese_ngram",
+                            "search_analyzer": "chinese_search"
                         },
                         "count": {"type": "integer"},
                         "desc": {
                             "type": "text",
-                            "analyzer": "ik_max_word",
-                            "search_analyzer": "ik_smart"
+                            "analyzer": "chinese_ngram",
+                            "search_analyzer": "chinese_search"
                         },
                         "selection": {"type": "keyword"},
                         "pic": {"type": "keyword"},
                         "others": {
                             "type": "text",
-                            "analyzer": "ik_max_word",
-                            "search_analyzer": "ik_smart"
+                            "analyzer": "chinese_ngram",
+                            "search_analyzer": "chinese_search"
                         }
                     }
                 },
@@ -142,8 +155,8 @@ def get_es_mapping():
                         "deliver_by": {"type": "keyword"},
                         "note": {
                             "type": "text",
-                            "analyzer": "ik_max_word",
-                            "search_analyzer": "ik_smart"
+                            "analyzer": "chinese_ngram",
+                            "search_analyzer": "chinese_search"
                         },
                         "utensils": {"type": "integer"},
                         "invoice": {"type": "boolean"}
@@ -156,18 +169,15 @@ def get_es_mapping():
                         "name": {"type": "keyword"},
                         "content": {
                             "type": "text",
-                            "analyzer": "ik_max_word",
-                            "search_analyzer": "ik_smart"
+                            "analyzer": "chinese_ngram",
+                            "search_analyzer": "chinese_search"
                         },
                         "timestamp": {"type": "long"},
-                        "choice": {"type": "integer"}
+                        "choice": {"type": "integer"},
+                        "likes": {"type": "integer"}
                     }
                 }
             }
-        },
-        "settings": {
-            "number_of_shards": 1,
-            "number_of_replicas": 0
         }
     }
 
@@ -200,7 +210,7 @@ def create_index(es: Elasticsearch, index_name: str, recreate=False):
 
 
 def init_elasticsearch(config, recreate_index=False):
-    """Initialize Elasticsearch: check IK plugin and create index"""
+    """Initialize Elasticsearch: create index with N-gram analyzer"""
     hosts = config.get('elasticsearch', {}).get('hosts', ['http://localhost:9200'])
     index_name = config.get('elasticsearch', {}).get('index_name', 'problems')
     username = config.get('elasticsearch', {}).get('username', '')
@@ -239,15 +249,7 @@ def init_elasticsearch(config, recreate_index=False):
         cluster_info = es.info()
         es_version = cluster_info.get('version', {}).get('number', 'unknown')
         print(f"✓ Connected to Elasticsearch {es_version}")
-        
-        # Check IK Analyzer
-        print("\nChecking IK Analyzer plugin...")
-        if check_ik_analyzer(es):
-            print("✓ IK Analyzer plugin is installed")
-        else:
-            print("✗ IK Analyzer plugin is NOT installed")
-            print_ik_installation_instructions()
-            raise Exception("IK Analyzer plugin is required but not installed")
+        print("✓ Using N-gram analyzer (no IK Analyzer plugin required)")
         
     except ConnectionError as e:
         print(f"✗ Connection error: {e}")
@@ -264,8 +266,6 @@ def init_elasticsearch(config, recreate_index=False):
         print("  → Check username and password in config.yml")
         raise
     except Exception as e:
-        if "IK Analyzer plugin is required" in str(e):
-            raise
         print(f"✗ Failed to connect to Elasticsearch: {e}")
         print(f"  → Error type: {type(e).__name__}")
         raise

@@ -57,6 +57,7 @@ class Comment:
     content: str
     timestamp: int  # timestamp in seconds
     choice: int  # 1 for support user, 2 for support merchant
+    likes: int = 0  # number of likes
 
 
 @dataclass
@@ -67,6 +68,7 @@ class ProblemDocument:
     """
     id: Union[str, int]  # unique identifier for the review record
     mongo_id: str  # MongoDB unique identifier
+    stars: int = 0  # user rating, 1-5, 1 is worst, 5 is best
     user_review: str = ""  # user's text review, may be empty for refund problems
     review_pics: List[str] = field(default_factory=list)  # array of review image URLs
     timestamp: int = 0  # user review timestamp in seconds
@@ -83,7 +85,7 @@ class ProblemDocument:
     # Nested structures
     replies: List[Reply] = field(default_factory=list)  # timeline of merchant/user replies
     appeals: List[Appeal] = field(default_factory=list)  # appeals from user/merchant
-    order_info: Optional[str] = None  # order info for non-delivery problems (e.g., group purchase info)
+    order_info: Optional[dict] = None  # order info for non-delivery problems (e.g., group purchase info), variable dict
     orders: List[Order] = field(default_factory=list)  # order items
     order_detail: Optional[OrderDetail] = None  # order detail for delivery scenarios
     comments: List[Comment] = field(default_factory=list)  # evaluation comments
@@ -93,6 +95,7 @@ class ProblemDocument:
         result = {
             "id": self.id,
             "mongo_id": self.mongo_id,
+            "stars": self.stars,
             "user_review": self.user_review,
             "review_pics": self.review_pics,
             "timestamp": self.timestamp,
@@ -164,7 +167,8 @@ class ProblemDocument:
                     "name": c.name,
                     "content": c.content,
                     "timestamp": c.timestamp,
-                    "choice": c.choice
+                    "choice": c.choice,
+                    "likes": c.likes
                 }
                 for c in self.comments
             ]
