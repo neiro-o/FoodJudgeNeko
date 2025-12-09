@@ -2,13 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { authAPI, invitationAPI, Invitation } from '@/lib/api';
+import LanguageSelector from '@/components/LanguageSelector';
+import PageTitle from '@/components/PageTitle';
 
 type Tab = 'password' | 'points';
 
 export default function UserPage() {
   const { isAuthenticated, loading, logout, user } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('password');
   
@@ -60,12 +64,12 @@ export default function UserPage() {
     setPasswordSuccess('');
 
     if (newPassword !== confirmPassword) {
-      setPasswordError('New passwords do not match');
+      setPasswordError(t('user.passwordMismatch'));
       return;
     }
 
     if (newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
+      setPasswordError(t('user.passwordTooShort'));
       return;
     }
 
@@ -75,12 +79,12 @@ export default function UserPage() {
         old_password: oldPassword,
         new_password: newPassword,
       });
-      setPasswordSuccess('Password changed successfully');
+      setPasswordSuccess(t('user.passwordSuccess'));
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
-      setPasswordError(error.response?.data?.error || 'Failed to change password');
+      setPasswordError(error.response?.data?.error || t('user.passwordError'));
     } finally {
       setPasswordLoading(false);
     }
@@ -92,18 +96,18 @@ export default function UserPage() {
     setInviteSuccess('');
 
     if (inviteCount < 1 || inviteCount > 10) {
-      setInviteError('Count must be between 1 and 10');
+      setInviteError(t('user.inviteCountError'));
       return;
     }
 
     setInviteLoading(true);
     try {
       const response = await invitationAPI.generate({ count: inviteCount });
-      setInviteSuccess(`Generated ${response.count} invitation code(s) successfully`);
+      setInviteSuccess(t('user.inviteSuccess', { count: response.count }));
       setInviteCount(1);
       loadInvitations();
     } catch (error: any) {
-      setInviteError(error.response?.data?.error || 'Failed to generate invitation codes');
+      setInviteError(error.response?.data?.error || t('user.inviteError'));
     } finally {
       setInviteLoading(false);
     }
@@ -112,7 +116,7 @@ export default function UserPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+        <div className="text-gray-600">{t('loading')}</div>
       </div>
     );
   }
@@ -122,26 +126,29 @@ export default function UserPage() {
   }
 
   return (
+    <>
+      <PageTitle titleKey="pageTitle.user" />
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">MTV2</h1>
+              <h1 className="text-xl font-semibold text-gray-900">{t('user.title')}</h1>
             </div>
             <div className="flex items-center space-x-4">
+              <LanguageSelector />
               <button
                 onClick={() => router.push('/problems')}
                 className="text-sm text-gray-600 hover:text-gray-800"
               >
-                Problems
+                {t('user.problems')}
               </button>
-              <span className="text-sm text-gray-700">Welcome, {user?.username}</span>
+              <span className="text-sm text-gray-700">{t('user.welcome', { username: user?.username || '' })}</span>
               <button
                 onClick={logout}
                 className="text-sm text-gray-600 hover:text-gray-800"
               >
-                Logout
+                {t('logout')}
               </button>
             </div>
           </div>
@@ -161,7 +168,7 @@ export default function UserPage() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Change Password
+                {t('user.changePassword')}
               </button>
               <button
                 onClick={() => setActiveTab('points')}
@@ -171,7 +178,7 @@ export default function UserPage() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Points & Invitations
+                {t('user.pointsInvitations')}
               </button>
             </nav>
           </div>
@@ -181,7 +188,7 @@ export default function UserPage() {
             {/* Change Password Tab */}
             {activeTab === 'password' && (
               <div className="max-w-md">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Change Password</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('user.changePassword')}</h2>
                 
                 {passwordError && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -198,7 +205,7 @@ export default function UserPage() {
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div>
                     <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                      Old Password
+                      {t('user.oldPassword')}
                     </label>
                     <input
                       id="oldPassword"
@@ -212,7 +219,7 @@ export default function UserPage() {
 
                   <div>
                     <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                      New Password
+                      {t('user.newPassword')}
                     </label>
                     <input
                       id="newPassword"
@@ -227,7 +234,7 @@ export default function UserPage() {
 
                   <div>
                     <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                      Confirm New Password
+                      {t('user.confirmNewPassword')}
                     </label>
                     <input
                       id="confirmPassword"
@@ -245,7 +252,7 @@ export default function UserPage() {
                     disabled={passwordLoading}
                     className="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
-                    {passwordLoading ? 'Changing...' : 'Change Password'}
+                    {passwordLoading ? t('user.submittingPassword') : t('user.submitPassword')}
                   </button>
                 </form>
               </div>
@@ -254,17 +261,17 @@ export default function UserPage() {
             {/* Points & Invitations Tab */}
             {activeTab === 'points' && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Points & Invitations</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('user.pointsInvitations')}</h2>
                 
                 {/* Points Display */}
                 <div className="mb-8 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                  <p className="text-sm text-indigo-700 mb-1">Your Points</p>
+                  <p className="text-sm text-indigo-700 mb-1">{t('user.yourPoints')}</p>
                   <p className="text-3xl font-bold text-indigo-900">{userPoints}</p>
                 </div>
 
                 {/* Generate Invitation Code */}
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Generate Invitation Code</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('user.generateInvite')}</h3>
                   
                   {inviteError && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -281,7 +288,7 @@ export default function UserPage() {
                   <form onSubmit={handleGenerateInvite} className="space-y-4">
                     <div>
                       <label htmlFor="inviteCount" className="block text-sm font-medium text-gray-700 mb-2">
-                        Number of Codes (1-10)
+                        {t('user.inviteCount')}
                       </label>
                       <input
                         id="inviteCount"
@@ -300,19 +307,19 @@ export default function UserPage() {
                       disabled={inviteLoading}
                       className="bg-indigo-600 text-white py-2 px-6 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
-                      {inviteLoading ? 'Generating...' : 'Generate Codes'}
+                      {inviteLoading ? t('user.generating') : t('user.generateCodes')}
                     </button>
                   </form>
                 </div>
 
                 {/* Invitations List */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">My Invitation Codes</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('user.myInvitations')}</h3>
                   
                   {loadingInvitations ? (
-                    <div className="text-center py-8 text-gray-600">Loading...</div>
+                    <div className="text-center py-8 text-gray-600">{t('user.loadingInvitations')}</div>
                   ) : !invitations || invitations.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">No invitation codes generated yet</div>
+                    <div className="text-center py-8 text-gray-500">{t('user.noInvitations')}</div>
                   ) : (
                     <div className="space-y-2">
                       {invitations.map((invitation) => (
@@ -330,7 +337,7 @@ export default function UserPage() {
                                 {invitation.invite_code}
                               </p>
                               <p className="text-xs text-gray-500 mt-1">
-                                Created: {new Date(invitation.created_at).toLocaleString()}
+                                {t('user.created')}: {new Date(invitation.created_at).toLocaleString()}
                               </p>
                             </div>
                             <div>
@@ -341,7 +348,7 @@ export default function UserPage() {
                                     : 'bg-green-200 text-green-800'
                                 }`}
                               >
-                                {invitation.used ? 'Used' : 'Available'}
+                                {invitation.used ? t('user.used') : t('user.available')}
                               </span>
                             </div>
                           </div>
@@ -356,6 +363,7 @@ export default function UserPage() {
         </div>
       </main>
     </div>
+    </>
   );
 }
 

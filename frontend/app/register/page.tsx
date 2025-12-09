@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
 import Link from 'next/link';
+import LanguageSelector from '@/components/LanguageSelector';
+import PageTitle from '@/components/PageTitle';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -15,6 +18,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   // Redirect if already authenticated
@@ -29,12 +33,12 @@ export default function RegisterPage() {
 
     // Validation
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('register.passwordMismatch'));
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('register.passwordTooShort'));
       return;
     }
 
@@ -51,19 +55,24 @@ export default function RegisterPage() {
       // Registration successful, redirect to login
       router.push('/login?registered=true');
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(err.message || t('register.error'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
+    <>
+      <PageTitle titleKey="pageTitle.register" />
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+        <div className="absolute top-4 right-4">
+          <LanguageSelector />
+        </div>
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-            <p className="text-gray-600">Sign up with an invitation code</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('register.title')}</h1>
+            <p className="text-gray-600">{t('register.subtitle')}</p>
           </div>
 
           {error && (
@@ -75,7 +84,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="inviteCode" className="block text-sm font-medium text-gray-700 mb-2">
-                Invitation Code *
+                {t('register.inviteCode')} *
               </label>
               <input
                 id="inviteCode"
@@ -84,13 +93,13 @@ export default function RegisterPage() {
                 onChange={(e) => setInviteCode(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-                placeholder="Enter your invitation code"
+                placeholder={t('register.inviteCodePlaceholder')}
               />
             </div>
 
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                Username *
+                {t('register.username')} *
               </label>
               <input
                 id="username"
@@ -99,13 +108,13 @@ export default function RegisterPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-                placeholder="Choose a username"
+                placeholder={t('register.usernamePlaceholder')}
               />
             </div>
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email *
+                {t('register.email')} *
               </label>
               <input
                 id="email"
@@ -114,13 +123,13 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-                placeholder="Enter your email"
+                placeholder={t('register.emailPlaceholder')}
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password *
+                {t('register.password')} *
               </label>
               <input
                 id="password"
@@ -130,13 +139,13 @@ export default function RegisterPage() {
                 required
                 minLength={6}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-                placeholder="Enter your password (min. 6 characters)"
+                placeholder={t('register.passwordPlaceholder')}
               />
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password *
+                {t('register.confirmPassword')} *
               </label>
               <input
                 id="confirmPassword"
@@ -146,7 +155,7 @@ export default function RegisterPage() {
                 required
                 minLength={6}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-                placeholder="Confirm your password"
+                placeholder={t('register.confirmPasswordPlaceholder')}
               />
             </div>
 
@@ -155,21 +164,22 @@ export default function RegisterPage() {
               disabled={loading}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? t('register.submitting') : t('register.submit')}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              Already have an account?{' '}
+              {t('register.hasAccount')}{' '}
               <Link href="/login" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                Sign in
+                {t('register.signIn')}
               </Link>
             </p>
           </div>
         </div>
       </div>
     </div>
+    </>
   );
 }
 

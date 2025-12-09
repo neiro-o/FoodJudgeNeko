@@ -2,8 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import LanguageSelector from '@/components/LanguageSelector';
+import PageTitle from '@/components/PageTitle';
 
 function LoginForm() {
   const [username, setUsername] = useState('');
@@ -12,15 +15,16 @@ function LoginForm() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // Check for registration success message
   useEffect(() => {
     if (searchParams.get('registered') === 'true') {
-      setSuccess('Account created successfully! Please sign in.');
+      setSuccess(t('login.success'));
     }
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -41,7 +45,7 @@ function LoginForm() {
     try {
       await login(username, password);
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+      setError(err.message || t('login.error'));
     } finally {
       setLoading(false);
     }
@@ -49,11 +53,14 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+      <div className="absolute top-4 right-4">
+        <LanguageSelector />
+      </div>
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-            <p className="text-gray-600">Sign in to your account</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('login.title')}</h1>
+            <p className="text-gray-600">{t('login.subtitle')}</p>
           </div>
 
           {error && (
@@ -71,7 +78,7 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                Username
+                {t('login.username')}
               </label>
               <input
                 id="username"
@@ -80,13 +87,13 @@ function LoginForm() {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-                placeholder="Enter your username"
+                placeholder={t('login.usernamePlaceholder')}
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
+                {t('login.password')}
               </label>
               <input
                 id="password"
@@ -95,7 +102,7 @@ function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-                placeholder="Enter your password"
+                placeholder={t('login.passwordPlaceholder')}
               />
             </div>
 
@@ -104,15 +111,15 @@ function LoginForm() {
               disabled={loading}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? t('login.submitting') : t('login.submit')}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
+              {t('login.noAccount')}{' '}
               <Link href="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                Sign up
+                {t('login.signUp')}
               </Link>
             </p>
           </div>
@@ -123,14 +130,18 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   return (
+    <>
+      <PageTitle titleKey="pageTitle.login" />
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-        <div className="text-gray-600">Loading...</div>
+          <div className="text-gray-600">{t('loading')}</div>
       </div>
     }>
       <LoginForm />
     </Suspense>
+    </>
   );
 }
 
