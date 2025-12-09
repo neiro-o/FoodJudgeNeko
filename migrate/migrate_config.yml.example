@@ -1,0 +1,39 @@
+# Migration Configuration
+# Copy this file to migrate_config.yml and fill in your values
+
+# Source MongoDB (origin database)
+source:
+  # SSH Tunnel Configuration (optional, set enabled: false to disable)
+  ssh:
+    enabled: false
+    host: "your-ssh-host.com"
+    port: 22
+    username: "your-ssh-username"
+    # Use one of: password, key_file, or key_string
+    password: ""  # SSH password (if using password auth)
+    key_file: ""  # Path to SSH private key file (e.g., ~/.ssh/id_rsa)
+    key_string: ""  # SSH private key as string (alternative to key_file)
+    # Local port for SSH tunnel (will be auto-assigned if not specified)
+    local_port: 27018
+  
+  # MongoDB connection string (always use direct connection string format)
+  # If SSH is enabled: use "mongodb://127.0.0.1:LOCAL_PORT" where LOCAL_PORT matches your ssh.local_port
+  # If SSH is disabled: use your direct MongoDB connection (e.g., "mongodb://host:port")
+  # Authentication can be included: "mongodb://username:password@host:port"
+  connection_string: "mongodb://127.0.0.1:27018"
+  database_name: "mtdb"
+  
+  # Source collections
+  collections:
+    meituan: "meituan"  # Source collection for problems
+    manual: "manual"    # Source collection for notes
+
+# Migration options
+migration:
+  # Export mode: "full" or "percentile"
+  # If percentile, specify the percentage (0-100)
+  mode: "full"  # Options: "full" or "percentile"
+  percentile: 100  # Only used if mode is "percentile" (0-100)
+  
+  # Batch size for processing documents
+  batch_size: 1000
