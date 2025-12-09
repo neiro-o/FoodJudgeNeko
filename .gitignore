@@ -69,3 +69,6 @@ Thumbs.db
 *.temp
 .cache/
 
+# ESsync archived documentation
+ESsync/archived/
+
