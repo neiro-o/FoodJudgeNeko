@@ -1,5 +1,6 @@
 # Configuration files
 config.yml
+migrate/migrate_config.yml
 
 # Go
 *.exe
