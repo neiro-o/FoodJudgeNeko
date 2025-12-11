@@ -75,6 +75,10 @@ export default function RegisterPage() {
             <p className="text-gray-600">{t('register.subtitle')}</p>
           </div>
 
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">{t('register.notice')}</p>
+          </div>
+
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-600">{error}</p>

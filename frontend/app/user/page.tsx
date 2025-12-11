@@ -5,13 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { authAPI, invitationAPI, Invitation } from '@/lib/api';
-import LanguageSelector from '@/components/LanguageSelector';
+import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 
 type Tab = 'password' | 'points';
 
 export default function UserPage() {
-  const { isAuthenticated, loading, logout, user } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('password');
@@ -128,34 +128,10 @@ export default function UserPage() {
   return (
     <>
       <PageTitle titleKey="pageTitle.user" />
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">{t('user.title')}</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <LanguageSelector />
-              <button
-                onClick={() => router.push('/problems')}
-                className="text-sm text-gray-600 hover:text-gray-800"
-              >
-                {t('user.problems')}
-              </button>
-              <span className="text-sm text-gray-700">{t('user.welcome', { username: user?.username || '' })}</span>
-              <button
-                onClick={logout}
-                className="text-sm text-gray-600 hover:text-gray-800"
-              >
-                {t('logout')}
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar title={t('user.title')} />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm">
           {/* Tabs */}
           <div className="border-b border-gray-200">

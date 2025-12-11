@@ -5,12 +5,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { problemAPI, searchAPI, SearchResult } from '@/lib/api';
-import LanguageSelector from '@/components/LanguageSelector';
+import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/components/ColumnCustomizer';
 
 export default function ProblemsPage() {
-  const { isAuthenticated, loading, logout, user } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
 
@@ -355,34 +355,10 @@ export default function ProblemsPage() {
   return (
     <>
       <PageTitle titleKey="pageTitle.problems" />
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">{t('problems.title')}</h1>
-            </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <LanguageSelector />
-              <button
-                onClick={() => router.push('/user')}
-                className="text-sm text-indigo-600 hover:text-indigo-800"
-              >
-                {t('problems.userCenter')}
-              </button>
-              <span className="text-sm text-gray-700 hidden sm:inline">{t('problems.welcome', { username: user?.username || '' })}</span>
-              <button
-                onClick={logout}
-                className="text-sm text-gray-600 hover:text-gray-800"
-              >
-                {t('logout')}
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar title={t('problems.title')} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Upload Section */}
         <div className="bg-white rounded-lg shadow-sm mb-8">
           <div className="p-6">

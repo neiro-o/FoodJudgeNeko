@@ -68,6 +68,7 @@ const translations: Record<Language, Record<string, string>> = {
     'register.passwordTooShort': 'Password must be at least 6 characters',
     'register.hasAccount': 'Already have an account?',
     'register.signIn': 'Sign in',
+    'register.notice': 'This website is exclusively for large model developers. Abuse of real public reviews (such as directly applying AI opinions for reviews) is not supported. Registration requires an invitation code.',
     
     // Problems page
     'problems.title': 'Problem Lib',
@@ -207,6 +208,7 @@ const translations: Record<Language, Record<string, string>> = {
     'register.passwordTooShort': '密码至少需要6个字符',
     'register.hasAccount': '已有账户？',
     'register.signIn': '登录',
+    'register.notice': '网站仅限大模型开发者使用，不支持对真实大众评审的滥用（如直接套用AI观点评审等），注册需要邀请码。',
     
     // Problems page
     'problems.title': '题库',
