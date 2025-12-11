@@ -156,6 +156,54 @@ class MongoToESSync:
             logger.error(f"✗ Failed to fetch documents: {e}")
             return []
     
+    def fetch_documents_batch(self, batch_size: int = 1000) -> List[Dict[str, Any]]:
+        """
+        Fetch documents from MongoDB in batches using cursor.
+        This is a generator that yields batches of documents to avoid loading all into memory.
+        
+        Args:
+            batch_size: Number of documents to fetch per batch
+            
+        Yields:
+            List of MongoDB documents
+        """
+        try:
+            db_name = self.config['mongodb']['database_name']
+            collection_name = self.config['mongodb']['collections']['problems']
+            
+            db = self.mongo_client[db_name]
+            collection = db[collection_name]
+            
+            # Count total documents
+            total = collection.count_documents({})
+            logger.info(f"📊 Found {total} documents in {db_name}.{collection_name}")
+            
+            # Use cursor to fetch documents in batches
+            cursor = collection.find({}).batch_size(batch_size)
+            batch = []
+            fetched_count = 0
+            
+            for doc in cursor:
+                batch.append(doc)
+                fetched_count += 1
+                
+                # Yield batch when it reaches batch_size
+                if len(batch) >= batch_size:
+                    logger.info(f"✓ Fetched batch: {fetched_count}/{total} documents")
+                    yield batch
+                    batch = []
+            
+            # Yield remaining documents
+            if batch:
+                logger.info(f"✓ Fetched final batch: {fetched_count}/{total} documents")
+                yield batch
+            
+            logger.info(f"✓ Completed fetching all {fetched_count} documents")
+            
+        except PyMongoError as e:
+            logger.error(f"✗ Failed to fetch documents: {e}")
+            yield []
+    
     def convert_document(self, bson_doc: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
         """
         Convert a single BSON document to ES format.
@@ -184,12 +232,13 @@ class MongoToESSync:
             error_msg = f"Conversion error: {e}"
             return None, error_msg
     
-    def prepare_bulk_actions(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def prepare_bulk_actions(self, documents: List[Dict[str, Any]], accumulate_total: bool = False) -> List[Dict[str, Any]]:
         """
         Convert documents and prepare bulk actions for Elasticsearch.
         
         Args:
             documents: List of MongoDB documents
+            accumulate_total: If True, add to total count instead of setting it (for batch mode)
             
         Returns:
             List of Elasticsearch bulk actions
@@ -197,7 +246,10 @@ class MongoToESSync:
         actions = []
         index_name = self.config['elasticsearch']['index_name']
         
-        self.stats['total'] = len(documents)
+        if accumulate_total:
+            self.stats['total'] += len(documents)
+        else:
+            self.stats['total'] = len(documents)
         
         for i, bson_doc in enumerate(documents, 1):
             # Progress logging
@@ -242,12 +294,13 @@ class MongoToESSync:
         logger.info(f"✓ Prepared {len(actions)} documents for indexing")
         return actions
     
-    def bulk_index(self, actions: List[Dict[str, Any]]) -> bool:
+    def bulk_index(self, actions: List[Dict[str, Any]], accumulate_stats: bool = False) -> bool:
         """
         Bulk index documents to Elasticsearch.
         
         Args:
             actions: List of Elasticsearch bulk actions
+            accumulate_stats: If True, add to success/failed counts instead of setting them (for batch mode)
             
         Returns:
             True if successful, False otherwise
@@ -265,8 +318,14 @@ class MongoToESSync:
                 raise_on_exception=False
             )
             
-            self.stats['success'] = success
-            self.stats['failed'] = len(failed) if isinstance(failed, list) else 0
+            failed_count = len(failed) if isinstance(failed, list) else 0
+            
+            if accumulate_stats:
+                self.stats['success'] += success
+                self.stats['failed'] += failed_count
+            else:
+                self.stats['success'] = success
+                self.stats['failed'] = failed_count
             
             logger.info(f"✓ Bulk indexing complete: {success} succeeded, {self.stats['failed']} failed")
             
@@ -315,9 +374,13 @@ class MongoToESSync:
         
         print("=" * 80)
     
-    def sync(self) -> bool:
+    def sync(self, use_batch_mode: bool = True, batch_size: int = 1000) -> bool:
         """
         Main synchronization process.
+        
+        Args:
+            use_batch_mode: If True, process documents in batches (recommended for large collections)
+            batch_size: Number of documents to process per batch (only used if use_batch_mode=True)
         
         Returns:
             True if successful, False otherwise
@@ -337,20 +400,58 @@ class MongoToESSync:
         if not self.connect_elasticsearch():
             return False
         
-        # Step 3: Fetch documents
-        logger.info("\n[3/5] Fetching documents from MongoDB...")
-        documents = self.fetch_all_documents()
-        if not documents:
-            logger.warning("⚠️  No documents found")
-            return False
-        
-        # Step 4: Convert documents
-        logger.info("\n[4/5] Converting documents...")
-        actions = self.prepare_bulk_actions(documents)
-        
-        # Step 5: Bulk index to Elasticsearch
-        logger.info("\n[5/5] Indexing to Elasticsearch...")
-        success = self.bulk_index(actions)
+        if use_batch_mode:
+            # Batch processing mode: fetch, convert, and index in batches
+            logger.info("\n[3/5] Fetching and processing documents in batches...")
+            logger.info(f"Batch size: {batch_size} documents")
+            
+            # Reset stats for batch mode
+            self.stats['total'] = 0
+            self.stats['success'] = 0
+            self.stats['failed'] = 0
+            self.stats['skipped'] = 0
+            
+            batch_num = 0
+            total_processed = 0
+            
+            for batch_documents in self.fetch_documents_batch(batch_size):
+                if not batch_documents:
+                    continue
+                
+                batch_num += 1
+                logger.info(f"\n--- Processing batch {batch_num} ({len(batch_documents)} documents) ---")
+                
+                # Convert documents (accumulate total count)
+                actions = self.prepare_bulk_actions(batch_documents, accumulate_total=True)
+                total_processed += len(batch_documents)
+                
+                # Bulk index to Elasticsearch (accumulate stats)
+                if not self.bulk_index(actions, accumulate_stats=True):
+                    logger.error(f"✗ Failed to index batch {batch_num}")
+                    # Continue with next batch instead of failing completely
+                
+                logger.info(f"✓ Batch {batch_num} completed. Total processed: {total_processed}")
+            
+            if total_processed == 0:
+                logger.warning("⚠️  No documents found")
+                return False
+        else:
+            # Original mode: fetch all, then process all
+            # Step 3: Fetch documents
+            logger.info("\n[3/5] Fetching documents from MongoDB...")
+            documents = self.fetch_all_documents()
+            if not documents:
+                logger.warning("⚠️  No documents found")
+                return False
+            
+            # Step 4: Convert documents
+            logger.info("\n[4/5] Converting documents...")
+            actions = self.prepare_bulk_actions(documents)
+            
+            # Step 5: Bulk index to Elasticsearch
+            logger.info("\n[5/5] Indexing to Elasticsearch...")
+            if not self.bulk_index(actions):
+                return False
         
         # Calculate duration
         duration = datetime.now() - start_time
@@ -361,7 +462,7 @@ class MongoToESSync:
         logger.info(f"\n✓ Synchronization completed in {duration}")
         logger.info("=" * 80)
         
-        return success
+        return True
     
     def close(self):
         """Close database connections."""
@@ -388,7 +489,7 @@ def main():
     
     try:
         # Run synchronization
-        success = sync_manager.sync()
+        success = sync_manager.sync(batch_size=300)
         
         if success:
             print("\n✅ Synchronization completed successfully!")
