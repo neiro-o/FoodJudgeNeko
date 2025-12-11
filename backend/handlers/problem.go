@@ -33,8 +33,8 @@ type QueueItem struct {
 }
 
 func UploadProblem(c *gin.Context) {
-	// Get authenticated user ID
-	accountID, exists := c.Get("user_id")
+	// Get authenticated user ID (MongoDB ObjectID hex string)
+	accountID, exists := utils.GetUserID(c)
 	if !exists {
 		utils.UnauthorizedResponse(c, "User not authenticated")
 		return
@@ -69,6 +69,22 @@ func UploadProblem(c *gin.Context) {
 		return
 	}
 
+	// Check if userId and taskId combination already exists in MongoDB problems collection
+	var existingProblem bson.M
+	err = database.Problems.FindOne(ctx, bson.M{
+		"userId": req.UserID,
+		"taskId": req.TaskID,
+	}).Decode(&existingProblem)
+	if err == nil {
+		// Problem already exists
+		utils.ConflictResponse(c, "Problem has already exists")
+		return
+	} else if err != mongo.ErrNoDocuments {
+		// Database error
+		utils.InternalServerErrorResponse(c, "Database error")
+		return
+	}
+
 	// Check if userId and taskId combination already exists in Redis queue
 	queueKey := fmt.Sprintf("%s:%s", req.UserID, req.TaskID)
 	existsCount, err := database.RedisClient.Exists(ctx, queueKey).Result()
@@ -86,7 +102,7 @@ func UploadProblem(c *gin.Context) {
 	queueItem := QueueItem{
 		UserID:    req.UserID,
 		TaskID:    req.TaskID,
-		AccountID: accountID.(string),
+		AccountID: accountID, // MongoDB ObjectID hex string from accounts collection
 		UploadIP:  uploadIP,
 	}
 
@@ -131,8 +147,8 @@ type ProblemUploadResult struct {
 }
 
 func UploadMultipleProblems(c *gin.Context) {
-	// Get authenticated user ID
-	accountID, exists := c.Get("user_id")
+	// Get authenticated user ID (MongoDB ObjectID hex string)
+	accountID, exists := utils.GetUserID(c)
 	if !exists {
 		utils.UnauthorizedResponse(c, "User not authenticated")
 		return
@@ -180,6 +196,24 @@ func UploadMultipleProblems(c *gin.Context) {
 			continue
 		}
 
+		// Check if userId and taskId combination already exists in MongoDB problems collection
+		var existingProblem bson.M
+		err = database.Problems.FindOne(ctx, bson.M{
+			"userId": problem.UserID,
+			"taskId": problem.TaskID,
+		}).Decode(&existingProblem)
+		if err == nil {
+			// Problem already exists
+			result.Message = "Problem already exists"
+			results = append(results, result)
+			continue
+		} else if err != mongo.ErrNoDocuments {
+			// Database error
+			result.Message = "Database error while checking problems collection"
+			results = append(results, result)
+			continue
+		}
+
 		// Check if userId and taskId combination already exists in Redis queue
 		queueKey := fmt.Sprintf("%s:%s", problem.UserID, problem.TaskID)
 		existsCount, err := database.RedisClient.Exists(ctx, queueKey).Result()
@@ -199,7 +233,7 @@ func UploadMultipleProblems(c *gin.Context) {
 		queueItem := QueueItem{
 			UserID:    problem.UserID,
 			TaskID:    problem.TaskID,
-			AccountID: accountID.(string),
+			AccountID: accountID, // MongoDB ObjectID hex string from accounts collection
 			UploadIP:  uploadIP,
 		}
 
@@ -244,8 +278,11 @@ func UploadMultipleProblems(c *gin.Context) {
 		}
 	}
 
-	utils.SuccessResponse(c, gin.H{
-		"message": fmt.Sprintf("Bulk upload completed: %d successful, %d failed", successCount, failedCount),
+	// Create response with message in the outer level and data directly
+	responseMessage := fmt.Sprintf("Bulk upload completed: %d successful, %d failed", successCount, failedCount)
+	c.JSON(200, gin.H{
+		"code":    0,
+		"message": responseMessage,
 		"data": gin.H{
 			"total":    len(results),
 			"success":  successCount,
