@@ -251,8 +251,10 @@ export default function ProblemsPage() {
       const response = await problemAPI.uploadMultiple({
         problems: multipleParsed.pairs,
       });
+      const successCount = response.success ?? 0;
+      const failedCount = response.failed ?? 0;
       setUploadSuccess(
-        t('problems.upload.successMultiple', { success: response.success, failed: response.failed })
+        t('problems.upload.successMultiple', { success: successCount, failed: failedCount })
       );
       setMultipleUrls('');
       setMultipleParsed({ pairs: [], userIdCount: 0, taskIdCount: 0, isValid: false });
