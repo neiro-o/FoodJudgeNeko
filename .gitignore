@@ -73,3 +73,6 @@ Thumbs.db
 # ESsync archived documentation
 ESsync/archived/
 
+crawl/
+
+backend/cache
