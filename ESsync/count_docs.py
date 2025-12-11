@@ -30,12 +30,21 @@ def main():
     # Connect to ES
     es_config = config['elasticsearch']
     try:
-        es = Elasticsearch(
-            es_config['hosts'],
-            basic_auth=(es_config['username'], es_config['password']),
-            verify_certs=False,
-            ssl_show_warn=False
-        )
+        es_client_config = {
+            'hosts': es_config['hosts'],
+        }
+        
+        # Only add authentication if both username and password are provided
+        if es_config.get('username') and es_config.get('password'):
+            es_client_config['basic_auth'] = (es_config['username'], es_config['password'])
+        
+        # Only configure SSL for HTTPS connections
+        use_https = any(host.startswith('https://') for host in es_config['hosts'])
+        if use_https:
+            es_client_config['verify_certs'] = False
+            es_client_config['ssl_show_warn'] = False
+        
+        es = Elasticsearch(**es_client_config)
         
         if not es.ping():
             print("✗ Cannot connect to Elasticsearch")

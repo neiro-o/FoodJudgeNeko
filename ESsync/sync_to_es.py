@@ -108,12 +108,21 @@ class MongoToESSync:
         """Connect to Elasticsearch."""
         try:
             es_config = self.config['elasticsearch']
-            self.es_client = Elasticsearch(
-                es_config['hosts'],
-                basic_auth=(es_config['username'], es_config['password']),
-                verify_certs=False,  # Set to True in production with proper certs
-                ssl_show_warn=False
-            )
+            es_client_config = {
+                'hosts': es_config['hosts'],
+            }
+            
+            # Only add authentication if both username and password are provided
+            if es_config.get('username') and es_config.get('password'):
+                es_client_config['basic_auth'] = (es_config['username'], es_config['password'])
+            
+            # Only configure SSL for HTTPS connections
+            use_https = any(host.startswith('https://') for host in es_config['hosts'])
+            if use_https:
+                es_client_config['verify_certs'] = False  # Set to True in production with proper certs
+                es_client_config['ssl_show_warn'] = False
+            
+            self.es_client = Elasticsearch(**es_client_config)
             # Test connection
             if self.es_client.ping():
                 logger.info(f"✓ Connected to Elasticsearch: {es_config['hosts']}")

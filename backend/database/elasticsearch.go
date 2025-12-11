@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"mtv2/backend/config"
@@ -28,13 +29,26 @@ func ConnectElasticsearch() error {
 		cfg.Password = config.AppConfig.Elasticsearch.Password
 	}
 
-	// Configure for development (skip TLS verification for HTTPS connections)
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
+	// Only configure TLS transport for HTTPS connections
+	// Check if any host uses HTTPS
+	useHTTPS := false
+	for _, host := range config.AppConfig.Elasticsearch.Hosts {
+		if strings.HasPrefix(strings.ToLower(host), "https://") {
+			useHTTPS = true
+			break
+		}
 	}
-	cfg.Transport = transport
+
+	if useHTTPS {
+		// Configure for development (skip TLS verification for HTTPS connections)
+		transport := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+		cfg.Transport = transport
+	}
+	// For HTTP connections, use default transport (no TLS configuration needed)
 
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
