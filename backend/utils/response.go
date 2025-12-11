@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Response represents the standard API response format
@@ -48,4 +50,28 @@ func InternalServerErrorResponse(c *gin.Context, message string) {
 // ConflictResponse sends a conflict error response
 func ConflictResponse(c *gin.Context, message string) {
 	ErrorResponse(c, 409, message)
+}
+
+// GetUserID returns the authenticated user's MongoDB ObjectID as a hex string
+// Returns empty string and false if user is not authenticated
+func GetUserID(c *gin.Context) (string, bool) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		return "", false
+	}
+	userIDStr, ok := userID.(string)
+	if !ok {
+		return "", false
+	}
+	return userIDStr, true
+}
+
+// GetUserObjectID returns the authenticated user's MongoDB ObjectID
+// Returns error if user is not authenticated or ID is invalid
+func GetUserObjectID(c *gin.Context) (primitive.ObjectID, error) {
+	userID, exists := GetUserID(c)
+	if !exists {
+		return primitive.NilObjectID, errors.New("user not authenticated")
+	}
+	return primitive.ObjectIDFromHex(userID)
 }
