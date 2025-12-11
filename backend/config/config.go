@@ -15,6 +15,7 @@ type Config struct {
 			Accounts      string `yaml:"accounts"`
 			Invitations   string `yaml:"invitations"`
 			ProcessedList string `yaml:"processed_list"`
+			Problems      string `yaml:"problems"`
 		} `yaml:"collections"`
 	} `yaml:"mongodb"`
 	Redis struct {
@@ -57,4 +58,3 @@ func LoadConfig(configPath string) error {
 	AppConfig = config
 	return nil
 }
-

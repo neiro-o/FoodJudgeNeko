@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"mtv2/backend/config"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"mtv2/backend/config"
 )
 
 var (
@@ -16,6 +17,7 @@ var (
 	Accounts      *mongo.Collection
 	Invitations   *mongo.Collection
 	ProcessedList *mongo.Collection
+	Problems      *mongo.Collection
 )
 
 func Connect() error {
@@ -38,6 +40,7 @@ func Connect() error {
 	Accounts = DB.Collection(config.AppConfig.MongoDB.Collections.Accounts)
 	Invitations = DB.Collection(config.AppConfig.MongoDB.Collections.Invitations)
 	ProcessedList = DB.Collection(config.AppConfig.MongoDB.Collections.ProcessedList)
+	Problems = DB.Collection(config.AppConfig.MongoDB.Collections.Problems)
 
 	fmt.Println("Connected to MongoDB successfully")
 	return nil
@@ -52,4 +55,3 @@ func Disconnect() error {
 	}
 	return nil
 }
-
