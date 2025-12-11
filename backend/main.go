@@ -70,6 +70,9 @@ func main() {
 	{
 		api.POST("/login", handlers.Login)
 		api.POST("/register", handlers.Register)
+		// Media endpoints are public but validate hash (hash generation is protected)
+		api.GET("/media/image", handlers.LoadImage)
+		api.GET("/media/video", handlers.LoadVideo)
 	}
 
 	// Protected routes
@@ -86,6 +89,7 @@ func main() {
 		protected.GET("/problem/recent", handlers.GetRecentProblems)
 		protected.GET("/problem/by-esid/:id", handlers.SearchByESID)
 		protected.GET("/problem/by-mongoid/:id", handlers.SearchByMongoID)
+		protected.POST("/media/hash", handlers.GenerateMediaHash)
 	}
 
 	// Start server

@@ -479,6 +479,9 @@ func parseComments(comments []interface{}) []Comment {
 			if choice, ok := commentMap["choice"].(float64); ok {
 				comment.Choice = int(choice)
 			}
+			if likes, ok := commentMap["likes"].(float64); ok {
+				comment.Likes = int(likes)
+			}
 			result = append(result, comment)
 		}
 	}
