@@ -299,7 +299,11 @@ const translations: Record<Language, Record<string, string>> = {
 // Helper function to replace placeholders
 function replacePlaceholders(text: string, params: Record<string, string | number>): string {
   return text.replace(/\{(\w+)\}/g, (match, key) => {
-    return params[key]?.toString() || match;
+    const value = params[key];
+    if (value === undefined || value === null) {
+      return match;
+    }
+    return value.toString();
   });
 }
 
