@@ -107,6 +107,65 @@ def get_collection_count(collection) -> int:
     return collection.count_documents({})
 
 
+def clear_target_database(target_db, target_collections: Dict[str, str], require_confirmation: bool = True) -> None:
+    """
+    Clear problems and notes collections in the target database.
+    Requires user confirmation before proceeding.
+    """
+    print("\n" + "="*60)
+    print("Clear Target MongoDB")
+    print("="*60)
+    
+    # Only clear problems and notes collections
+    collections_to_clear = ['problems', 'notes']
+    collection_info = []
+    for col_key in collections_to_clear:
+        if col_key in target_collections:
+            col_name = target_collections[col_key]
+            collection = target_db[col_name]
+            count = get_collection_count(collection)
+            collection_info.append((col_name, count))
+        else:
+            print(f"⚠ Warning: Collection '{col_key}' not found in target_collections config")
+    
+    # Display what will be cleared
+    print("\nCollections to be cleared:")
+    total_docs = 0
+    for col_name, count in collection_info:
+        print(f"  - {col_name}: {count} documents")
+        total_docs += count
+    
+    print(f"\nTotal documents to be deleted: {total_docs}")
+    
+    if total_docs == 0:
+        print("⚠ No documents to clear. Target database is already empty.")
+        return
+    
+    # Require confirmation
+    if require_confirmation:
+        print("\n⚠ WARNING: This will permanently delete all data in the 'problems' and 'notes' collections!")
+        print(f"  Database: {target_db.name}")
+        print(f"  Collections: {', '.join([col for col, _ in collection_info])}")
+        
+        response = input("\nType 'yes' to confirm clearing the 'problems' and 'notes' collections: ").strip().lower()
+        
+        if response != 'yes':
+            print("✗ Operation cancelled. No data was cleared.")
+            return
+    
+    # Clear collections
+    print("\nClearing collections...")
+    for col_name, count in collection_info:
+        if count > 0:
+            collection = target_db[col_name]
+            result = collection.delete_many({})
+            print(f"✓ Cleared {col_name}: {result.deleted_count} documents deleted")
+        else:
+            print(f"  {col_name}: already empty")
+    
+    print("\n✓ Target database cleared successfully!")
+
+
 def export_collection(
     source_collection,
     target_collection,
@@ -241,6 +300,11 @@ def main():
         action='store_true',
         help='Perform a dry run without actually migrating data'
     )
+    parser.add_argument(
+        '--clear-target',
+        action='store_true',
+        help='Clear data from problems and notes collections in target MongoDB (requires confirmation)'
+    )
     
     args = parser.parse_args()
     
@@ -259,7 +323,42 @@ def main():
     if args.dry_run:
         print("\n⚠ DRY RUN MODE - No data will be migrated\n")
     
-    # Setup SSH tunnel if needed
+    # Get target connection info first (needed for clear mode)
+    target_connection_string = target_config['mongodb']['connection_string']
+    target_database_name = target_config['mongodb']['database_name']
+    target_collections = target_config['mongodb']['collections']
+    
+    # Handle clear-target mode
+    if args.clear_target:
+        print("\n⚠ CLEAR TARGET MODE - Will clear target MongoDB collections\n")
+        
+        # Connect to target MongoDB only
+        print("\n" + "="*60)
+        print("Connecting to Target MongoDB")
+        print("="*60)
+        target_client, target_db = connect_to_mongodb(
+            target_connection_string,
+            target_database_name,
+            db_label="Target MongoDB"
+        )
+        
+        try:
+            clear_target_database(target_db, target_collections, require_confirmation=True)
+            target_client.close()
+            print("\n✓ Clear operation completed successfully!")
+            return
+        except KeyboardInterrupt:
+            print("\n\n⚠ Operation interrupted by user")
+            target_client.close()
+            sys.exit(1)
+        except Exception as e:
+            print(f"\n✗ Clear operation failed: {e}")
+            import traceback
+            traceback.print_exc()
+            target_client.close()
+            sys.exit(1)
+    
+    # Setup SSH tunnel if needed (for migration mode)
     tunnel = None
     if migrate_config['source'].get('ssh', {}).get('enabled', False):
         tunnel = create_ssh_tunnel(migrate_config['source']['ssh'])
@@ -267,10 +366,6 @@ def main():
     # Get connection strings
     source_connection_string = migrate_config['source']['connection_string']
     source_database_name = migrate_config['source']['database_name']
-    
-    # Target connection - use same pattern as setup scripts
-    target_connection_string = target_config['mongodb']['connection_string']
-    target_database_name = target_config['mongodb']['database_name']
     
     try:
         # Connect to source MongoDB (may use SSH tunnel if enabled)
@@ -321,7 +416,6 @@ def main():
         else:
             # Get collection names from configs
             source_collections = migrate_config['source']['collections']
-            target_collections = target_config['mongodb']['collections']
             
             # Migrate meituan -> problems
             source_meituan = source_collections.get('meituan', 'meituan')
