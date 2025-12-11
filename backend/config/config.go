@@ -34,8 +34,9 @@ type Config struct {
 		Password  string   `yaml:"password"`
 	} `yaml:"elasticsearch"`
 	Server struct {
-		Port      int    `yaml:"port"`
-		JWTSecret string `yaml:"jwt_secret"`
+		Port           int      `yaml:"port"`
+		JWTSecret      string   `yaml:"jwt_secret"`
+		AllowedOrigins []string `yaml:"allowed_origins"`
 	} `yaml:"server"`
 }
 

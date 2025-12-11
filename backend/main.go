@@ -51,14 +51,31 @@ func main() {
 	r := gin.Default()
 
 	// Configure CORS
+	allowedOrigins := config.AppConfig.Server.AllowedOrigins
+	if len(allowedOrigins) == 0 {
+		// Default to localhost for development
+		allowedOrigins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+	}
+
+	log.Printf("CORS allowed origins: %v", allowedOrigins)
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://127.0.0.1:3000"},
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
+
+	// Add logging middleware to debug CORS issues
+	r.Use(func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if origin != "" {
+			log.Printf("Request from origin: %s, method: %s, path: %s", origin, c.Request.Method, c.Request.URL.Path)
+		}
+		c.Next()
+	})
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
