@@ -149,6 +149,28 @@ def extract_pic_urls(picture_list: List[Any], video_list: List[Any]) -> List[str
     return urls
 
 
+def extract_filename_from_url(url: Optional[str]) -> str:
+    """
+    Extract filename from a URL, handling cases with no extension.
+    
+    Args:
+        url: URL string (e.g., "https://s3plus.meituan.net/ipr-public-prod/20240527 161941_rk7l20.png")
+        
+    Returns:
+        Filename string (e.g., "20240527 161941_rk7l20.png" or "20240527 161941_rk7l20")
+    """
+    if not url:
+        return ""
+    
+    # Remove query parameters if any
+    url = url.split('?')[0]
+    
+    # Extract the last part after the last '/'
+    filename = url.split('/')[-1]
+    
+    return filename
+
+
 def convert_bson_to_es_type1(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
     """
     Convert a single MongoDB BSON document to Elasticsearch document format.
@@ -422,7 +444,7 @@ def convert_bson_to_es_type1(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                     
                     # Choice: 1 if voteOperate is 'DOWN', else 2
                     vote_operate = safe_get(comment_item, "voteOperate")
-                    choice = 1 if vote_operate == "DOWN" else 2
+                    choice = 1 if vote_operate == "DOWN" else (2 if vote_operate == "UP" else 0)
                     
                     # Timestamp - as integer
                     create_time = safe_get(comment_item, "createTime")
@@ -439,11 +461,11 @@ def convert_bson_to_es_type1(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                         userid = user_id if user_id else 0
                     
                     # Likes - extract from source if available, default to 0
-                    likes = safe_get(comment_item, "likes", default=0)
+                    likes = safe_get(comment_item, "approveCount", default=-1)
                     try:
                         likes = int(likes) if likes else 0
                     except (ValueError, TypeError):
-                        likes = 0
+                        likes = -1
                     
                     comments.append({
                         "userid": userid,
@@ -647,7 +669,7 @@ def convert_bson_to_es_type2(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                     
                     # Choice: 1 if voteOperate is 'DOWN', else 2
                     vote_operate = safe_get(comment_item, "voteOperate")
-                    choice = 1 if vote_operate == "DOWN" else 2
+                    choice = 1 if vote_operate == "DOWN" else (2 if vote_operate == "UP" else 0)
                     
                     # Timestamp - as integer
                     create_time = safe_get(comment_item, "createTime")
@@ -664,11 +686,11 @@ def convert_bson_to_es_type2(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                         userid = user_id if user_id else 0
                     
                     # Likes - extract from source if available, default to 0
-                    likes = safe_get(comment_item, "likes", default=0)
+                    likes = safe_get(comment_item, "approveCount", default=-1)
                     try:
                         likes = int(likes) if likes else 0
                     except (ValueError, TypeError):
-                        likes = 0
+                        likes = -1
                     
                     comments.append({
                         "userid": userid,
@@ -932,7 +954,7 @@ def convert_bson_to_es_type3(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                     
                     # Choice: 1 if voteOperate is 'DOWN', else 2
                     vote_operate = safe_get(comment_item, "voteOperate")
-                    choice = 1 if vote_operate == "DOWN" else 2
+                    choice = 1 if vote_operate == "DOWN" else (2 if vote_operate == "UP" else 0)
                     
                     # Timestamp - as integer
                     create_time = safe_get(comment_item, "createTime")
@@ -949,11 +971,11 @@ def convert_bson_to_es_type3(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                         userid = user_id if user_id else 0
                     
                     # Likes - extract from source if available, default to 0
-                    likes = safe_get(comment_item, "likes", default=0)
+                    likes = safe_get(comment_item, "approveCount", default=-1)
                     try:
                         likes = int(likes) if likes else 0
                     except (ValueError, TypeError):
-                        likes = 0
+                        likes = -1
                     
                     comments.append({
                         "userid": userid,
@@ -1120,7 +1142,7 @@ def convert_bson_to_es_type4(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                     
                     # Choice: 2 if voteOperate is 'DOWN', else 1 (reversed for Type 4)
                     vote_operate = safe_get(comment_item, "voteOperate")
-                    choice = 2 if vote_operate == "DOWN" else 1
+                    choice = 2 if vote_operate == "DOWN" else (1 if vote_operate == "UP" else 0)
                     
                     # Timestamp - as integer
                     create_time = safe_get(comment_item, "createTime")
@@ -1137,11 +1159,167 @@ def convert_bson_to_es_type4(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                         userid = user_id if user_id else 0
                     
                     # Likes - extract from source if available, default to 0
-                    likes = safe_get(comment_item, "likes", default=0)
+                    likes = safe_get(comment_item, "approveCount", default=-1)
                     try:
                         likes = int(likes) if likes else 0
                     except (ValueError, TypeError):
-                        likes = 0
+                        likes = -1
+                    
+                    comments.append({
+                        "userid": userid,
+                        "name": safe_get(comment_item, "userName", default=""),
+                        "content": safe_get(comment_item, "content", default=""),
+                        "timestamp": timestamp,
+                        "choice": choice,
+                        "likes": likes
+                    })
+    
+    es_doc["comments"] = comments
+    
+    return es_doc
+
+
+def convert_bson_to_es_type5(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert a single MongoDB BSON document to Elasticsearch document format.
+    This function handles Type 5 problems (IPR).
+    
+    Args:
+        bson_doc: MongoDB BSON document
+        
+    Returns:
+        Elasticsearch document dictionary
+    """
+    # Initialize ES document
+    es_doc = {}
+    
+    # Top-level fields (same as Type 4)
+    mongo_id = safe_get(bson_doc, "_id")
+    es_doc["mongo_id"] = str(mongo_id) if mongo_id else None
+    
+    # Stars: No review for IPR, default to 0
+    es_doc["stars"] = 0
+    
+    # Get logo URLs
+    prosecutor_logo_url = safe_get(bson_doc, "detail", "taskInfo", "voteContent", "logoInfo", "prosecutorLogoUrl", default="")
+    defendant_logo_url = safe_get(bson_doc, "detail", "taskInfo", "voteContent", "logoInfo", "defendantLogoUrl", default="")
+    
+    # Extract filenames from URLs
+    filename1 = extract_filename_from_url(prosecutor_logo_url)
+    filename2 = extract_filename_from_url(defendant_logo_url)
+    
+    # User review: "{filename1} vs {filename2}"
+    es_doc["user_review"] = f"{filename1} vs {filename2}"
+    
+    # Review pictures: [prosecutorLogoUrl, defendantLogoUrl]
+    review_pics = []
+    if prosecutor_logo_url:
+        review_pics.append(prosecutor_logo_url)
+    if defendant_logo_url:
+        review_pics.append(defendant_logo_url)
+    es_doc["review_pics"] = review_pics
+    
+    # Timestamp: int(detail.taskInfo.voteEndTime / 1000)
+    vote_end_time = safe_get(bson_doc, "detail", "taskInfo", "voteEndTime")
+    try:
+        es_doc["timestamp"] = int(int(vote_end_time) / 1000) if vote_end_time else 0
+    except (ValueError, TypeError):
+        es_doc["timestamp"] = 0
+    
+    # Others: empty string
+    es_doc["others"] = ""
+    
+    # Problem type: 5 for this function
+    es_doc["problem_type"] = 5
+    
+    # Answer: 1 if newSupportRatio > newOpposeRatio, else 2 (same as Type 4)
+    support_ratio = safe_get(bson_doc, "detail", "taskInfo", "newSupportRatio", default="0")
+    oppose_ratio = safe_get(bson_doc, "detail", "taskInfo", "newOpposeRatio", default="0")
+    try:
+        support = int(support_ratio)
+        oppose = int(oppose_ratio)
+        es_doc["answer"] = 1 if support > oppose else 2
+    except (ValueError, TypeError):
+        es_doc["answer"] = 2
+    
+    # Ratios (same as Type 4: ratio_1 is support)
+    try:
+        es_doc["ratio_1"] = int(support_ratio)
+    except (ValueError, TypeError):
+        es_doc["ratio_1"] = 0
+    
+    try:
+        es_doc["ratio_2"] = int(oppose_ratio)
+    except (ValueError, TypeError):
+        es_doc["ratio_2"] = 0
+    
+    # Uploader
+    es_doc["uploader"] = safe_get(bson_doc, "uploader")
+    
+    # TaskId and UserId
+    es_doc["taskId"] = safe_get(bson_doc, "taskId")
+    es_doc["userId"] = safe_get(bson_doc, "userId")
+    
+    # Created at
+    upload_timestamp = safe_get(bson_doc, "upload_timestamp")
+    try:
+        es_doc["created_at"] = int(upload_timestamp) if upload_timestamp else 0
+    except (ValueError, TypeError):
+        es_doc["created_at"] = 0
+    
+    # Replies array: Empty for Type 5
+    es_doc["replies"] = []
+    
+    # Appeals array: Empty for Type 5
+    es_doc["appeals"] = []
+    
+    # Order info: null for Type 5
+    es_doc["order_info"] = None
+    
+    # Orders array: Empty for Type 5
+    es_doc["orders"] = []
+    
+    # Order detail: null for Type 5
+    es_doc["order_detail"] = None
+    
+    # Comments array (same as Type 4: reversed choice)
+    comments = []
+    comment_array = safe_get(bson_doc, "comment", default=[])
+    if isinstance(comment_array, list):
+        for comment_page in comment_array:
+            if not isinstance(comment_page, dict):
+                continue
+            
+            page_content = safe_get(comment_page, "pageContent", default=[])
+            if isinstance(page_content, list):
+                for comment_item in page_content:
+                    if not isinstance(comment_item, dict):
+                        continue
+                    
+                    # Choice: 2 if voteOperate is 'DOWN', else 1 (reversed for Type 5, same as Type 4)
+                    vote_operate = safe_get(comment_item, "voteOperate")
+                    choice = 2 if vote_operate == "DOWN" else (1 if vote_operate == "UP" else 0)
+                    
+                    # Timestamp - as integer
+                    create_time = safe_get(comment_item, "createTime")
+                    try:
+                        timestamp = int(int(create_time) / 1000) if create_time else 0
+                    except (ValueError, TypeError):
+                        timestamp = 0
+                    
+                    # User ID
+                    user_id = safe_get(comment_item, "userId")
+                    try:
+                        userid = int(user_id) if user_id else 0
+                    except (ValueError, TypeError):
+                        userid = user_id if user_id else 0
+                    
+                    # Likes - extract from source if available, default to 0
+                    likes = safe_get(comment_item, "approveCount", default=-1)
+                    try:
+                        likes = int(likes) if likes else 0
+                    except (ValueError, TypeError):
+                        likes = -1
                     
                     comments.append({
                         "userid": userid,
@@ -1170,16 +1348,13 @@ def convert_bson_to_es(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
               DAODIAN_TICKET, DAODIAN_COMPLEX (Dine-in and service reviews)
     - Type 3: WAIMAI_QUIK_REFUND (Takeaway refunds)
     - Type 4: DAOZONG_JIAOYI (Dine-in refunds)
-    - Type 5: IPR (Reserved - not yet implemented)
+    - Type 5: IPR (IPR problems)
     
     Args:
         bson_doc: MongoDB BSON document
         
     Returns:
         Elasticsearch document dictionary
-        
-    Raises:
-        ValueError: If processType is not recognized or Type 5 is encountered
     """
     # Get processType from the document
     process_type = safe_get(bson_doc, "detail", "taskInfo", "processType", default="")
@@ -1207,9 +1382,9 @@ def convert_bson_to_es(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
     elif process_type == "DAOZONG_JIAOYI":
         return convert_bson_to_es_type4(bson_doc)
     
-    # Type 5: Reserved (not yet implemented)
+    # Type 5: IPR
     elif process_type == "IPR":
-        raise ValueError(f"Type 5 (IPR) converter is not yet implemented. processType: {process_type}")
+        return convert_bson_to_es_type5(bson_doc)
     
     # Unknown processType - default to Type 2 (most flexible)
     else:
