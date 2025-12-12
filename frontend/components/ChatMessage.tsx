@@ -53,8 +53,28 @@ export default function ChatMessage({
     return '/avatars/avatar_3.png';
   };
 
-  // Get picture label
-  const getPictureLabel = (index: number) => {
+  // Check if URL is a video based on extension
+  const isVideoUrl = (url: string): boolean => {
+    if (!url) return false;
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname.toLowerCase();
+      const videoExtensions = ['.mp4', '.m3u8', '.webm', '.mov', '.avi', '.mkv', '.flv'];
+      return videoExtensions.some(ext => pathname.endsWith(ext));
+    } catch {
+      // If URL parsing fails, try simple string check
+      const lowerUrl = url.toLowerCase();
+      return lowerUrl.includes('.mp4') || lowerUrl.includes('.m3u8') || 
+             lowerUrl.includes('.webm') || lowerUrl.includes('.mov') ||
+             lowerUrl.includes('.avi') || lowerUrl.includes('.mkv') || lowerUrl.includes('.flv');
+    }
+  };
+
+  // Get media label (picture or video)
+  const getMediaLabel = (url: string, index: number) => {
+    if (isVideoUrl(url)) {
+      return language === 'zh' ? `视频${index + 1}` : `Video ${index + 1}`;
+    }
     return language === 'zh' ? `图片${index + 1}` : `Picture ${index + 1}`;
   };
 
@@ -95,7 +115,7 @@ export default function ChatMessage({
           >
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
             
-            {/* Picture links */}
+            {/* Picture/Video links */}
             {message.pics && message.pics.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {message.pics.map((pic, index) => (
@@ -104,7 +124,7 @@ export default function ChatMessage({
                     onClick={() => setModalImage(pic)}
                     className="text-indigo-600 hover:text-indigo-800 hover:underline text-sm"
                   >
-                    {getPictureLabel(index)}
+                    {getMediaLabel(pic, index)}
                   </button>
                 ))}
               </div>

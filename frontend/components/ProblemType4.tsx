@@ -4,13 +4,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import ChatTimeline from './ChatTimeline';
 import { ChatMessageData } from './ChatMessage';
+import ImageModal from './ImageModal';
+import RatioBar from './RatioBar';
 import { mediaAPI } from '@/lib/api';
-
-interface Reply {
-  role: string;
-  timestamp: number;
-  content: string;
-}
 
 interface Appeal {
   role: string;
@@ -19,30 +15,37 @@ interface Appeal {
   pics?: string[];
 }
 
-interface ProblemType2Props {
-  userReview: string;
-  reviewPics?: string[];
-  timestamp: number;
-  replies?: Reply[];
+interface OrderInfoRaw {
+  productImageUrl?: string;
+  productName?: string;
+  orderPrice?: number;
+  [key: string]: any;
+}
+
+interface OrderInfo {
+  raw?: OrderInfoRaw;
+  processed?: any;
+}
+
+interface ProblemType4Props {
   appeals?: Appeal[];
+  orderInfo?: OrderInfo;
   others?: string;
   ratio1?: number;
   ratio2?: number;
   answer?: number;
 }
 
-export default function ProblemType2({
-  userReview,
-  reviewPics,
-  timestamp,
-  replies = [],
+export default function ProblemType4({
   appeals = [],
+  orderInfo,
   others,
   ratio1 = 50,
   ratio2 = 50,
   answer = 1,
-}: ProblemType2Props) {
+}: ProblemType4Props) {
   const { language } = useLanguage();
+  const [modalImage, setModalImage] = useState<string | null>(null);
   const [imageUrlMap, setImageUrlMap] = useState<Map<string, string>>(new Map());
 
   // Check if URL is from external domain (not same origin)
@@ -85,14 +88,12 @@ export default function ProblemType2({
     const preloadMedia = async () => {
       const mediaUrls: string[] = [];
 
-      if (reviewPics) {
-        reviewPics.forEach((pic) => {
-          if (isExternalUrl(pic)) {
-            mediaUrls.push(pic);
-          }
-        });
+      // Collect product image URL
+      if (orderInfo?.raw?.productImageUrl && isExternalUrl(orderInfo.raw.productImageUrl)) {
+        mediaUrls.push(orderInfo.raw.productImageUrl);
       }
 
+      // Collect appeal pics
       appeals.forEach((appeal) => {
         if (appeal.pics) {
           appeal.pics.forEach((pic) => {
@@ -117,7 +118,7 @@ export default function ProblemType2({
     };
 
     preloadMedia();
-  }, [reviewPics, appeals]);
+  }, [orderInfo, appeals]);
 
   // Get role name based on role and language
   const getRoleName = (role: string): string => {
@@ -130,37 +131,6 @@ export default function ProblemType2({
       return language === 'zh' ? `路人${id}` : `Anonymous ${id}`;
     }
     return role;
-  };
-
-  // Build messages array for problem section
-  const buildProblemMessages = (): ChatMessageData[] => {
-    const messages: ChatMessageData[] = [];
-
-    // First message is always from user
-    // Proxy image URLs if they are external
-    const proxiedReviewPics = reviewPics?.map((pic) => 
-      imageUrlMap.get(pic) || pic
-    );
-
-    messages.push({
-      role: 'user',
-      name: getRoleName('user'),
-      timestamp: timestamp,
-      content: userReview,
-      pics: proxiedReviewPics,
-    });
-
-    // Add replies
-    replies.forEach((reply) => {
-      messages.push({
-        role: reply.role,
-        name: getRoleName(reply.role),
-        timestamp: reply.timestamp,
-        content: reply.content,
-      });
-    });
-
-    return messages;
   };
 
   // Build messages array for appeals section
@@ -182,16 +152,20 @@ export default function ProblemType2({
   };
 
   // Rebuild messages when imageUrlMap changes
-  const problemMessages = useMemo(() => buildProblemMessages(), [reviewPics, replies, timestamp, imageUrlMap, language]);
   const appealMessages = useMemo(() => buildAppealMessages(), [appeals, imageUrlMap, language]);
   
+  // Check if order info should be shown (only if productName AND orderPrice exist)
+  const showOrderInfo = orderInfo?.raw?.productName && orderInfo?.raw?.orderPrice !== undefined;
+  
+  // Get product image URL (proxied if external)
+  const productImageUrl = orderInfo?.raw?.productImageUrl 
+    ? (imageUrlMap.get(orderInfo.raw.productImageUrl) || orderInfo.raw.productImageUrl)
+    : null;
+  
   const problemTitle = language === 'zh' ? '题目' : 'Problem';
-  const problemDescription = language === 'zh' ? '堂食评价纠纷' : 'Dining Review Disputes';
-  const appealsTitle = language === 'zh' ? '商户申诉' : 'Appeals';
-  const othersTitle = language === 'zh' ? '其他信息' : 'Other Info';
-
-  // Import RatioBar dynamically to avoid issues
-  const RatioBar = require('./RatioBar').default;
+  const problemDescription = language === 'zh' ? '线下服务退款申诉' : 'Offline Service Refund Appeal';
+  const ordersTitle = language === 'zh' ? '订单信息' : 'Orders';
+  const noteTitle = language === 'zh' ? '备注' : 'Note';
 
   return (
     <div>
@@ -199,27 +173,70 @@ export default function ProblemType2({
       <h2 className="text-lg font-semibold text-gray-900 mb-4">{problemTitle}</h2>
       <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} />
       <h3 className="text-lg font-semibold text-gray-900 mb-4">{problemDescription}</h3>
-      <div className="mb-6">
-        <ChatTimeline messages={problemMessages} />
-      </div>
+
+      {/* Order Info Section */}
+      {showOrderInfo && (
+        <div className="mb-6">
+          <h3 className="text-base font-semibold text-gray-900 mb-3">{ordersTitle}</h3>
+          <div className="flex gap-4">
+            {/* Product Image */}
+            {productImageUrl && (
+              <div className="flex-shrink-0">
+                {isExternalUrl(orderInfo?.raw?.productImageUrl || '') && !imageUrlMap.has(orderInfo?.raw?.productImageUrl || '') ? (
+                  // Show placeholder while loading proxied URL
+                  <div className="w-20 h-20 bg-gray-200 rounded flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-400 border-t-transparent"></div>
+                  </div>
+                ) : (
+                  <img
+                    src={productImageUrl}
+                    alt={orderInfo?.raw?.productName || 'Product'}
+                    className="w-20 h-20 object-cover rounded cursor-pointer hover:opacity-80 transition"
+                    onClick={() => setModalImage(productImageUrl)}
+                  />
+                )}
+              </div>
+            )}
+            
+            {/* Product Info */}
+            <div className="flex-1 min-w-0">
+              {/* Product Name */}
+              <p className="text-sm font-medium text-gray-900 break-words">
+                {orderInfo?.raw?.productName}
+              </p>
+              
+              {/* Price */}
+              <p className="text-sm text-orange-600 font-medium mt-1">
+                ¥{orderInfo?.raw?.orderPrice}
+              </p>
+            </div>
+          </div>
+          
+          {/* Others as Note */}
+          {others && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-sm text-gray-500">
+                <span className="font-medium">{noteTitle}: </span>
+                <span className="text-gray-600">{others}</span>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Appeals Section */}
       {appealMessages.length > 0 && (
-        <>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">{appealsTitle}</h3>
-          <div className="mb-6">
-            <ChatTimeline messages={appealMessages} />
-          </div>
-        </>
-      )}
-
-      {/* Others Section */}
-      {others && (
-        <div className="border-t border-gray-200 pt-4 mt-4">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">{othersTitle}</h3>
-          <p className="text-sm text-gray-600 whitespace-pre-wrap">{others}</p>
+        <div className="mb-6">
+          <ChatTimeline messages={appealMessages} />
         </div>
       )}
+
+      {/* Image Modal */}
+      <ImageModal
+        imageUrl={modalImage ? (imageUrlMap.get(modalImage) || modalImage) : ''}
+        isOpen={!!modalImage}
+        onClose={() => setModalImage(null)}
+      />
     </div>
   );
 }

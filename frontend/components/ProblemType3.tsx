@@ -8,12 +8,6 @@ import ImageModal from './ImageModal';
 import RatioBar from './RatioBar';
 import { mediaAPI } from '@/lib/api';
 
-interface Reply {
-  role: string;
-  timestamp: number;
-  content: string;
-}
-
 interface Appeal {
   role: string;
   timestamp: number;
@@ -41,11 +35,7 @@ interface OrderDetail {
   invoice: boolean;
 }
 
-interface ProblemType1Props {
-  userReview: string;
-  reviewPics?: string[];
-  timestamp: number;
-  replies?: Reply[];
+interface ProblemType3Props {
   appeals?: Appeal[];
   orders?: Order[];
   orderDetail?: OrderDetail;
@@ -55,11 +45,7 @@ interface ProblemType1Props {
   answer?: number;
 }
 
-export default function ProblemType1({
-  userReview,
-  reviewPics,
-  timestamp,
-  replies = [],
+export default function ProblemType3({
   appeals = [],
   orders = [],
   orderDetail,
@@ -67,7 +53,7 @@ export default function ProblemType1({
   ratio1 = 50,
   ratio2 = 50,
   answer = 1,
-}: ProblemType1Props) {
+}: ProblemType3Props) {
   const { language } = useLanguage();
   const [expandedDescs, setExpandedDescs] = useState<Set<number>>(new Set());
   const [modalImage, setModalImage] = useState<string | null>(null);
@@ -108,28 +94,6 @@ export default function ProblemType1({
     }
   };
 
-  // Get proxied media URL for external URLs (image or video)
-  const getMediaUrl = async (originalUrl: string): Promise<string> => {
-    if (!isExternalUrl(originalUrl)) {
-      return originalUrl;
-    }
-
-    // Check cache first
-    if (imageUrlMap.has(originalUrl)) {
-      return imageUrlMap.get(originalUrl)!;
-    }
-
-    try {
-      const getProxiedUrl = isVideoUrl(originalUrl) ? mediaAPI.getVideoUrl : mediaAPI.getImageUrl;
-      const proxiedUrl = await getProxiedUrl(originalUrl);
-      setImageUrlMap((prev) => new Map(prev).set(originalUrl, proxiedUrl));
-      return proxiedUrl;
-    } catch (error) {
-      console.error('Failed to get proxied URL:', error);
-      return originalUrl; // Fallback to original URL
-    }
-  };
-
   // Preload external media (images and videos)
   useEffect(() => {
     const preloadMedia = async () => {
@@ -141,14 +105,6 @@ export default function ProblemType1({
           mediaUrls.push(order.pic);
         }
       });
-
-      if (reviewPics) {
-        reviewPics.forEach((pic) => {
-          if (isExternalUrl(pic)) {
-            mediaUrls.push(pic);
-          }
-        });
-      }
 
       appeals.forEach((appeal) => {
         if (appeal.pics) {
@@ -174,7 +130,7 @@ export default function ProblemType1({
     };
 
     preloadMedia();
-  }, [orders, reviewPics, appeals]);
+  }, [orders, appeals]);
 
   // Get role name based on role and language
   const getRoleName = (role: string): string => {
@@ -187,37 +143,6 @@ export default function ProblemType1({
       return language === 'zh' ? `路人${id}` : `Anonymous ${id}`;
     }
     return role;
-  };
-
-  // Build messages array for problem section
-  const buildProblemMessages = (): ChatMessageData[] => {
-    const messages: ChatMessageData[] = [];
-
-    // First message is always from user
-    // Proxy image URLs if they are external
-    const proxiedReviewPics = reviewPics?.map((pic) => 
-      imageUrlMap.get(pic) || pic
-    );
-
-    messages.push({
-      role: 'user',
-      name: getRoleName('user'),
-      timestamp: timestamp,
-      content: userReview,
-      pics: proxiedReviewPics,
-    });
-
-    // Add replies
-    replies.forEach((reply) => {
-      messages.push({
-        role: reply.role,
-        name: getRoleName(reply.role),
-        timestamp: reply.timestamp,
-        content: reply.content,
-      });
-    });
-
-    return messages;
   };
 
   // Build messages array for appeals section
@@ -287,12 +212,11 @@ export default function ProblemType1({
   const totalItemsCount = orders.reduce((sum, order) => sum + order.count, 0);
 
   // Rebuild messages when imageUrlMap changes
-  const problemMessages = useMemo(() => buildProblemMessages(), [reviewPics, replies, timestamp, imageUrlMap, language]);
   const appealMessages = useMemo(() => buildAppealMessages(), [appeals, imageUrlMap, language]);
   
   const problemTitle = language === 'zh' ? '题目' : 'Problem';
-  const problemDescription = language === 'zh' ? '外卖评价投诉纠纷' : 'Takeaway Review Disputes';
-  const appealsTitle = language === 'zh' ? '商户申诉' : 'Appeals';
+  const problemDescription = language === 'zh' ? '外卖退款申诉' : 'Takeout refund appeal';
+  const appealsTitle = language === 'zh' ? '申诉记录' : 'Appeal Records';
   const othersTitle = language === 'zh' ? '其他信息' : 'Other Info';
   const ordersTitle = language === 'zh' ? '订单信息' : 'Orders';
   const notesSubtitle = language === 'zh' ? '用户备注' : 'Notes';
@@ -305,14 +229,10 @@ export default function ProblemType1({
       <h2 className="text-lg font-semibold text-gray-900 mb-4">{problemTitle}</h2>
       <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} />
       <h3 className="text-lg font-semibold text-gray-900 mb-4">{problemDescription}</h3>
-      <div className="mb-6">
-        <ChatTimeline messages={problemMessages} />
-      </div>
 
       {/* Appeals Section */}
       {appealMessages.length > 0 && (
         <>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">{appealsTitle}</h3>
           <div className="mb-6">
             <ChatTimeline messages={appealMessages} />
           </div>
