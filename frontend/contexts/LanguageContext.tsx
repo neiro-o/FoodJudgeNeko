@@ -128,6 +128,8 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.search.customizeClose': 'Close',
     'problems.search.customizeReset': 'Reset to Default',
     'problems.search.counts': 'Currently there are {elasticsearch} problems, with {redis} problems in process. Raw data: {mongodb} problems.',
+    'problems.search.resultLimit': 'Results per page',
+    'problems.search.resultLimitDesc': 'Adjust number of results (5-20)',
     
     // User page
     'user.title': 'MTV2',
@@ -293,6 +295,8 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.search.customizeClose': '关闭',
     'problems.search.customizeReset': '重置为默认',
     'problems.search.counts': '当前共有 {elasticsearch} 题，上传队列中有 {redis} 题，原始数据 {mongodb} 题',
+    'problems.search.resultLimit': '每页结果数',
+    'problems.search.resultLimitDesc': '调整结果数量 (5-20)',
     
     // User page
     'user.title': 'MTV2',

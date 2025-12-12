@@ -27,18 +27,22 @@ interface ColumnCustomizerProps {
   onClose: () => void;
   columns: ColumnConfig[];
   onChange: (columns: ColumnConfig[]) => void;
+  resultLimit: number;
+  onResultLimitChange: (limit: number) => void;
 }
 
-export default function ColumnCustomizer({ isOpen, onClose, columns, onChange }: ColumnCustomizerProps) {
+export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, resultLimit, onResultLimitChange }: ColumnCustomizerProps) {
   const { t } = useLanguage();
   const [localColumns, setLocalColumns] = useState<ColumnConfig[]>(columns);
+  const [localResultLimit, setLocalResultLimit] = useState(resultLimit);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setLocalColumns(columns);
+      setLocalResultLimit(resultLimit);
     }
-  }, [isOpen, columns]);
+  }, [isOpen, columns, resultLimit]);
 
   const getColumnLabel = (id: ColumnId): string => {
     const labels: Record<ColumnId, string> = {
@@ -125,12 +129,15 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange }:
     }));
     
     onChange(reordered);
+    onResultLimitChange(localResultLimit);
     onClose();
   };
 
   const handleReset = () => {
     setLocalColumns(DEFAULT_COLUMNS);
+    setLocalResultLimit(15);
     onChange(DEFAULT_COLUMNS);
+    onResultLimitChange(15);
   };
 
   if (!isOpen) return null;
@@ -215,6 +222,27 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange }:
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Result Limit Control */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-gray-700">{t('problems.search.resultLimit')}</span>
+                <p className="text-xs text-gray-500 mt-0.5">{t('problems.search.resultLimitDesc')}</p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="range"
+                  min="5"
+                  max="20"
+                  value={localResultLimit}
+                  onChange={(e) => setLocalResultLimit(Number(e.target.value))}
+                  className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <span className="text-sm font-medium text-gray-900 w-8 text-center">{localResultLimit}</span>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -61,14 +61,6 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Validate IP address
-		clientIP := getClientIP(c)
-		if claims.IPAddress != clientIP {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token IP address mismatch"})
-			c.Abort()
-			return
-		}
-
 		// Check if token is blacklisted in Redis
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()

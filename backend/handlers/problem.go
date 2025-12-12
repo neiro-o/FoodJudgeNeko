@@ -49,7 +49,7 @@ func UploadProblem(c *gin.Context) {
 	}
 
 	// Get client IP
-	uploadIP := c.ClientIP()
+	uploadIP := getClientIP(c)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -163,7 +163,7 @@ func UploadMultipleProblems(c *gin.Context) {
 	}
 
 	// Get client IP
-	uploadIP := c.ClientIP()
+	uploadIP := getClientIP(c)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

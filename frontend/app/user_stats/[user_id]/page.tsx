@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { userDetailAPI, UserInfoResponse, UserComment, UserCommentsResponse } from '@/lib/api';
@@ -11,6 +11,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 export default function UserStatsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const userId = params.user_id as string;
   const { t } = useLanguage();
 
@@ -23,6 +24,7 @@ export default function UserStatsPage() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [mobilePageInput, setMobilePageInput] = useState('');
 
   const LIMIT = 10;
 
@@ -72,9 +74,12 @@ export default function UserStatsPage() {
 
   useEffect(() => {
     if (userId && !loading) {
-      fetchComments(1);
+      // Read page number from URL params
+      const pageParam = searchParams.get('pn');
+      const initialPage = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1;
+      fetchComments(initialPage);
     }
-  }, [userId, loading, fetchComments]);
+  }, [userId, loading, fetchComments, searchParams]);
 
   // Format timestamp
   const formatDate = (timestamp: number) => {
@@ -91,6 +96,26 @@ export default function UserStatsPage() {
     if (page >= 1 && page <= totalPages) {
       fetchComments(page);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Update URL with page number
+      const newParams = new URLSearchParams(searchParams.toString());
+      if (page === 1) {
+        newParams.delete('pn');
+      } else {
+        newParams.set('pn', String(page));
+      }
+      const paramString = newParams.toString();
+      router.push(`/user_stats/${userId}${paramString ? `?${paramString}` : ''}`);
+    }
+  };
+
+  // Handle mobile page jump
+  const handleMobilePageJump = (e: React.FormEvent) => {
+    e.preventDefault();
+    const page = parseInt(mobilePageInput, 10);
+    if (!isNaN(page) && page >= 1 && page <= totalPages) {
+      handlePageChange(page);
+      setMobilePageInput('');
     }
   };
 
@@ -113,31 +138,54 @@ export default function UserStatsPage() {
 
     return (
       <div className="mt-6">
-        {/* Mobile pagination - simple prev/next with page indicator */}
-        <div className="flex sm:hidden justify-between items-center">
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Prev
-          </button>
-          <span className="text-sm text-gray-600">
-            {currentPage} / {totalPages}
-          </span>
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
-          >
-            Next
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+        {/* Mobile pagination - prev/next with page jump */}
+        <div className="flex sm:hidden flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Prev
+            </button>
+            <span className="text-sm text-gray-600">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+            >
+              Next
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          {/* Page jump input */}
+          <form onSubmit={handleMobilePageJump} className="flex justify-center items-center gap-2">
+            <span className="text-sm text-gray-600">跳转到</span>
+            <input
+              type="number"
+              min="1"
+              max={totalPages}
+              value={mobilePageInput}
+              onChange={(e) => setMobilePageInput(e.target.value)}
+              placeholder={String(currentPage)}
+              className="w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+            />
+            <span className="text-sm text-gray-600">页</span>
+            <button
+              type="submit"
+              disabled={!mobilePageInput || parseInt(mobilePageInput, 10) < 1 || parseInt(mobilePageInput, 10) > totalPages}
+              className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 transition"
+            >
+              Go
+            </button>
+          </form>
         </div>
 
         {/* Desktop pagination - full page numbers */}

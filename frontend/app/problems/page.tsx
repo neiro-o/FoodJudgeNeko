@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { problemAPI, searchAPI, SearchResult } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
@@ -13,12 +13,14 @@ export default function ProblemsPage() {
   const { isAuthenticated, loading } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Upload states
   const [uploadMode, setUploadMode] = useState<'single' | 'multiple'>('single');
   const [singleUrl, setSingleUrl] = useState('');
   const [singleParsed, setSingleParsed] = useState<{ userId: string; taskId: string } | null>(null);
   const [multipleUrls, setMultipleUrls] = useState('');
+  const [uploadStateLoaded, setUploadStateLoaded] = useState(false);
   const [multipleParsed, setMultipleParsed] = useState<{
     pairs: Array<{ userId: string; taskId: string }>;
     userIdCount: number;
@@ -44,6 +46,7 @@ export default function ProblemsPage() {
   // Column customization states
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+  const [resultLimit, setResultLimit] = useState(15);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -51,28 +54,65 @@ export default function ProblemsPage() {
     }
   }, [isAuthenticated, loading, router]);
 
-  // Load recent problems on page load
+  // Load recent problems on page load or search from URL params
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      const loadRecentProblems = async () => {
-        setSearchLoading(true);
-        setSearchError('');
-        try {
-          const response = await searchAPI.recent(15);
-          setSearchResults(response.results);
-          setSearchTotal(response.total);
-          setCurrentSearchKeyword('');
-        } catch (error: any) {
-          setSearchError(error.message || t('problems.search.errorFailed'));
-          setSearchResults([]);
-          setSearchTotal(0);
-        } finally {
-          setSearchLoading(false);
+      const urlKeyword = searchParams.get('q');
+      
+      // Get saved result limit from localStorage (since state may not be updated yet)
+      let limit = 15;
+      if (typeof window !== 'undefined') {
+        const savedLimit = localStorage.getItem('problemResultLimit');
+        if (savedLimit) {
+          const parsed = parseInt(savedLimit, 10);
+          if (!isNaN(parsed) && parsed >= 5 && parsed <= 20) {
+            limit = parsed;
+          }
         }
-      };
-      loadRecentProblems();
+      }
+      
+      if (urlKeyword && urlKeyword.trim()) {
+        // Search with the keyword from URL
+        const performSearch = async () => {
+          setSearchLoading(true);
+          setSearchError('');
+          try {
+            const response = await searchAPI.search(urlKeyword.trim(), limit);
+            setSearchResults(response.results);
+            setSearchTotal(response.total);
+            setCurrentSearchKeyword(urlKeyword.trim());
+          } catch (error: any) {
+            setSearchError(error.message || t('problems.search.errorFailed'));
+            setSearchResults([]);
+            setSearchTotal(0);
+            setCurrentSearchKeyword('');
+          } finally {
+            setSearchLoading(false);
+          }
+        };
+        performSearch();
+      } else {
+        // Load recent problems
+        const loadRecentProblems = async () => {
+          setSearchLoading(true);
+          setSearchError('');
+          try {
+            const response = await searchAPI.recent(limit);
+            setSearchResults(response.results);
+            setSearchTotal(response.total);
+            setCurrentSearchKeyword('');
+          } catch (error: any) {
+            setSearchError(error.message || t('problems.search.errorFailed'));
+            setSearchResults([]);
+            setSearchTotal(0);
+          } finally {
+            setSearchLoading(false);
+          }
+        };
+        loadRecentProblems();
+      }
     }
-  }, [isAuthenticated, loading, t]);
+  }, [isAuthenticated, loading, t, searchParams]);
 
   // Load counts on page load
   useEffect(() => {
@@ -93,7 +133,7 @@ export default function ProblemsPage() {
     }
   }, [isAuthenticated, loading]);
 
-  // Load column configuration from localStorage
+  // Load column configuration and result limit from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('problemTableColumns');
@@ -105,8 +145,44 @@ export default function ProblemsPage() {
           console.error('Failed to parse saved column configuration', e);
         }
       }
+      const savedLimit = localStorage.getItem('problemResultLimit');
+      if (savedLimit) {
+        const parsed = parseInt(savedLimit, 10);
+        if (!isNaN(parsed) && parsed >= 5 && parsed <= 20) {
+          setResultLimit(parsed);
+        }
+      }
     }
   }, []);
+
+  // Load upload state from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('problemUploadState');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.uploadMode) setUploadMode(parsed.uploadMode);
+          if (parsed.singleUrl) setSingleUrl(parsed.singleUrl);
+          if (parsed.multipleUrls) setMultipleUrls(parsed.multipleUrls);
+        } catch (e) {
+          console.error('Failed to parse saved upload state', e);
+        }
+      }
+      setUploadStateLoaded(true);
+    }
+  }, []);
+
+  // Save upload state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && uploadStateLoaded) {
+      localStorage.setItem('problemUploadState', JSON.stringify({
+        uploadMode,
+        singleUrl,
+        multipleUrls,
+      }));
+    }
+  }, [uploadMode, singleUrl, multipleUrls, uploadStateLoaded]);
 
   // Save column configuration to localStorage
   const handleColumnsChange = (newColumns: ColumnConfig[]) => {
@@ -127,6 +203,33 @@ export default function ProblemsPage() {
     setColumns(reordered);
     if (typeof window !== 'undefined') {
       localStorage.setItem('problemTableColumns', JSON.stringify(reordered));
+    }
+  };
+
+  // Save result limit to localStorage and re-fetch results
+  const handleResultLimitChange = async (limit: number) => {
+    setResultLimit(limit);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('problemResultLimit', String(limit));
+    }
+    
+    // Re-fetch results with new limit
+    setSearchLoading(true);
+    setSearchError('');
+    try {
+      if (currentSearchKeyword) {
+        const response = await searchAPI.search(currentSearchKeyword, limit);
+        setSearchResults(response.results);
+        setSearchTotal(response.total);
+      } else {
+        const response = await searchAPI.recent(limit);
+        setSearchResults(response.results);
+        setSearchTotal(response.total);
+      }
+    } catch (error: any) {
+      setSearchError(error.message || t('problems.search.errorFailed'));
+    } finally {
+      setSearchLoading(false);
     }
   };
 
@@ -300,11 +403,16 @@ export default function ProblemsPage() {
     setSearchLoading(true);
 
     try {
-      const response = await searchAPI.search(keyword, 15);
+      const response = await searchAPI.search(keyword, resultLimit);
       setSearchResults(response.results);
       setSearchTotal(response.total);
       setCurrentSearchKeyword(keyword);
       setSearchKeyword(''); // Clear the input after successful search
+      
+      // Update URL with search keyword
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('q', keyword);
+      router.push(`/problems?${params.toString()}`);
     } catch (error: any) {
       setSearchError(error.message || t('problems.search.errorFailed'));
       setSearchResults([]);
@@ -714,6 +822,8 @@ export default function ProblemsPage() {
         onClose={() => setIsCustomizerOpen(false)}
         columns={columns}
         onChange={handleColumnsChange}
+        resultLimit={resultLimit}
+        onResultLimitChange={handleResultLimitChange}
       />
     </div>
     </>
