@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: '选择与结果不一致，掉小心心了！',
   icons: {
     icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
   },
 }
 

@@ -174,6 +174,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Rankings page
     'rankings.title': 'Rankings',
+    'pageTitle.rankings': 'Rankings',
     'rankings.rank': 'Rank',
     'rankings.user': 'User',
     'rankings.likes': 'Likes',
@@ -341,6 +342,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Rankings page
     'rankings.title': '排行榜',
+    'pageTitle.rankings': '评论排行榜',
     'rankings.rank': '排名',
     'rankings.user': '用户',
     'rankings.likes': '获赞',

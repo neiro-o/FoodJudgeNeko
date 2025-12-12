@@ -56,6 +56,13 @@ export default function UserStatsPage() {
     }
   }, [userId, t, getAvatarUrl]);
 
+  // Update page title with user name
+  useEffect(() => {
+    if (userInfo?.userName) {
+      document.title = userInfo.userName;
+    }
+  }, [userInfo?.userName]);
+
   // Fetch comments
   const fetchComments = useCallback(async (page: number) => {
     try {

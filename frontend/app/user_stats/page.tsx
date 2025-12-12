@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import PageTitle from '@/components/PageTitle';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { userDetailAPI, RankingItem } from '@/lib/api';
 
@@ -58,6 +59,7 @@ export default function RankingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <PageTitle titleKey="pageTitle.rankings" />
         <Navbar title={t('rankings.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-500">{t('rankings.loading')}</div>
@@ -69,6 +71,7 @@ export default function RankingsPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <PageTitle titleKey="pageTitle.rankings" />
         <Navbar title={t('rankings.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
           <div className="text-red-500">{error}</div>
@@ -79,6 +82,7 @@ export default function RankingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageTitle titleKey="pageTitle.rankings" />
       <Navbar title={t('rankings.title')} showBackButton backHref="/problems" />
 
       <div className="max-w-4xl mx-auto px-4 py-6">

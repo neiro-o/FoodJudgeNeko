@@ -46,7 +46,11 @@ export default function ChatMessage({
     if (message.role === 'merchant') {
       return merchantAvatar;
     }
-    return userAvatar;
+    if (message.role === 'user') {
+      return userAvatar;
+    }
+    // For any other role (not user or merchant), use avatar_3.png
+    return '/avatars/avatar_3.png';
   };
 
   // Get picture label

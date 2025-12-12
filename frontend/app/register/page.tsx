@@ -49,7 +49,7 @@ export default function RegisterPage() {
         username,
         email,
         password,
-        invite_code: inviteCode,
+        invitation_code: inviteCode,
       });
       
       // Registration successful, redirect to login
