@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"mtv2/backend/config"
 	"mtv2/backend/database"
@@ -16,11 +19,23 @@ import (
 
 type SearchRequest struct {
 	Keyword string `form:"keyword" json:"keyword" binding:"required"`
-	Limit   int    `form:"limit" json:"limit" binding:"required,min=5,max=20"`
+	Limit   int    `form:"limit" json:"limit" binding:"required,min=5,max=30"`
 }
 
 type RecentProblemsRequest struct {
 	Limit int `form:"limit" json:"limit" binding:"omitempty,min=5,max=20"`
+}
+
+// isSingleCharacter checks if the keyword is a single character (handles Unicode properly)
+func isSingleCharacter(keyword string) bool {
+	return utf8.RuneCountInString(keyword) == 1
+}
+
+// escapeWildcard escapes special wildcard characters for Elasticsearch wildcard query
+func escapeWildcard(s string) string {
+	// Escape special characters: *, ?, \
+	re := regexp.MustCompile(`([*?\\])`)
+	return re.ReplaceAllString(s, `\$1`)
 }
 
 // calculateFuzziness calculates fuzziness based on keyword length
@@ -150,68 +165,112 @@ func Search(c *gin.Context) {
 		return
 	}
 
+	// Validate limit: ensure it's between 5 and 30
+	if req.Limit < 5 || req.Limit > 30 {
+		utils.BadRequestResponse(c, "limit must be between 5 and 30")
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Calculate dynamic fuzziness and min_score based on keyword length
-	fuzziness := calculateFuzziness(req.Keyword)
-	minScore := calculateMinScore(req.Keyword)
+	var query map[string]interface{}
 
-	// Build Elasticsearch query using the centralized query builder
-	boolQuery := utils.BuildBoolQuery(req.Keyword, fuzziness)
+	// For single character keywords, use wildcard query on user_review field
+	if isSingleCharacter(req.Keyword) {
+		// Escape special wildcard characters
+		escapedKeyword := escapeWildcard(req.Keyword)
 
-	query := map[string]interface{}{
-		"query": map[string]interface{}{
-			"bool": boolQuery,
-		},
-		"min_score": minScore, // Dynamic score threshold based on keyword length
-		"size":      15,       // Fixed size to 15 (matching Python script)
-		"highlight": map[string]interface{}{
-			"fields": map[string]interface{}{
-				"user_review": map[string]interface{}{
-					"require_field_match": false, // Allow highlighting even if field doesn't match query
-					"highlight_query": map[string]interface{}{
-						"match_phrase": map[string]interface{}{
-							"user_review": map[string]interface{}{
-								"query": req.Keyword,
-							},
-						},
-					},
-				},
-				"others": map[string]interface{}{
-					"require_field_match": false,
-					"highlight_query": map[string]interface{}{
-						"match_phrase": map[string]interface{}{
-							"others": map[string]interface{}{
-								"query": req.Keyword,
-							},
-						},
-					},
-				},
-				"replies.content": map[string]interface{}{
-					"require_field_match": false,
-					"highlight_query": map[string]interface{}{
-						"match_phrase": map[string]interface{}{
-							"replies.content": map[string]interface{}{
-								"query": req.Keyword,
-							},
-						},
-					},
-				},
-				"appeals.content": map[string]interface{}{
-					"require_field_match": false,
-					"highlight_query": map[string]interface{}{
-						"match_phrase": map[string]interface{}{
-							"appeals.content": map[string]interface{}{
-								"query": req.Keyword,
-							},
-						},
+		query = map[string]interface{}{
+			"query": map[string]interface{}{
+				"wildcard": map[string]interface{}{
+					"user_review": map[string]interface{}{
+						"value":            fmt.Sprintf("*%s*", escapedKeyword),
+						"case_insensitive": true,
 					},
 				},
 			},
-			"pre_tags":  []string{"<mark>"},
-			"post_tags": []string{"</mark>"},
-		},
+			"size": req.Limit,
+			"highlight": map[string]interface{}{
+				"fields": map[string]interface{}{
+					"user_review": map[string]interface{}{
+						"require_field_match": false,
+						"highlight_query": map[string]interface{}{
+							"wildcard": map[string]interface{}{
+								"user_review": map[string]interface{}{
+									"value":            fmt.Sprintf("*%s*", escapedKeyword),
+									"case_insensitive": true,
+								},
+							},
+						},
+					},
+				},
+				"pre_tags":  []string{"<mark>"},
+				"post_tags": []string{"</mark>"},
+			},
+		}
+	} else {
+		// For multi-character keywords, use the normal query builder
+		// Calculate dynamic fuzziness and min_score based on keyword length
+		fuzziness := calculateFuzziness(req.Keyword)
+		minScore := calculateMinScore(req.Keyword)
+
+		// Build Elasticsearch query using the centralized query builder
+		boolQuery := utils.BuildBoolQuery(req.Keyword, fuzziness)
+
+		query = map[string]interface{}{
+			"query": map[string]interface{}{
+				"bool": boolQuery,
+			},
+			"min_score": minScore, // Dynamic score threshold based on keyword length
+			"size":      req.Limit,
+			"highlight": map[string]interface{}{
+				"fields": map[string]interface{}{
+					"user_review": map[string]interface{}{
+						"require_field_match": false, // Allow highlighting even if field doesn't match query
+						"highlight_query": map[string]interface{}{
+							"match_phrase": map[string]interface{}{
+								"user_review": map[string]interface{}{
+									"query": req.Keyword,
+								},
+							},
+						},
+					},
+					"others": map[string]interface{}{
+						"require_field_match": false,
+						"highlight_query": map[string]interface{}{
+							"match_phrase": map[string]interface{}{
+								"others": map[string]interface{}{
+									"query": req.Keyword,
+								},
+							},
+						},
+					},
+					"replies.content": map[string]interface{}{
+						"require_field_match": false,
+						"highlight_query": map[string]interface{}{
+							"match_phrase": map[string]interface{}{
+								"replies.content": map[string]interface{}{
+									"query": req.Keyword,
+								},
+							},
+						},
+					},
+					"appeals.content": map[string]interface{}{
+						"require_field_match": false,
+						"highlight_query": map[string]interface{}{
+							"match_phrase": map[string]interface{}{
+								"appeals.content": map[string]interface{}{
+									"query": req.Keyword,
+								},
+							},
+						},
+					},
+				},
+				"pre_tags":  []string{"<mark>"},
+				"post_tags": []string{"</mark>"},
+			},
+		}
 	}
 
 	queryJSON, err := json.Marshal(query)
@@ -488,6 +547,67 @@ func parseComments(comments []interface{}) []Comment {
 	return result
 }
 
+// userIdEncrypt encrypts a userId string by:
+// 1. Reverse the userId number
+// 2. Set it to base-9
+// 3. Reverse it again
+// 4. Return it to base 10
+func userIdEncrypt(userId string) string {
+	if userId == "" {
+		return userId
+	}
+
+	// Step 1: Convert userId string to number and reverse it
+	num, err := strconv.ParseInt(userId, 10, 64)
+	if err != nil {
+		// If userId is not a valid number, return as is
+		return userId
+	}
+
+	// Reverse the number
+	reversedNum := reverseNumber(num)
+
+	// Step 2: Convert to base-9
+	base9Str := strconv.FormatInt(reversedNum, 9)
+
+	// Step 3: Reverse the base-9 string
+	reversedBase9 := reverseString(base9Str)
+
+	// Step 4: Convert back to base-10
+	encryptedNum, err := strconv.ParseInt(reversedBase9, 9, 64)
+	if err != nil {
+		// If conversion fails, return original
+		return userId
+	}
+
+	// Return as string
+	return strconv.FormatInt(encryptedNum, 10)
+}
+
+// reverseNumber reverses the digits of a number
+// Example: 12345 -> 54321
+func reverseNumber(num int64) int64 {
+	if num == 0 {
+		return 0
+	}
+
+	reversed := int64(0)
+	for num > 0 {
+		reversed = reversed*10 + num%10
+		num /= 10
+	}
+	return reversed
+}
+
+// reverseString reverses a string
+func reverseString(s string) string {
+	runes := []rune(s)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+	return string(runes)
+}
+
 // calculateCommentAnswer calculates the most selected choice from comments
 // Excludes the last comment if the comments length is even
 func calculateCommentAnswer(comments []Comment) *int {
@@ -725,6 +845,11 @@ func SearchByESID(c *gin.Context) {
 
 	doc := parseDocument(source, score, highlight)
 
+	// Encrypt userId before returning
+	if doc.UserID != "" {
+		doc.UserID = userIdEncrypt(doc.UserID)
+	}
+
 	utils.SuccessResponse(c, doc)
 }
 
@@ -826,6 +951,11 @@ func SearchByMongoID(c *gin.Context) {
 	}
 
 	doc := parseDocument(source, score, highlight)
+
+	// Encrypt userId before returning
+	if doc.UserID != "" {
+		doc.UserID = userIdEncrypt(doc.UserID)
+	}
 
 	utils.SuccessResponse(c, doc)
 }

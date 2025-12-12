@@ -16,6 +16,8 @@ type Config struct {
 			Invitations   string `yaml:"invitations"`
 			ProcessedList string `yaml:"processed_list"`
 			Problems      string `yaml:"problems"`
+			Notes         string `yaml:"notes"`
+			Comments      string `yaml:"comments"`
 		} `yaml:"collections"`
 	} `yaml:"mongodb"`
 	Redis struct {

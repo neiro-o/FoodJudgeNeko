@@ -49,6 +49,7 @@ interface ProblemType1Props {
   appeals?: Appeal[];
   orders?: Order[];
   orderDetail?: OrderDetail;
+  others?: string;
   ratio1?: number;
   ratio2?: number;
   answer?: number;
@@ -62,6 +63,7 @@ export default function ProblemType1({
   appeals = [],
   orders = [],
   orderDetail,
+  others,
   ratio1 = 50,
   ratio2 = 50,
   answer = 1,
@@ -273,6 +275,7 @@ export default function ProblemType1({
   const problemTitle = language === 'zh' ? '题目' : 'Problem';
   const problemDescription = language === 'zh' ? '外卖评价投诉纠纷' : 'Takeaway Review Disputes';
   const appealsTitle = language === 'zh' ? '商户申诉' : 'Appeals';
+  const othersTitle = language === 'zh' ? '其他信息' : 'Other Info';
   const ordersTitle = language === 'zh' ? '订单信息' : 'Orders';
   const notesSubtitle = language === 'zh' ? '用户备注' : 'Notes';
   const itemsSubtitle = language === 'zh' ? `商品 (${totalItemsCount} 件)` : `Items (${totalItemsCount})`;
@@ -296,6 +299,14 @@ export default function ProblemType1({
             <ChatTimeline messages={appealMessages} />
           </div>
         </>
+      )}
+
+      {/* Others Section */}
+      {others && (
+        <div className="border-t border-gray-200 pt-4 mt-4 mb-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-2">{othersTitle}</h3>
+          <p className="text-sm text-gray-600 whitespace-pre-wrap">{others}</p>
+        </div>
       )}
 
       {/* Orders Section */}

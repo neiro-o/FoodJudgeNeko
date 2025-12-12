@@ -26,6 +26,13 @@ function LoginForm() {
     }
   }, [searchParams, t]);
 
+  // Check for expired session message
+  useEffect(() => {
+    if (searchParams.get('expired') === 'true') {
+      setError(t('login.expired'));
+    }
+  }, [searchParams, t]);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {

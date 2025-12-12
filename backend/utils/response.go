@@ -52,6 +52,11 @@ func ConflictResponse(c *gin.Context, message string) {
 	ErrorResponse(c, 409, message)
 }
 
+// NotFoundResponse sends a not found error response
+func NotFoundResponse(c *gin.Context, message string) {
+	ErrorResponse(c, 404, message)
+}
+
 // GetUserID returns the authenticated user's MongoDB ObjectID as a hex string
 // Returns empty string and false if user is not authenticated
 func GetUserID(c *gin.Context) (string, bool) {

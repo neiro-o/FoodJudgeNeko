@@ -8,6 +8,7 @@ import { searchAPI } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ProblemType1 from '@/components/ProblemType1';
+import ProblemType2 from '@/components/ProblemType2';
 import CommentList from '@/components/CommentList';
 
 // Problem data interface
@@ -122,16 +123,25 @@ export default function ProblemDetailPage() {
                       appeals={problem.appeals}
                       orders={problem.orders}
                       orderDetail={problem.order_detail}
+                      others={problem.others}
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
                     />
                   )}
-                </div>
-
-                {/* Layout 3 */}
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  {/* Layout 3 Content */}
+                  {problem.problem_type === 2 && (
+                    <ProblemType2
+                      userReview={problem.user_review}
+                      reviewPics={problem.review_pics}
+                      timestamp={problem.timestamp}
+                      replies={problem.replies}
+                      appeals={problem.appeals}
+                      others={problem.others}
+                      ratio1={problem.ratio_1}
+                      ratio2={problem.ratio_2}
+                      answer={problem.answer}
+                    />
+                  )}
                 </div>
               </div>
 

@@ -26,7 +26,26 @@ async function apiRequest<T>(
     headers,
   });
 
-  const data: ApiResponse<T> = await response.json();
+  // Handle 401 Unauthorized - redirect to login
+  if (response.status === 401) {
+    // Clear auth data
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Redirect to login with expired parameter
+      window.location.href = '/login?expired=true';
+    }
+    throw new Error('Unauthorized');
+  }
+
+  // Try to parse JSON, but handle cases where response might not be JSON
+  let data: ApiResponse<T>;
+  try {
+    data = await response.json();
+  } catch (error) {
+    // If response is not JSON, throw a generic error
+    throw new Error('Invalid response from server');
+  }
 
   if (data.code !== 0) {
     throw new Error(data.message || 'Request failed');
@@ -141,6 +160,10 @@ export const problemAPI = {
       body: JSON.stringify(data),
     });
   },
+
+  count: async (): Promise<{ counts: { elasticsearch: number; mongodb: number; redis: number } }> => {
+    return apiRequest<{ counts: { elasticsearch: number; mongodb: number; redis: number } }>('/problem/count');
+  },
 };
 
 // Search API
@@ -220,5 +243,73 @@ export const mediaAPI = {
       hash: hash,
     });
     return `${API_BASE_URL}/media/video?${params.toString()}`;
+  },
+};
+
+// User Detail API
+export interface UserInfoResponse {
+  userName: string;
+  likes: number;
+  replies: number;
+}
+
+export interface UserComment {
+  id: string;
+  problemId: string;
+  commentId: string;
+  userId: string;
+  userName: string;
+  userPic: string;
+  createTime: number;
+  content: string;
+  approveCount: number;
+  replyTotal: number;
+  isAnonymous: boolean;
+  voteOperate: string;
+  choice: number;
+}
+
+export interface UserCommentsResponse {
+  comments: UserComment[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface RankingItem {
+  userId: string;
+  userName: string;
+  likes: number;
+  commentCount: number;
+}
+
+export interface RankingsResponse {
+  rankings: RankingItem[];
+  total: number;
+}
+
+export const userDetailAPI = {
+  getAvatarUrl: (userId: string): string => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return '';
+    return `${API_BASE_URL}/user_detail/avatar?userId=${userId}&token=${encodeURIComponent(token)}`;
+  },
+
+  getUserInfo: async (userId: string): Promise<UserInfoResponse> => {
+    return apiRequest<UserInfoResponse>(`/user_detail/user_info?userId=${userId}`);
+  },
+
+  getComments: async (userId: string, page: number = 1, limit: number = 10): Promise<UserCommentsResponse> => {
+    const params = new URLSearchParams({
+      userId,
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    return apiRequest<UserCommentsResponse>(`/user_detail/comments?${params.toString()}`);
+  },
+
+  getRankings: async (): Promise<RankingsResponse> => {
+    return apiRequest<RankingsResponse>('/user_detail/rankings');
   },
 };

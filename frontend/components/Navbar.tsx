@@ -18,9 +18,11 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
   
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isUserOpen, setIsUserOpen] = useState(false);
+  const [isTitleMenuOpen, setIsTitleMenuOpen] = useState(false);
   
   const langRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+  const titleMenuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -30,6 +32,9 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
       }
       if (userRef.current && !userRef.current.contains(event.target as Node)) {
         setIsUserOpen(false);
+      }
+      if (titleMenuRef.current && !titleMenuRef.current.contains(event.target as Node)) {
+        setIsTitleMenuOpen(false);
       }
     };
 
@@ -56,6 +61,11 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
     router.push(backHref);
   };
 
+  const handleNavigate = (path: string) => {
+    setIsTitleMenuOpen(false);
+    router.push(path);
+  };
+
   return (
     <nav className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,7 +84,38 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
                 </svg>
               </button>
             )}
-            <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+            <div className="relative" ref={titleMenuRef}>
+              <button
+                onClick={() => setIsTitleMenuOpen(!isTitleMenuOpen)}
+                className="text-xl font-semibold text-gray-900 hover:text-indigo-600 transition cursor-pointer"
+              >
+                {title}
+              </button>
+
+              {/* Title Menu Dropdown */}
+              {isTitleMenuOpen && (
+                <div className="absolute left-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <button
+                    onClick={() => handleNavigate('/')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
+                  >
+                    {t('nav.home')}
+                  </button>
+                  <button
+                    onClick={() => handleNavigate('/problems')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
+                  >
+                    {t('nav.problems')}
+                  </button>
+                  <button
+                    onClick={() => handleNavigate('/user_stats')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
+                  >
+                    {t('nav.userStats')}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right side icons */}

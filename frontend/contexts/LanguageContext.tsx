@@ -22,7 +22,10 @@ const translations: Record<Language, Record<string, string>> = {
     'language': 'Language',
     'english': 'English',
     'chinese': '中文',
-    
+    'nav.home': 'Home',
+    'nav.problems': 'Problems',
+    'nav.userStats': 'User Details',
+
     // Page titles
     'pageTitle.home': 'You lose a heart.',
     'pageTitle.login': 'Login',
@@ -47,6 +50,7 @@ const translations: Record<Language, Record<string, string>> = {
     'login.noAccount': "Don't have an account?",
     'login.signUp': 'Sign up',
     'login.success': 'Account created successfully! Please sign in.',
+    'login.expired': 'Login status deactivated, please login again.',
     
     // Register page
     'register.title': 'Create Account',
@@ -123,6 +127,7 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.search.customizeDescription': 'Drag to reorder, toggle to show/hide columns',
     'problems.search.customizeClose': 'Close',
     'problems.search.customizeReset': 'Reset to Default',
+    'problems.search.counts': 'Currently there are {elasticsearch} problems, with {redis} problems in process. Raw data: {mongodb} problems.',
     
     // User page
     'user.title': 'MTV2',
@@ -153,6 +158,26 @@ const translations: Record<Language, Record<string, string>> = {
     'user.created': 'Created',
     'user.used': 'Used',
     'user.available': 'Available',
+
+    // User Stats page
+    'userStats.title': 'User Detail',
+    'userStats.totalLikes': '{count} Likes',
+    'userStats.totalReplies': '{count} Replies',
+    'userStats.comments': 'Comments ({count})',
+    'userStats.supportUser': 'Support User',
+    'userStats.supportMerchant': 'Support Merchant',
+    'userStats.loading': 'Loading...',
+    'userStats.notFound': 'User not found',
+    'userStats.noComments': 'No comments yet',
+
+    // Rankings page
+    'rankings.title': 'Rankings',
+    'rankings.rank': 'Rank',
+    'rankings.user': 'User',
+    'rankings.likes': 'Likes',
+    'rankings.comments': 'Comments',
+    'rankings.loading': 'Loading...',
+    'rankings.empty': 'No rankings available',
   },
   zh: {
     // Common
@@ -162,6 +187,9 @@ const translations: Record<Language, Record<string, string>> = {
     'language': '语言',
     'english': 'English',
     'chinese': '中文',
+    'nav.home': '首页',
+    'nav.problems': '题库',
+    'nav.userStats': '查成分',
     
     // Page titles
     'pageTitle.home': '乐一欧应援网站',
@@ -187,6 +215,7 @@ const translations: Record<Language, Record<string, string>> = {
     'login.noAccount': '还没有账户？',
     'login.signUp': '注册',
     'login.success': '账户创建成功！请登录。',
+    'login.expired': '登录状态失效，请重新登录',
     
     // Register page
     'register.title': '创建账户',
@@ -263,6 +292,7 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.search.customizeDescription': '拖拽排序，切换显示/隐藏列',
     'problems.search.customizeClose': '关闭',
     'problems.search.customizeReset': '重置为默认',
+    'problems.search.counts': '当前共有 {elasticsearch} 题，上传队列中有 {redis} 题，原始数据 {mongodb} 题',
     
     // User page
     'user.title': 'MTV2',
@@ -293,6 +323,26 @@ const translations: Record<Language, Record<string, string>> = {
     'user.created': '创建时间',
     'user.used': '已使用',
     'user.available': '可用',
+
+    // User Stats page
+    'userStats.title': '查成分',
+    'userStats.totalLikes': '共获得 {count} 个赞',
+    'userStats.totalReplies': '共获得 {count} 次回复',
+    'userStats.comments': '历史评论 ({count})',
+    'userStats.supportUser': '适合展示',
+    'userStats.supportMerchant': '不适合展示',
+    'userStats.loading': '加载中...',
+    'userStats.notFound': '用户不存在',
+    'userStats.noComments': '暂无评论',
+
+    // Rankings page
+    'rankings.title': '排行榜',
+    'rankings.rank': '排名',
+    'rankings.user': '用户',
+    'rankings.likes': '获赞',
+    'rankings.comments': '评论数',
+    'rankings.loading': '加载中...',
+    'rankings.empty': '暂无排行数据',
   },
 };
 

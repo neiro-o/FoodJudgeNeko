@@ -7,6 +7,7 @@ Includes examples for keyword search, field-specific search, and advanced querie
 """
 
 import sys
+import re
 import yaml
 from pathlib import Path
 from typing import Dict, List, Any
@@ -225,6 +226,71 @@ def search_by_type(es: Elasticsearch, index_name: str, problem_type: int, size: 
         return None
 
 
+def search_user_review_contains(es: Elasticsearch, index_name: str, search_string: str, size: int = 10):
+    """
+    Search for documents where user_review field contains the specified string.
+    Uses simple string inclusion (substring matching), not indexed full-text search.
+    
+    Args:
+        es: Elasticsearch client
+        index_name: Index name
+        search_string: String to search for in user_review field
+        size: Number of results to return
+    """
+    print(f"\n{'='*80}")
+    print(f"Searching for documents where user_review contains: '{search_string}'")
+    print(f"(Simple string inclusion, no indexing)")
+    print(f"{'='*80}\n")
+    
+    # Escape special characters for wildcard query
+    # Escape wildcard special characters: *, ?, \
+    escaped_string = re.sub(r'([*?\\])', r'\\\1', search_string)
+    
+    query = {
+        "query": {
+            "wildcard": {
+                "user_review": {
+                    "value": f"*{escaped_string}*",
+                    "case_insensitive": True
+                }
+            }
+        },
+        "size": size
+    }
+    
+    try:
+        response = es.search(index=index_name, body=query)
+        
+        total = response['hits']['total']['value']
+        print(f"Found {total} document(s)\n")
+        
+        if total > 0:
+            for i, hit in enumerate(response['hits']['hits'], 1):
+                doc = hit['_source']
+                user_review = doc.get('user_review', '')
+                
+                print(f"[{i}] mongo_id: {doc.get('mongo_id')}")
+                print(f"    problem_type: {doc.get('problem_type')}")
+                print(f"    user_review: {user_review[:200]}...")
+                
+                # Show where the string was found
+                if search_string.lower() in user_review.lower():
+                    idx = user_review.lower().find(search_string.lower())
+                    start = max(0, idx - 30)
+                    end = min(len(user_review), idx + len(search_string) + 30)
+                    context = user_review[start:end]
+                    print(f"    Match context: ...{context}...")
+                print()
+        else:
+            print("No documents found.")
+            
+        return response
+        
+    except (TransportError, RequestError) as e:
+        print(f"✗ Search error: {e}")
+        return None
+
+
 def search_combined(es: Elasticsearch, index_name: str, keyword: str, problem_type: int = None, size: int = 10):
     """
     Combined search: keyword + optional problem type filter.
@@ -318,6 +384,13 @@ def main():
     print("EXAMPLE 4: Search by problem type")
     print(f"{'='*80}")
     search_by_type(es, index_name, problem_type=1, size=5)
+    
+    # Example 5: Simple string inclusion search in user_review
+    search_str = "份量很足"
+    print(f"\n{'='*80}")
+    print("EXAMPLE 5: Simple string inclusion search in user_review")
+    print(f"{'='*80}")
+    search_user_review_contains(es, index_name, search_str, size=5)
     
     print("\n" + "="*80)
     print("Search examples completed!")

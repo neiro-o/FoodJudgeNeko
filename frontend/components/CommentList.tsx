@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+
 interface Comment {
   userid: number;
   name: string;
@@ -38,16 +40,30 @@ export default function CommentList({ comments, pageSize = 8 }: CommentListProps
     const year = gmt8.getFullYear();
     const month = (gmt8.getMonth() + 1).toString().padStart(2, '0');
     const day = gmt8.getDate().toString().padStart(2, '0');
-    const hours = gmt8.getHours();
-    const minutes = gmt8.getMinutes().toString().padStart(2, '0');
-    const seconds = gmt8.getSeconds().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
 
-  // Get avatar path based on userid
-  const getAvatarPath = (userid: number): string => {
+  // Get avatar URL from API with token
+  const getAvatarUrl = (userid: number): string => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return getDefaultAvatarPath(userid);
+    return `${API_BASE_URL}/user_detail/avatar?userId=${userid}&token=${encodeURIComponent(token)}`;
+  };
+
+  // Get default avatar path based on userid (fallback)
+  const getDefaultAvatarPath = (userid: number): string => {
     const avatarIndex = (userid % 9) + 1;
     return `/avatars/comment_avt_${avatarIndex}.png`;
+  };
+
+  // Handle avatar error - fall back to default avatar
+  const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>, userid: number) => {
+    const target = e.target as HTMLImageElement;
+    const defaultPath = getDefaultAvatarPath(userid);
+    // Only change if not already using the default
+    if (!target.src.includes('/avatars/comment_avt_')) {
+      target.src = defaultPath;
+    }
   };
 
   // Handle avatar click
@@ -69,10 +85,11 @@ export default function CommentList({ comments, pageSize = 8 }: CommentListProps
             {/* Avatar */}
             <div className="flex-shrink-0">
               <img
-                src={getAvatarPath(comment.userid)}
+                src={getAvatarUrl(comment.userid)}
                 alt={comment.name}
                 className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
                 onClick={() => handleAvatarClick(comment.userid)}
+                onError={(e) => handleAvatarError(e, comment.userid)}
               />
             </div>
 

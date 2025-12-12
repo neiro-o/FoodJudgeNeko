@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -290,5 +291,59 @@ func UploadMultipleProblems(c *gin.Context) {
 			"results":  results,
 			"uploadIP": uploadIP,
 		},
+	})
+}
+
+// CountItems returns the count of items in Elasticsearch, MongoDB, and Redis queue
+func CountItems(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	counts := gin.H{
+		"elasticsearch": int64(0),
+		"mongodb":       int64(0),
+		"redis":         int64(0),
+	}
+
+	// Count Elasticsearch documents
+	indexName := config.AppConfig.Elasticsearch.IndexName
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match_all": map[string]interface{}{},
+		},
+	}
+	queryJSON, err := json.Marshal(query)
+	if err == nil {
+		res, err := database.ESClient.Count(
+			database.ESClient.Count.WithContext(ctx),
+			database.ESClient.Count.WithIndex(indexName),
+			database.ESClient.Count.WithBody(bytes.NewReader(queryJSON)),
+		)
+		if err == nil && !res.IsError() {
+			var result map[string]interface{}
+			if err := json.NewDecoder(res.Body).Decode(&result); err == nil {
+				if count, ok := result["count"].(float64); ok {
+					counts["elasticsearch"] = int64(count)
+				}
+			}
+			res.Body.Close()
+		}
+	}
+
+	// Count MongoDB documents
+	mongoCount, err := database.Problems.CountDocuments(ctx, bson.M{})
+	if err == nil {
+		counts["mongodb"] = mongoCount
+	}
+
+	// Count Redis queue items
+	queueName := config.AppConfig.Redis.Fields.ProblemsQueue
+	redisCount, err := database.RedisClient.LLen(ctx, queueName).Result()
+	if err == nil {
+		counts["redis"] = redisCount
+	}
+
+	utils.SuccessResponse(c, gin.H{
+		"counts": counts,
 	})
 }

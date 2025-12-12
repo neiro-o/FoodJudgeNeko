@@ -90,6 +90,8 @@ func main() {
 		// Media endpoints are public but validate hash (hash generation is protected)
 		api.GET("/media/image", handlers.LoadImage)
 		api.GET("/media/video", handlers.LoadVideo)
+		// Avatar endpoint accepts token via query parameter (for use in <img src="">)
+		api.GET("/user_detail/avatar", handlers.GetUserAvatar)
 	}
 
 	// Protected routes
@@ -104,9 +106,15 @@ func main() {
 		protected.POST("/problem/upload-multiple", handlers.UploadMultipleProblems)
 		protected.GET("/problem/search", handlers.Search)
 		protected.GET("/problem/recent", handlers.GetRecentProblems)
+		protected.GET("/problem/count", handlers.CountItems)
 		protected.GET("/problem/by-esid/:id", handlers.SearchByESID)
 		protected.GET("/problem/by-mongoid/:id", handlers.SearchByMongoID)
 		protected.POST("/media/hash", handlers.GenerateMediaHash)
+
+		// User detail routes
+		protected.GET("/user_detail/user_info", handlers.GetUserInfo)
+		protected.GET("/user_detail/comments", handlers.GetUserComments)
+		protected.GET("/user_detail/rankings", handlers.GetRankings)
 	}
 
 	// Start server

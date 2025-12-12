@@ -37,6 +37,10 @@ export default function ProblemsPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
 
+  // Count states
+  const [counts, setCounts] = useState<{ elasticsearch: number; mongodb: number; redis: number } | null>(null);
+  const [countsLoading, setCountsLoading] = useState(false);
+
   // Column customization states
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
@@ -69,6 +73,25 @@ export default function ProblemsPage() {
       loadRecentProblems();
     }
   }, [isAuthenticated, loading, t]);
+
+  // Load counts on page load
+  useEffect(() => {
+    if (isAuthenticated && !loading) {
+      const loadCounts = async () => {
+        setCountsLoading(true);
+        try {
+          const response = await problemAPI.count();
+          setCounts(response.counts);
+        } catch (error: any) {
+          console.error('Failed to load counts:', error);
+          // Don't show error to user, just leave counts as null
+        } finally {
+          setCountsLoading(false);
+        }
+      };
+      loadCounts();
+    }
+  }, [isAuthenticated, loading]);
 
   // Load column configuration from localStorage
   useEffect(() => {
@@ -360,10 +383,10 @@ export default function ProblemsPage() {
       <div className="min-h-screen bg-gray-50">
         <Navbar title={t('problems.title')} />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
         {/* Upload Section */}
         <div className="bg-white rounded-lg shadow-sm mb-8">
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('problems.upload.title')}</h2>
 
             {/* Mode Toggle */}
@@ -509,33 +532,33 @@ export default function ProblemsPage() {
 
         {/* Search Section */}
         <div className="bg-white rounded-lg shadow-sm">
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('problems.search.title')}</h2>
 
             {/* Search Form */}
             <form onSubmit={handleSearch} className="mb-6">
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-row gap-2 sm:gap-4">
                 <input
                   type="text"
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
                   placeholder={t('problems.search.placeholder')}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  className="flex-1 min-w-0 px-2 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setIsCustomizerOpen(true)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition whitespace-nowrap flex items-center justify-center"
+                  className="px-2 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition whitespace-nowrap flex items-center justify-center flex-shrink-0"
                   title={t('problems.search.customizeColumns')}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                   </svg>
                 </button>
                 <button
                   type="submit"
                   disabled={searchLoading}
-                  className="bg-indigo-600 text-white py-2 px-6 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap"
+                  className="bg-indigo-600 text-white py-2 px-3 sm:px-6 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap flex-shrink-0 text-sm sm:text-base"
                 >
                   {searchLoading ? t('problems.search.searching') : t('problems.search.submit')}
                 </button>
@@ -545,6 +568,19 @@ export default function ProblemsPage() {
             {searchError && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{searchError}</p>
+              </div>
+            )}
+
+            {/* Counts Display */}
+            {(counts && (!currentSearchKeyword)) && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  {t('problems.search.counts', {
+                    elasticsearch: counts.elasticsearch,
+                    redis: counts.redis,
+                    mongodb: counts.mongodb,
+                  })}
+                </p>
               </div>
             )}
 
@@ -563,7 +599,7 @@ export default function ProblemsPage() {
             )}
 
             {searchResults.length > 0 && (
-              <div className="overflow-auto max-h-[600px] border border-gray-200 rounded-lg">
+              <div className="overflow-x-auto -mx-2 sm:mx-0 max-h-[600px] border border-gray-200 rounded-lg">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>

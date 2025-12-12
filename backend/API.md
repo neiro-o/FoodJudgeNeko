@@ -369,3 +369,135 @@ Get a specific problem by its MongoDB ID.
   }
 }
 ```
+
+---
+
+## User Detail (Protected)
+
+### Get User Avatar
+
+**GET** `/api/user_detail/avatar?userId=xxx&token=xxx`
+
+Get user's avatar image. Returns the cached image file directly. Caches avatars in `cache/img/avatar_{userId}.{ext}`.
+
+**Note:** This endpoint accepts the auth token via query parameter (instead of Authorization header) because it's used in `<img src="">` tags which cannot send custom headers.
+
+**Query Parameters:**
+- `userId` (required): The user ID to look up
+- `token` (required): JWT authentication token
+
+**Response:**
+- Returns image file directly (Content-Type: image/jpeg, image/png, etc.)
+- Returns 401 if token is invalid or missing
+- Returns 404 if user has no non-anonymous comments or no avatar
+
+### Get User Info
+
+**GET** `/api/user_detail/user_info?userId=xxx`
+
+Get user information including username, total likes, and total replies.
+
+**Query Parameters:**
+- `userId` (required): The user ID to look up
+
+**Response:**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "userName": "用户昵称",
+    "likes": 12345,
+    "replies": 678
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "code": 404,
+  "message": "No non-anonymous comment found for this user"
+}
+```
+
+### Get User Comments
+
+**GET** `/api/user_detail/comments?userId=xxx&page=1&limit=10`
+
+Get paginated comments for a user, sorted by approveCount (desc) and createTime (desc).
+
+**Query Parameters:**
+- `userId` (required): The user ID to look up
+- `page` (optional, default: 1): Page number
+- `limit` (optional, default: 10, max: 100): Number of comments per page
+
+**Response:**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "comments": [
+      {
+        "id": "mongo_object_id_hex",
+        "problemId": "problem_mongo_id",
+        "commentId": "1754799712775200769",
+        "userId": "3417484203",
+        "userName": "用户昵称",
+        "userPic": "https://...",
+        "createTime": 1707211828,
+        "content": "评论内容...",
+        "approveCount": 1489,
+        "replyTotal": 34,
+        "isAnonymous": false,
+        "voteOperate": "DOWN",
+        "choice": 1
+      }
+    ],
+    "total": 42,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 5
+  }
+}
+```
+
+**Choice Values:**
+- `1`: Support User (适合展示) - User voted DOWN (or UP if reversed for DAOZONG_JIAOYI/IPR)
+- `2`: Support Merchant (不适合展示) - User voted UP (or DOWN if reversed for DAOZONG_JIAOYI/IPR)
+
+### Get Rankings
+
+**GET** `/api/user_detail/rankings`
+
+Get top 100 users ranked by total likes (approveCount) across all their comments.
+
+**Response:**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "rankings": [
+      {
+        "userId": "3417484203",
+        "userName": "用户昵称",
+        "likes": 15890,
+        "commentCount": 234
+      },
+      {
+        "userId": "1234567890",
+        "userName": "另一个用户",
+        "likes": 12345,
+        "commentCount": 156
+      }
+    ],
+    "total": 100
+  }
+}
+```
+
+**Notes:**
+- Only includes users with non-anonymous comments (to get userName)
+- Returns up to 100 users sorted by total likes (descending)
