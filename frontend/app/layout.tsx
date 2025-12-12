@@ -8,7 +8,10 @@ export const metadata: Metadata = {
   title: '掉心心',
   description: '选择与结果不一致，掉小心心了！',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon.ico', type: 'image/x-icon' },
+    ],
     shortcut: '/favicon.ico',
     apple: '/favicon.ico',
   },
