@@ -93,6 +93,7 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.upload.taskIdsFound': 'Task IDs found',
     'problems.upload.validPairs': 'Valid pairs (after removing duplicates)',
     'problems.upload.warning': '⚠️ Number of userIds must equal number of taskIds',
+    'problems.upload.modeHint': 'Please click the button under the textbox lol',
     'problems.upload.submitMultiple': 'Upload Problems',
     'problems.upload.error': 'Failed to upload problem',
     'problems.upload.errorInvalid': 'Please enter a valid URL',
@@ -127,6 +128,11 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.search.customizeDescription': 'Drag to reorder, toggle to show/hide columns',
     'problems.search.customizeClose': 'Close',
     'problems.search.customizeReset': 'Reset to Default',
+    'problems.search.reorderMode': 'Reorder mode',
+    'problems.search.modeDrag': 'Drag',
+    'problems.search.modeClick': 'Click ↑↓',
+    'problems.search.moveUp': 'Move up',
+    'problems.search.moveDown': 'Move down',
     'problems.search.counts': 'Currently there are {elasticsearch} problems, with {redis} problems in process. Raw data: {mongodb} problems.',
     'problems.search.resultLimit': 'Results per page',
     'problems.search.resultLimitDesc': 'Adjust number of results (5-20)',
@@ -181,6 +187,14 @@ const translations: Record<Language, Record<string, string>> = {
     'rankings.comments': 'Comments',
     'rankings.loading': 'Loading...',
     'rankings.empty': 'No rankings available',
+
+    // Problem Operations
+    'problemOps.title': 'Problem Operations',
+    'problemOps.copyLink': 'Copy Link',
+    'problemOps.copyJson': 'Copy JSON',
+    'problemOps.copyYaml': 'Copy YAML',
+    'problemOps.copySuccess': 'Copied to clipboard!',
+    'problemOps.copyFailed': 'Failed to copy',
   },
   zh: {
     // Common
@@ -261,6 +275,7 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.upload.taskIdsFound': '找到的任务ID',
     'problems.upload.validPairs': '有效配对（去重后）',
     'problems.upload.warning': '⚠️ 用户ID数量必须等于任务ID数量',
+    'problems.upload.modeHint': '传题是下面的按钮哦',
     'problems.upload.submitMultiple': '上传问题',
     'problems.upload.error': '上传问题失败',
     'problems.upload.errorInvalid': '请输入有效的URL',
@@ -295,6 +310,11 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.search.customizeDescription': '拖拽排序，切换显示/隐藏列',
     'problems.search.customizeClose': '关闭',
     'problems.search.customizeReset': '重置为默认',
+    'problems.search.reorderMode': '排序模式',
+    'problems.search.modeDrag': '拖拽',
+    'problems.search.modeClick': '点击 ↑↓',
+    'problems.search.moveUp': '上移',
+    'problems.search.moveDown': '下移',
     'problems.search.counts': '当前共有 {elasticsearch} 题，上传队列中有 {redis} 题，原始数据 {mongodb} 题',
     'problems.search.resultLimit': '每页结果数',
     'problems.search.resultLimitDesc': '调整结果数量 (5-20)',
@@ -349,6 +369,14 @@ const translations: Record<Language, Record<string, string>> = {
     'rankings.comments': '评论数',
     'rankings.loading': '加载中...',
     'rankings.empty': '暂无排行数据',
+
+    // Problem Operations
+    'problemOps.title': '题目操作',
+    'problemOps.copyLink': '复制链接',
+    'problemOps.copyJson': '复制JSON',
+    'problemOps.copyYaml': '复制YAML',
+    'problemOps.copySuccess': '已复制到剪贴板！',
+    'problemOps.copyFailed': '复制失败',
   },
 };
 

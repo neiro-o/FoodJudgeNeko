@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export type ColumnId = 'index' | 'problemTitle' | 'time' | 'answer' | 'ratio' | 'hot1' | 'comment' | 'detail';
+export type ReorderMode = 'drag' | 'click';
 
 export interface ColumnConfig {
   id: ColumnId;
@@ -36,6 +37,7 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, r
   const [localColumns, setLocalColumns] = useState<ColumnConfig[]>(columns);
   const [localResultLimit, setLocalResultLimit] = useState(resultLimit);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [reorderMode, setReorderMode] = useState<ReorderMode>('drag');
 
   useEffect(() => {
     if (isOpen) {
@@ -43,6 +45,24 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, r
       setLocalResultLimit(resultLimit);
     }
   }, [isOpen, columns, resultLimit]);
+
+  // Load reorder mode from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedMode = localStorage.getItem('columnReorderMode');
+      if (savedMode === 'drag' || savedMode === 'click') {
+        setReorderMode(savedMode);
+      }
+    }
+  }, []);
+
+  // Save reorder mode to localStorage
+  const handleReorderModeChange = (mode: ReorderMode) => {
+    setReorderMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('columnReorderMode', mode);
+    }
+  };
 
   const getColumnLabel = (id: ColumnId): string => {
     const labels: Record<ColumnId, string> = {
@@ -112,6 +132,48 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, r
     setDraggedIndex(null);
   };
 
+  // Move column up (for click mode)
+  const handleMoveUp = (columnId: ColumnId) => {
+    const reorderable = localColumns.filter(col => col.id !== 'index' && col.id !== 'detail');
+    const indexCol = localColumns.find(col => col.id === 'index')!;
+    const detailCol = localColumns.find(col => col.id === 'detail')!;
+
+    const currentPos = reorderable.findIndex(col => col.id === columnId);
+    if (currentPos <= 0) return; // Already at top
+
+    const newReorderable = [...reorderable];
+    [newReorderable[currentPos - 1], newReorderable[currentPos]] = 
+      [newReorderable[currentPos], newReorderable[currentPos - 1]];
+
+    const reordered = [
+      { ...indexCol, order: 0 },
+      ...newReorderable.map((col, idx) => ({ ...col, order: idx + 1 })),
+      { ...detailCol, order: newReorderable.length + 1 },
+    ];
+    setLocalColumns(reordered);
+  };
+
+  // Move column down (for click mode)
+  const handleMoveDown = (columnId: ColumnId) => {
+    const reorderable = localColumns.filter(col => col.id !== 'index' && col.id !== 'detail');
+    const indexCol = localColumns.find(col => col.id === 'index')!;
+    const detailCol = localColumns.find(col => col.id === 'detail')!;
+
+    const currentPos = reorderable.findIndex(col => col.id === columnId);
+    if (currentPos < 0 || currentPos >= reorderable.length - 1) return; // Already at bottom
+
+    const newReorderable = [...reorderable];
+    [newReorderable[currentPos], newReorderable[currentPos + 1]] = 
+      [newReorderable[currentPos + 1], newReorderable[currentPos]];
+
+    const reordered = [
+      { ...indexCol, order: 0 },
+      ...newReorderable.map((col, idx) => ({ ...col, order: idx + 1 })),
+      { ...detailCol, order: newReorderable.length + 1 },
+    ];
+    setLocalColumns(reordered);
+  };
+
   const handleSave = () => {
     // Ensure index is first and detail is last
     const sorted = [...localColumns].sort((a, b) => {
@@ -153,6 +215,31 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, r
         <div className="p-6 border-b">
           <h2 className="text-xl font-bold text-gray-900">{t('problems.search.customizeTitle')}</h2>
           <p className="text-sm text-gray-600 mt-1">{t('problems.search.customizeDescription')}</p>
+          
+          {/* Reorder mode toggle */}
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-sm text-gray-600">{t('problems.search.reorderMode')}:</span>
+            <button
+              onClick={() => handleReorderModeChange('drag')}
+              className={`px-3 py-1 text-xs rounded-full transition ${
+                reorderMode === 'drag'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t('problems.search.modeDrag')}
+            </button>
+            <button
+              onClick={() => handleReorderModeChange('click')}
+              className={`px-3 py-1 text-xs rounded-full transition ${
+                reorderMode === 'click'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t('problems.search.modeClick')}
+            </button>
+          </div>
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
@@ -174,24 +261,63 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, r
             {reorderableColumns.map((column, reorderableIndex) => {
               const actualIndex = localColumns.findIndex(c => c.id === column.id);
               const isDragged = draggedIndex === actualIndex;
+              const isFirst = reorderableIndex === 0;
+              const isLast = reorderableIndex === reorderableColumns.length - 1;
+              
               return (
                 <div
                   key={column.id}
-                  draggable={true}
-                  onDragStart={() => handleDragStart(actualIndex)}
-                  onDragOver={(e) => handleDragOver(e, actualIndex)}
-                  onDragEnd={handleDragEnd}
-                  className={`flex items-center p-3 rounded-lg border cursor-move transition ${
+                  draggable={reorderMode === 'drag'}
+                  onDragStart={reorderMode === 'drag' ? () => handleDragStart(actualIndex) : undefined}
+                  onDragOver={reorderMode === 'drag' ? (e) => handleDragOver(e, actualIndex) : undefined}
+                  onDragEnd={reorderMode === 'drag' ? handleDragEnd : undefined}
+                  className={`flex items-center p-3 rounded-lg border transition ${
+                    reorderMode === 'drag' ? 'cursor-move' : 'cursor-default'
+                  } ${
                     isDragged
                       ? 'bg-indigo-50 border-indigo-300 opacity-50'
                       : 'bg-white border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="flex items-center mr-3 text-gray-400">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                    </svg>
-                  </div>
+                  {/* Drag handle or Up/Down buttons */}
+                  {reorderMode === 'drag' ? (
+                    <div className="flex items-center mr-3 text-gray-400">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col mr-3 gap-0.5">
+                      <button
+                        onClick={() => handleMoveUp(column.id)}
+                        disabled={isFirst}
+                        className={`p-0.5 rounded transition ${
+                          isFirst
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'
+                        }`}
+                        title={t('problems.search.moveUp')}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleMoveDown(column.id)}
+                        disabled={isLast}
+                        className={`p-0.5 rounded transition ${
+                          isLast
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-gray-500 hover:text-indigo-600 hover:bg-indigo-50'
+                        }`}
+                        title={t('problems.search.moveDown')}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                   <div className="flex-1">
                     <span className="text-sm font-medium text-gray-700">{getColumnLabel(column.id)}</span>
                   </div>

@@ -76,7 +76,7 @@ export const authAPI = {
     });
   },
 
-  register: async (data: { username: string; email: string; password: string; invitation_code: string }): Promise<void> => {
+  register: async (data: { username: string; email: string; password: string; invite_code: string }): Promise<void> => {
     return apiRequest<void>('/register', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -99,10 +99,10 @@ export const authAPI = {
 
 // Invitation API
 export interface Invitation {
-  code: string;
+  invite_code: string;
   created_at: string;
-  used_by: string | null;
-  used_at: string | null;
+  used: boolean;
+  used_by?: string | null;
 }
 
 export interface InvitationListResponse {

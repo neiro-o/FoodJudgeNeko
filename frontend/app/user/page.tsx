@@ -300,9 +300,9 @@ export default function UserPage() {
                     <div className="space-y-2">
                       {invitations.map((invitation) => (
                         <div
-                          key={invitation.code}
+                          key={invitation.invite_code}
                           className={`p-4 rounded-lg border ${
-                            invitation.used_by !== null
+                            invitation.used
                               ? 'bg-gray-50 border-gray-200'
                               : 'bg-green-50 border-green-200'
                           }`}
@@ -310,7 +310,7 @@ export default function UserPage() {
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                             <div>
                               <p className="font-mono text-sm font-medium text-gray-900">
-                                {invitation.code}
+                                {invitation.invite_code}
                               </p>
                               <p className="text-xs text-gray-500 mt-1">
                                 {t('user.created')}: {new Date(invitation.created_at).toLocaleString()}
@@ -319,12 +319,12 @@ export default function UserPage() {
                             <div>
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  invitation.used_by !== null
+                                  invitation.used
                                     ? 'bg-gray-200 text-gray-800'
                                     : 'bg-green-200 text-green-800'
                                 }`}
                               >
-                                {invitation.used_by !== null ? t('user.used') : t('user.available')}
+                                {invitation.used ? t('user.used') : t('user.available')}
                               </span>
                             </div>
                           </div>

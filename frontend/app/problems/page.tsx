@@ -30,6 +30,11 @@ export default function ProblemsPage() {
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState('');
   const [uploadLoading, setUploadLoading] = useState(false);
+  
+  // Hint for repeated clicks on same mode
+  const [modeClickCount, setModeClickCount] = useState(0);
+  const [lastModeClickTime, setLastModeClickTime] = useState(0);
+  const [showModeHint, setShowModeHint] = useState(false);
 
   // Search states
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -230,6 +235,35 @@ export default function ProblemsPage() {
       setSearchError(error.message || t('problems.search.errorFailed'));
     } finally {
       setSearchLoading(false);
+    }
+  };
+
+  // Handle upload mode button click
+  const handleModeClick = (mode: 'single' | 'multiple') => {
+    const now = Date.now();
+    const timeDiff = now - lastModeClickTime;
+    
+    if (mode === uploadMode) {
+      // Clicking the already selected mode
+      if (timeDiff < 2000) {
+        // Within 2 seconds of last click
+        const newCount = modeClickCount + 1;
+        setModeClickCount(newCount);
+        if (newCount >= 2) {
+          // Show hint after 2+ consecutive clicks
+          setShowModeHint(true);
+          setTimeout(() => setShowModeHint(false), 3000);
+        }
+      } else {
+        setModeClickCount(1);
+      }
+      setLastModeClickTime(now);
+    } else {
+      // Switching mode
+      setUploadMode(mode);
+      setModeClickCount(0);
+      setLastModeClickTime(0);
+      setShowModeHint(false);
     }
   };
 
@@ -501,7 +535,7 @@ export default function ProblemsPage() {
             <div className="mb-6">
               <div className="flex space-x-4">
                 <button
-                  onClick={() => setUploadMode('single')}
+                  onClick={() => handleModeClick('single')}
                   className={`px-4 py-2 rounded-lg font-medium transition ${
                     uploadMode === 'single'
                       ? 'bg-indigo-600 text-white'
@@ -511,7 +545,7 @@ export default function ProblemsPage() {
                   {t('problems.upload.single')}
                 </button>
                 <button
-                  onClick={() => setUploadMode('multiple')}
+                  onClick={() => handleModeClick('multiple')}
                   className={`px-4 py-2 rounded-lg font-medium transition ${
                     uploadMode === 'multiple'
                       ? 'bg-indigo-600 text-white'
@@ -521,6 +555,15 @@ export default function ProblemsPage() {
                   {t('problems.upload.multiple')}
                 </button>
               </div>
+              
+              {/* Hint for repeated clicks */}
+              {showModeHint && (
+                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg animate-pulse">
+                  <p className="text-sm text-amber-700">
+                    {t('problems.upload.modeHint')}
+                  </p>
+                </div>
+              )}
             </div>
 
             {uploadError && (
