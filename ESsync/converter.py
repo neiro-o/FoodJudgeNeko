@@ -1078,7 +1078,7 @@ def convert_bson_to_es_type4(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
                 continue
             
             belong_type = safe_get(evidence, "belongType")
-            role = "merchant" if belong_type == "PROSECUTOR_EVIDENCE" else "user"
+            role = "user" if belong_type == "PROSECUTOR_EVIDENCE" else "merchant"
             
             create_time = safe_get(evidence, "createTime")
             try:
