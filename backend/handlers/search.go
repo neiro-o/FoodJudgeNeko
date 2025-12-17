@@ -159,6 +159,360 @@ type Comment struct {
 	Likes     int    `json:"likes"`     // number of likes
 }
 
+// extractRandomKeyword checks if "rand" or "random" appears as a whole word (prefix or suffix)
+// Returns (cleaned keyword, isRandom)
+func extractRandomKeyword(keyword string) (string, bool) {
+	// Use word boundary regex to match whole words
+	randRegex := regexp.MustCompile(`(?i)^\s*(rand|random)\s+|\s+(rand|random)\s*$`)
+
+	// Check if rand/random appears as whole word
+	if randRegex.MatchString(keyword) {
+		// Remove rand/random from keyword
+		cleaned := randRegex.ReplaceAllString(keyword, " ")
+		cleaned = regexp.MustCompile(`\s+`).ReplaceAllString(cleaned, " ")
+		cleaned = regexp.MustCompile(`^\s+|\s+$`).ReplaceAllString(cleaned, "")
+		return cleaned, true
+	}
+	return keyword, false
+}
+
+// executeESQuery executes an Elasticsearch query and returns parsed results
+func executeESQuery(ctx context.Context, query map[string]interface{}, limit int) ([]ESDocument, int64, error) {
+	query["size"] = limit
+
+	queryJSON, err := json.Marshal(query)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to build search query: %v", err)
+	}
+
+	indexName := config.AppConfig.Elasticsearch.IndexName
+	res, err := database.ESClient.Search(
+		database.ESClient.Search.WithContext(ctx),
+		database.ESClient.Search.WithIndex(indexName),
+		database.ESClient.Search.WithBody(bytes.NewReader(queryJSON)),
+		database.ESClient.Search.WithTrackTotalHits(true),
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("Elasticsearch search failed: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return nil, 0, fmt.Errorf("error parsing error response: %v", err)
+		}
+		return nil, 0, fmt.Errorf("Elasticsearch error: %v", e["error"])
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse search results: %v", err)
+	}
+
+	hits, ok := result["hits"].(map[string]interface{})
+	if !ok {
+		return nil, 0, fmt.Errorf("invalid search response format")
+	}
+
+	total, _ := hits["total"].(map[string]interface{})
+	totalValue, _ := total["value"].(float64)
+
+	hitsList, ok := hits["hits"].([]interface{})
+	if !ok {
+		return nil, 0, fmt.Errorf("invalid hits format")
+	}
+
+	results := make([]ESDocument, 0, len(hitsList))
+	for _, hit := range hitsList {
+		hitMap, ok := hit.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		source, ok := hitMap["_source"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		score, _ := hitMap["_score"].(float64)
+
+		doc := ESDocument{
+			Score: score,
+		}
+
+		if esID, ok := hitMap["_id"]; ok {
+			doc.ESID = esID
+		}
+
+		if highlight, ok := hitMap["highlight"].(map[string]interface{}); ok {
+			doc.Highlight = make(map[string][]string)
+			for k, v := range highlight {
+				if arr, ok := v.([]interface{}); ok {
+					strs := make([]string, len(arr))
+					for i, item := range arr {
+						if str, ok := item.(string); ok {
+							strs[i] = str
+						}
+					}
+					doc.Highlight[k] = strs
+				}
+			}
+		}
+
+		if mongoID, ok := source["mongo_id"].(string); ok {
+			doc.MongoID = mongoID
+		}
+		if userReview, ok := source["user_review"].(string); ok {
+			doc.UserReview = userReview
+		}
+		if timestamp, ok := source["timestamp"].(float64); ok {
+			doc.Timestamp = int64(timestamp)
+		}
+		if answer, ok := source["answer"].(float64); ok {
+			doc.Answer = int(answer)
+		}
+		if ratio1, ok := source["ratio_1"].(float64); ok {
+			doc.Ratio1 = ratio1
+		}
+		if ratio2, ok := source["ratio_2"].(float64); ok {
+			doc.Ratio2 = ratio2
+		}
+
+		if comments, ok := source["comments"].([]interface{}); ok {
+			parsedComments := parseComments(comments)
+			if len(parsedComments) > 0 {
+				hot1Answer := parsedComments[0].Choice
+				doc.Hot1Answer = &hot1Answer
+			}
+			doc.CommentAnswer = calculateCommentAnswer(parsedComments)
+		}
+
+		results = append(results, doc)
+	}
+
+	return results, int64(totalValue), nil
+}
+
+// SearchByRatio1 searches ES documents where ratio_1 == ratio
+// orderByRandom: if true, order by random; if false, order by created_at desc
+func SearchByRatio1(ctx context.Context, ratio float64, limit int, orderByRandom bool) ([]ESDocument, int64, error) {
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"ratio_1": ratio,
+			},
+		},
+	}
+
+	if orderByRandom {
+		// Use random_score for random ordering
+		query["sort"] = []map[string]interface{}{
+			{
+				"_script": map[string]interface{}{
+					"type":   "number",
+					"script": map[string]interface{}{"source": "Math.random()"},
+					"order":  "desc",
+				},
+			},
+		}
+	} else {
+		// Order by created_at desc
+		query["sort"] = []map[string]interface{}{
+			{
+				"created_at": map[string]interface{}{
+					"order": "desc",
+				},
+			},
+		}
+	}
+
+	return executeESQuery(ctx, query, limit)
+}
+
+// Search122 searches ES documents where answer == ans and comments[0].choice == (3 - ans)
+// orderByRandom: if true, order by random; if false, order by created_at desc
+func Search122(ctx context.Context, ans int, limit int, orderByRandom bool) ([]ESDocument, int64, error) {
+	expectedChoice := 3 - ans
+
+	// Build query that checks answer and that there's a comment with the expected choice
+	// Since comments is a nested field and we need to check comments[0] specifically,
+	// we'll use a nested query to match documents with the expected choice, then filter
+	// in application code to ensure it's the first comment (by timestamp)
+	// Build query to get documents with answer and comments having expected choice
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"answer": ans,
+						},
+					},
+					{
+						"nested": map[string]interface{}{
+							"path": "comments",
+							"query": map[string]interface{}{
+								"term": map[string]interface{}{
+									"comments.choice": expectedChoice,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"_source": []string{"mongo_id", "user_review", "timestamp", "answer", "ratio_1", "ratio_2", "comments", "created_at"},
+	}
+
+	if orderByRandom {
+		query["sort"] = []map[string]interface{}{
+			{
+				"_script": map[string]interface{}{
+					"type":   "number",
+					"script": map[string]interface{}{"source": "Math.random()"},
+					"order":  "desc",
+				},
+			},
+		}
+	} else {
+		query["sort"] = []map[string]interface{}{
+			{
+				"created_at": map[string]interface{}{
+					"order": "desc",
+				},
+			},
+		}
+	}
+
+	// Fetch more results to account for filtering
+	fetchLimit := limit * 5
+	query["size"] = fetchLimit
+
+	queryJSON, err := json.Marshal(query)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to build search query: %v", err)
+	}
+
+	indexName := config.AppConfig.Elasticsearch.IndexName
+	res, err := database.ESClient.Search(
+		database.ESClient.Search.WithContext(ctx),
+		database.ESClient.Search.WithIndex(indexName),
+		database.ESClient.Search.WithBody(bytes.NewReader(queryJSON)),
+		database.ESClient.Search.WithTrackTotalHits(true),
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("Elasticsearch search failed: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return nil, 0, fmt.Errorf("error parsing error response: %v", err)
+		}
+		return nil, 0, fmt.Errorf("Elasticsearch error: %v", e["error"])
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse search results: %v", err)
+	}
+
+	hits, ok := result["hits"].(map[string]interface{})
+	if !ok {
+		return nil, 0, fmt.Errorf("invalid search response format")
+	}
+
+	total, _ := hits["total"].(map[string]interface{})
+	totalValue, _ := total["value"].(float64)
+
+	hitsList, ok := hits["hits"].([]interface{})
+	if !ok {
+		return nil, 0, fmt.Errorf("invalid hits format")
+	}
+
+	// Filter results to ensure comments[0].choice == expectedChoice
+	filteredResults := make([]ESDocument, 0, limit)
+	for _, hit := range hitsList {
+		hitMap, ok := hit.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		source, ok := hitMap["_source"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// Check if comments[0].choice == expectedChoice
+		comments, ok := source["comments"].([]interface{})
+		if !ok || len(comments) == 0 {
+			continue
+		}
+
+		// Parse comments and find the first one by timestamp
+		parsedComments := parseComments(comments)
+		if len(parsedComments) == 0 {
+			continue
+		}
+
+		// Find the comment with the minimum timestamp (first comment)
+		firstComment := parsedComments[0]
+		for _, comment := range parsedComments {
+			if comment.Timestamp < firstComment.Timestamp {
+				firstComment = comment
+			}
+		}
+
+		// Check if first comment (by timestamp) has expected choice
+		if firstComment.Choice != expectedChoice {
+			continue
+		}
+
+		// This document matches, add it to results
+		score, _ := hitMap["_score"].(float64)
+		doc := ESDocument{
+			Score: score,
+		}
+
+		if esID, ok := hitMap["_id"]; ok {
+			doc.ESID = esID
+		}
+
+		if mongoID, ok := source["mongo_id"].(string); ok {
+			doc.MongoID = mongoID
+		}
+		if userReview, ok := source["user_review"].(string); ok {
+			doc.UserReview = userReview
+		}
+		if timestamp, ok := source["timestamp"].(float64); ok {
+			doc.Timestamp = int64(timestamp)
+		}
+		if answer, ok := source["answer"].(float64); ok {
+			doc.Answer = int(answer)
+		}
+		if ratio1, ok := source["ratio_1"].(float64); ok {
+			doc.Ratio1 = ratio1
+		}
+		if ratio2, ok := source["ratio_2"].(float64); ok {
+			doc.Ratio2 = ratio2
+		}
+
+		// Set hot1_answer and comment_answer
+		hot1Answer := firstComment.Choice
+		doc.Hot1Answer = &hot1Answer
+		doc.CommentAnswer = calculateCommentAnswer(parsedComments)
+
+		filteredResults = append(filteredResults, doc)
+		if len(filteredResults) >= limit {
+			break
+		}
+	}
+
+	return filteredResults, int64(totalValue), nil
+}
+
 func Search(c *gin.Context) {
 	var req SearchRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -175,12 +529,92 @@ func Search(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Extract random keyword and check if random ordering is requested
+	cleanedKeyword, orderByRandom := extractRandomKeyword(req.Keyword)
+	keyword := cleanedKeyword
+
+	// Check for special search patterns
+	// (1) Match full text "5149" or "4951": SearchByRatio1, ratio = 51, 49
+	if keyword == "5149" {
+		results, total, err := SearchByRatio1(ctx, 51.0, req.Limit, orderByRandom)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
+			return
+		}
+		utils.SuccessResponse(c, SearchResponse{
+			Total:   total,
+			Results: results,
+		})
+		return
+	}
+	if keyword == "4951" {
+		results, total, err := SearchByRatio1(ctx, 49.0, req.Limit, orderByRandom)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
+			return
+		}
+		utils.SuccessResponse(c, SearchResponse{
+			Total:   total,
+			Results: results,
+		})
+		return
+	}
+
+	// (2) Match regex "^\s*(\d+)(:|-)(\d+)\s*$" and sum equals 100: SearchByRatio1, ratio = int($1)
+	ratioRegex := regexp.MustCompile(`^\s*(\d+)(:|-)(\d+)\s*$`)
+	if matches := ratioRegex.FindStringSubmatch(keyword); matches != nil {
+		num1, err1 := strconv.Atoi(matches[1])
+		num2, err2 := strconv.Atoi(matches[3])
+		if err1 == nil && err2 == nil && num1+num2 == 100 {
+			results, total, err := SearchByRatio1(ctx, float64(num1), req.Limit, orderByRandom)
+			if err != nil {
+				utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
+				return
+			}
+			utils.SuccessResponse(c, SearchResponse{
+				Total:   total,
+				Results: results,
+			})
+			return
+		}
+	}
+
+	// (3) Match full text "122": Search122, ans = 1
+	if keyword == "122" {
+		results, total, err := Search122(ctx, 1, req.Limit, orderByRandom)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
+			return
+		}
+		utils.SuccessResponse(c, SearchResponse{
+			Total:   total,
+			Results: results,
+		})
+		return
+	}
+
+	// (4) Match full text "211": Search122, ans = 2
+	if keyword == "211" {
+		results, total, err := Search122(ctx, 2, req.Limit, orderByRandom)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
+			return
+		}
+		utils.SuccessResponse(c, SearchResponse{
+			Total:   total,
+			Results: results,
+		})
+		return
+	}
+
+	// (6) If none of the search match, normally search the keyword as current does
+	// Use the cleaned keyword (without rand/random) for the actual search
 	var query map[string]interface{}
 
 	// For single character keywords, use wildcard query on user_review field
-	if isSingleCharacter(req.Keyword) {
+	if isSingleCharacter(keyword) {
 		// Escape special wildcard characters
-		escapedKeyword := escapeWildcard(req.Keyword)
+		escapedKeyword := escapeWildcard(keyword)
 
 		query = map[string]interface{}{
 			"query": map[string]interface{}{
@@ -210,14 +644,27 @@ func Search(c *gin.Context) {
 				"post_tags": []string{"</mark>"},
 			},
 		}
+
+		// Add sorting: random if requested, otherwise by relevance (default)
+		if orderByRandom {
+			query["sort"] = []map[string]interface{}{
+				{
+					"_script": map[string]interface{}{
+						"type":   "number",
+						"script": map[string]interface{}{"source": "Math.random()"},
+						"order":  "desc",
+					},
+				},
+			}
+		}
 	} else {
 		// For multi-character keywords, use the normal query builder
 		// Calculate dynamic fuzziness and min_score based on keyword length
-		fuzziness := calculateFuzziness(req.Keyword)
-		minScore := calculateMinScore(req.Keyword)
+		fuzziness := calculateFuzziness(keyword)
+		minScore := calculateMinScore(keyword)
 
 		// Build Elasticsearch query using the centralized query builder
-		boolQuery := utils.BuildBoolQuery(req.Keyword, fuzziness)
+		boolQuery := utils.BuildBoolQuery(keyword, fuzziness)
 
 		query = map[string]interface{}{
 			"query": map[string]interface{}{
@@ -232,7 +679,7 @@ func Search(c *gin.Context) {
 						"highlight_query": map[string]interface{}{
 							"match_phrase": map[string]interface{}{
 								"user_review": map[string]interface{}{
-									"query": req.Keyword,
+									"query": keyword,
 								},
 							},
 						},
@@ -242,7 +689,7 @@ func Search(c *gin.Context) {
 						"highlight_query": map[string]interface{}{
 							"match_phrase": map[string]interface{}{
 								"others": map[string]interface{}{
-									"query": req.Keyword,
+									"query": keyword,
 								},
 							},
 						},
@@ -252,7 +699,7 @@ func Search(c *gin.Context) {
 						"highlight_query": map[string]interface{}{
 							"match_phrase": map[string]interface{}{
 								"replies.content": map[string]interface{}{
-									"query": req.Keyword,
+									"query": keyword,
 								},
 							},
 						},
@@ -262,7 +709,7 @@ func Search(c *gin.Context) {
 						"highlight_query": map[string]interface{}{
 							"match_phrase": map[string]interface{}{
 								"appeals.content": map[string]interface{}{
-									"query": req.Keyword,
+									"query": keyword,
 								},
 							},
 						},
@@ -270,6 +717,19 @@ func Search(c *gin.Context) {
 				},
 				"pre_tags":  []string{"<mark>"},
 				"post_tags": []string{"</mark>"},
+			},
+		}
+	}
+
+	// Add sorting: random if requested, otherwise by relevance (default)
+	if orderByRandom {
+		query["sort"] = []map[string]interface{}{
+			{
+				"_script": map[string]interface{}{
+					"type":   "number",
+					"script": map[string]interface{}{"source": "Math.random()"},
+					"order":  "desc",
+				},
 			},
 		}
 	}
