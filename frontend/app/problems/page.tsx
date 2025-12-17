@@ -19,6 +19,7 @@ export default function ProblemsPage() {
   const [uploadMode, setUploadMode] = useState<'single' | 'multiple'>('single');
   const [singleUrl, setSingleUrl] = useState('');
   const [singleParsed, setSingleParsed] = useState<{ userId: string; taskId: string } | null>(null);
+  const [singleDailyParsed, setSingleDailyParsed] = useState<{ userId: string; dateId: string } | null>(null);
   const [multipleUrls, setMultipleUrls] = useState('');
   const [uploadStateLoaded, setUploadStateLoaded] = useState(false);
   const [multipleParsed, setMultipleParsed] = useState<{
@@ -52,6 +53,7 @@ export default function ProblemsPage() {
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
   const [resultLimit, setResultLimit] = useState(15);
+  const [blockMaliciousComment, setBlockMaliciousComment] = useState(true);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -157,6 +159,10 @@ export default function ProblemsPage() {
           setResultLimit(parsed);
         }
       }
+      const savedBlockMalicious = localStorage.getItem('blockMaliciousComment');
+      if (savedBlockMalicious !== null) {
+        setBlockMaliciousComment(savedBlockMalicious !== 'false');
+      }
     }
   }, []);
 
@@ -238,6 +244,13 @@ export default function ProblemsPage() {
     }
   };
 
+  const handleBlockMaliciousCommentChange = (block: boolean) => {
+    setBlockMaliciousComment(block);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('blockMaliciousComment', String(block));
+    }
+  };
+
   // Handle upload mode button click
   const handleModeClick = (mode: 'single' | 'multiple') => {
     const now = Date.now();
@@ -279,17 +292,47 @@ export default function ProblemsPage() {
     }
   };
 
+  // Parse daily report URL to extract shareUserId and dailyReportTime
+  const parseDailyUrl = (url: string): { userId: string | null; dateId: string | null } => {
+    try {
+      const urlObj = new URL(url);
+      const jumpScene = urlObj.searchParams.get('jumpScene');
+      
+      // Only parse if it's a daily report URL
+      if (jumpScene !== 'dailyReport') {
+        return { userId: null, dateId: null };
+      }
+      
+      const userId = urlObj.searchParams.get('shareUserId');
+      const dateId = urlObj.searchParams.get('dailyReportTime');
+      return { userId, dateId };
+    } catch (error) {
+      return { userId: null, dateId: null };
+    }
+  };
+
   // Parse single URL in real-time
   useEffect(() => {
     if (uploadMode === 'single' && singleUrl.trim()) {
-      const parsed = parseUrl(singleUrl.trim());
-      if (parsed.userId && parsed.taskId) {
-        setSingleParsed({ userId: parsed.userId, taskId: parsed.taskId });
-      } else {
+      // First check if it's a daily report URL
+      const dailyParsed = parseDailyUrl(singleUrl.trim());
+      if (dailyParsed.userId && dailyParsed.dateId) {
+        setSingleDailyParsed({ userId: dailyParsed.userId, dateId: dailyParsed.dateId });
         setSingleParsed(null);
+      } else {
+        // Try regular URL parsing
+        const parsed = parseUrl(singleUrl.trim());
+        if (parsed.userId && parsed.taskId) {
+          setSingleParsed({ userId: parsed.userId, taskId: parsed.taskId });
+          setSingleDailyParsed(null);
+        } else {
+          setSingleParsed(null);
+          setSingleDailyParsed(null);
+        }
       }
     } else {
       setSingleParsed(null);
+      setSingleDailyParsed(null);
     }
   }, [singleUrl, uploadMode]);
 
@@ -367,6 +410,25 @@ export default function ProblemsPage() {
     e.preventDefault();
     setUploadError('');
     setUploadSuccess('');
+    
+    // Check if it's a daily report URL
+    if (singleDailyParsed) {
+      setUploadLoading(true);
+      try {
+        await problemAPI.uploadDaily({
+          userId: singleDailyParsed.userId,
+          dateId: singleDailyParsed.dateId,
+        });
+        setUploadSuccess(t('problems.upload.success'));
+        setSingleUrl('');
+        setSingleDailyParsed(null);
+      } catch (error: any) {
+        setUploadError(error.message || t('problems.upload.error'));
+      } finally {
+        setUploadLoading(false);
+      }
+      return;
+    }
     
     if (!singleParsed) {
       setUploadError(t('problems.upload.errorInvalid'));
@@ -594,7 +656,22 @@ export default function ProblemsPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                     placeholder={t('problems.upload.urlPlaceholder')}
                   />
-                  {singleParsed && (
+                  {singleDailyParsed && (
+                    <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="text-sm">
+                        <div className="mb-1 text-blue-800 font-medium">Daily Report Detected</div>
+                        <div className="mb-1 break-words">
+                          <span className="font-medium text-gray-700">User ID: </span>
+                          <span className="text-gray-900 break-all">{singleDailyParsed.userId}</span>
+                        </div>
+                        <div className="break-words">
+                          <span className="font-medium text-gray-700">Date ID: </span>
+                          <span className="text-gray-900 break-all">{singleDailyParsed.dateId}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {singleParsed && !singleDailyParsed && (
                     <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <div className="text-sm">
                         <div className="mb-1 break-words">
@@ -616,7 +693,7 @@ export default function ProblemsPage() {
                 </div>
                 <button
                   type="submit"
-                  disabled={uploadLoading || !singleParsed}
+                  disabled={uploadLoading || (!singleParsed && !singleDailyParsed)}
                   className="bg-indigo-600 text-white py-2 px-6 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   {uploadLoading ? t('problems.upload.submitting') : t('problems.upload.submit')}
@@ -867,6 +944,8 @@ export default function ProblemsPage() {
         onChange={handleColumnsChange}
         resultLimit={resultLimit}
         onResultLimitChange={handleResultLimitChange}
+        blockMaliciousComment={blockMaliciousComment}
+        onBlockMaliciousCommentChange={handleBlockMaliciousCommentChange}
       />
     </div>
     </>

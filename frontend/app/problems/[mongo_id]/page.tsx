@@ -156,7 +156,11 @@ export default function ProblemDetailPage() {
         setLoadingProblem(true);
         setError(null);
         try {
-          const data = await searchAPI.getByMongoId(mongoId);
+          // Get blockMaliciousComment setting from localStorage (default: 1)
+          const blockMaliciousComment = typeof window !== 'undefined' 
+            ? (localStorage.getItem('blockMaliciousComment') !== 'false' ? 1 : 0)
+            : 1;
+          const data = await searchAPI.getByMongoId(mongoId, blockMaliciousComment);
           setProblem(data);
         } catch (err: any) {
           console.error('Failed to fetch problem:', err);

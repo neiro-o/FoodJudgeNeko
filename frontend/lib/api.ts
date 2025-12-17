@@ -164,6 +164,13 @@ export const problemAPI = {
   count: async (): Promise<{ counts: { elasticsearch: number; mongodb: number; redis: number } }> => {
     return apiRequest<{ counts: { elasticsearch: number; mongodb: number; redis: number } }>('/problem/count');
   },
+
+  uploadDaily: async (data: { userId: string; dateId: string }): Promise<ProblemUploadResponse> => {
+    return apiRequest<ProblemUploadResponse>('/problem/upload_daily', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 // Search API
@@ -204,8 +211,11 @@ export const searchAPI = {
     return apiRequest<SearchResponse>(`/problem/recent?${params.toString()}`);
   },
 
-  getByMongoId: async (mongoId: string): Promise<any> => {
-    return apiRequest<any>(`/problem/by-mongoid/${mongoId}`);
+  getByMongoId: async (mongoId: string, blockMaliciousComment: number = 1): Promise<any> => {
+    const params = new URLSearchParams({
+      blockMaliciousComment: blockMaliciousComment.toString(),
+    });
+    return apiRequest<any>(`/problem/by-mongoid/${mongoId}?${params.toString()}`);
   },
 };
 
@@ -251,6 +261,7 @@ export interface UserInfoResponse {
   userName: string;
   likes: number;
   replies: number;
+  malicious: boolean;
 }
 
 export interface UserComment {
@@ -311,5 +322,11 @@ export const userDetailAPI = {
 
   getRankings: async (): Promise<RankingsResponse> => {
     return apiRequest<RankingsResponse>('/user_detail/rankings');
+  },
+
+  toggleMalicious: async (userId: string): Promise<{ malicious: boolean; message: string }> => {
+    return apiRequest<{ malicious: boolean; message: string }>(`/user_detail/toggle_malicious?userId=${userId}`, {
+      method: 'POST',
+    });
   },
 };

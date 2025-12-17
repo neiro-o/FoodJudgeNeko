@@ -19,6 +19,7 @@ var (
 	ProcessedList *mongo.Collection
 	Problems      *mongo.Collection
 	Comments      *mongo.Collection
+	Malicious     *mongo.Collection
 )
 
 func Connect() error {
@@ -43,6 +44,7 @@ func Connect() error {
 	ProcessedList = DB.Collection(config.AppConfig.MongoDB.Collections.ProcessedList)
 	Problems = DB.Collection(config.AppConfig.MongoDB.Collections.Problems)
 	Comments = DB.Collection(config.AppConfig.MongoDB.Collections.Comments)
+	Malicious = DB.Collection("malicious")
 
 	fmt.Println("Connected to MongoDB successfully")
 	return nil

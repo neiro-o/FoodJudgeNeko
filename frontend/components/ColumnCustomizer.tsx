@@ -30,12 +30,15 @@ interface ColumnCustomizerProps {
   onChange: (columns: ColumnConfig[]) => void;
   resultLimit: number;
   onResultLimitChange: (limit: number) => void;
+  blockMaliciousComment: boolean;
+  onBlockMaliciousCommentChange: (block: boolean) => void;
 }
 
-export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, resultLimit, onResultLimitChange }: ColumnCustomizerProps) {
+export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, resultLimit, onResultLimitChange, blockMaliciousComment, onBlockMaliciousCommentChange }: ColumnCustomizerProps) {
   const { t } = useLanguage();
   const [localColumns, setLocalColumns] = useState<ColumnConfig[]>(columns);
   const [localResultLimit, setLocalResultLimit] = useState(resultLimit);
+  const [localBlockMaliciousComment, setLocalBlockMaliciousComment] = useState(blockMaliciousComment);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [reorderMode, setReorderMode] = useState<ReorderMode>('drag');
 
@@ -43,8 +46,9 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, r
     if (isOpen) {
       setLocalColumns(columns);
       setLocalResultLimit(resultLimit);
+      setLocalBlockMaliciousComment(blockMaliciousComment);
     }
-  }, [isOpen, columns, resultLimit]);
+  }, [isOpen, columns, resultLimit, blockMaliciousComment]);
 
   // Load reorder mode from localStorage
   useEffect(() => {
@@ -192,6 +196,7 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, r
     
     onChange(reordered);
     onResultLimitChange(localResultLimit);
+    onBlockMaliciousCommentChange(localBlockMaliciousComment);
     onClose();
   };
 
@@ -368,6 +373,31 @@ export default function ColumnCustomizer({ isOpen, onClose, columns, onChange, r
                 />
                 <span className="text-sm font-medium text-gray-900 w-8 text-center">{localResultLimit}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Block Malicious Comment Control */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium text-gray-700">
+                  {t('problems.search.blockMaliciousComment')}
+                </span>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {t('problems.search.blockMaliciousCommentDesc')}
+                </p>
+              </div>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={localBlockMaliciousComment}
+                  onChange={(e) => setLocalBlockMaliciousComment(e.target.checked)}
+                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">
+                  {localBlockMaliciousComment ? '开启' : '关闭'}
+                </span>
+              </label>
             </div>
           </div>
         </div>

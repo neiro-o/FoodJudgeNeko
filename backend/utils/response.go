@@ -1,10 +1,15 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
+
+	"mtv2/backend/database"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -79,4 +84,31 @@ func GetUserObjectID(c *gin.Context) (primitive.ObjectID, error) {
 		return primitive.NilObjectID, errors.New("user not authenticated")
 	}
 	return primitive.ObjectIDFromHex(userID)
+}
+
+// IsAdmin checks if the authenticated user is an admin
+// Returns false if user is not authenticated or not an admin
+func IsAdmin(c *gin.Context) bool {
+	userID, exists := GetUserID(c)
+	if !exists {
+		return false
+	}
+
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var account struct {
+		IsAdmin bool `bson:"is_admin"`
+	}
+	err = database.Accounts.FindOne(ctx, bson.M{"_id": objID}).Decode(&account)
+	if err != nil {
+		return false
+	}
+
+	return account.IsAdmin
 }

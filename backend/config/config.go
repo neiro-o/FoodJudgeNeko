@@ -27,6 +27,7 @@ type Config struct {
 		DB       int    `yaml:"db"`
 		Fields   struct {
 			ProblemsQueue string `yaml:"problems_queue"`
+			DailyQueue    string `yaml:"daily_queue"`
 		} `yaml:"fields"`
 	} `yaml:"redis"`
 	Elasticsearch struct {

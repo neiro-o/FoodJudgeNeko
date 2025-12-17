@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { userDetailAPI, UserInfoResponse, UserComment, UserCommentsResponse } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -14,6 +15,7 @@ export default function UserStatsPage() {
   const searchParams = useSearchParams();
   const userId = params.user_id as string;
   const { t } = useLanguage();
+  const { user } = useAuth();
 
   const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
   const [comments, setComments] = useState<UserComment[]>([]);
@@ -25,6 +27,9 @@ export default function UserStatsPage() {
   const [error, setError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [mobilePageInput, setMobilePageInput] = useState('');
+  const [showMaliciousTooltip, setShowMaliciousTooltip] = useState(false);
+  const [showToggleDialog, setShowToggleDialog] = useState(false);
+  const [toggling, setToggling] = useState(false);
 
   const LIMIT = 10;
 
@@ -87,6 +92,19 @@ export default function UserStatsPage() {
       fetchComments(initialPage);
     }
   }, [userId, loading, fetchComments, searchParams]);
+
+  // Close tooltip on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showMaliciousTooltip) {
+        setShowMaliciousTooltip(false);
+      }
+    };
+    if (showMaliciousTooltip) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [showMaliciousTooltip]);
 
   // Format timestamp
   const formatDate = (timestamp: number) => {
@@ -287,10 +305,19 @@ export default function UserStatsPage() {
                 <img
                   src={avatarUrl}
                   alt="Avatar"
-                  className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                  className={`w-16 h-16 rounded-full object-cover border-2 border-gray-200 ${
+                    user?.is_admin ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''
+                  }`}
+                  onDoubleClick={(e) => {
+                    if (user?.is_admin) {
+                      e.stopPropagation();
+                      setShowToggleDialog(true);
+                    }
+                  }}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239CA3AF"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>';
                   }}
+                  title={user?.is_admin ? 'Double-click to toggle malicious status' : undefined}
                 />
               ) : (
                 <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
@@ -303,9 +330,41 @@ export default function UserStatsPage() {
 
             {/* User Info */}
             <div className="flex-1">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                {userInfo?.userName || 'Unknown User'}
-              </h2>
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {userInfo?.userName || 'Unknown User'}
+                </h2>
+                {userInfo?.malicious && (
+                  <div className="relative">
+                    <span 
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-300 cursor-pointer hover:bg-red-200 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMaliciousTooltip(!showMaliciousTooltip);
+                      }}
+                    >
+                      {t('userStats.maliciousAccount')}
+                    </span>
+                    {showMaliciousTooltip && (
+                      <>
+                        {/* Backdrop to close on outside click */}
+                        <div 
+                          className="fixed inset-0 z-40"
+                          onClick={() => setShowMaliciousTooltip(false)}
+                        />
+                        {/* Tooltip */}
+                        <div className="absolute left-0 top-full mt-2 z-50 w-80 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                          <p className="whitespace-normal leading-relaxed">
+                            {t('userStats.maliciousAccountTooltip')}
+                          </p>
+                          {/* Arrow pointing up */}
+                          <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="text-sm text-gray-600 space-y-1">
                 <p>{t('userStats.totalLikes', { count: userInfo?.likes || 0 })}</p>
                 <p>{t('userStats.totalReplies', { count: userInfo?.replies || 0 })}</p>
@@ -313,6 +372,56 @@ export default function UserStatsPage() {
             </div>
           </div>
         </div>
+
+        {/* Toggle Malicious Dialog */}
+        {showToggleDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {userInfo?.malicious ? 'Untag Malicious User' : 'Tag Malicious User'}
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                {userInfo?.malicious
+                  ? `Are you sure you want to remove the malicious tag from ${userInfo?.userName || 'this user'}?`
+                  : `Are you sure you want to tag ${userInfo?.userName || 'this user'} as malicious?`}
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowToggleDialog(false)}
+                  disabled={toggling}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setToggling(true);
+                    try {
+                      await userDetailAPI.toggleMalicious(userId);
+                      // Refresh user info
+                      const info = await userDetailAPI.getUserInfo(userId);
+                      setUserInfo(info);
+                      setShowToggleDialog(false);
+                    } catch (err: any) {
+                      console.error('Failed to toggle malicious status:', err);
+                      alert(err.message || 'Failed to toggle malicious status');
+                    } finally {
+                      setToggling(false);
+                    }
+                  }}
+                  disabled={toggling}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition disabled:opacity-50 ${
+                    userInfo?.malicious
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                >
+                  {toggling ? 'Processing...' : userInfo?.malicious ? 'Untag' : 'Tag'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Comments Section */}
         <div className="bg-white rounded-xl shadow-sm p-6">

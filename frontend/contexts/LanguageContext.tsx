@@ -136,6 +136,8 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.search.counts': 'Currently there are {elasticsearch} problems, with {redis} problems in process. Raw data: {mongodb} problems.',
     'problems.search.resultLimit': 'Results per page',
     'problems.search.resultLimitDesc': 'Adjust number of results (5-20)',
+    'problems.search.blockMaliciousComment': 'Block malicious account',
+    'problems.search.blockMaliciousCommentDesc': 'Block accounts sending malicious comments and choices.',
     
     // User page
     'user.title': 'MTV2',
@@ -177,6 +179,8 @@ const translations: Record<Language, Record<string, string>> = {
     'userStats.loading': 'Loading...',
     'userStats.notFound': 'User not found',
     'userStats.noComments': 'No comments yet',
+    'userStats.maliciousAccount': 'Malicious Account',
+    'userStats.maliciousAccountTooltip': 'This flag indicates that the account has repeatedly posted malicious, inflammatory, or divisive comments in the discussion section—either under their real name or anonymously—or has repeatedly selected incorrect options to flood the system. Please note that this flag may be inaccurate.',
 
     // Rankings page
     'rankings.title': 'Rankings',
@@ -318,6 +322,8 @@ const translations: Record<Language, Record<string, string>> = {
     'problems.search.counts': '当前共有 {elasticsearch} 题，上传队列中有 {redis} 题，原始数据 {mongodb} 题',
     'problems.search.resultLimit': '每页结果数',
     'problems.search.resultLimitDesc': '调整结果数量 (5-20)',
+    'problems.search.blockMaliciousComment': '屏蔽恶意账号',
+    'problems.search.blockMaliciousCommentDesc': '评论区中屏蔽引战评论及恶意评审者的评论',
     
     // User page
     'user.title': 'MTV2',
@@ -359,6 +365,8 @@ const translations: Record<Language, Record<string, string>> = {
     'userStats.loading': '加载中...',
     'userStats.notFound': '用户不存在',
     'userStats.noComments': '暂无评论',
+    'userStats.maliciousAccount': '恶意账号',
+    'userStats.maliciousAccountTooltip': '该标记代表该账号曾多次在评论区实名或匿名发表恶意、引战、对立言论，或多次故意选择错误选项灌水，标记可能有误。',
 
     // Rankings page
     'rankings.title': '排行榜',

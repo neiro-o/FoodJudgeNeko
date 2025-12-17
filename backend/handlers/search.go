@@ -15,6 +15,7 @@ import (
 	"mtv2/backend/utils"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type SearchRequest struct {
@@ -853,6 +854,36 @@ func SearchByESID(c *gin.Context) {
 	utils.SuccessResponse(c, doc)
 }
 
+// isMaliciousUser checks if a user ID is in the malicious collection
+func isMaliciousUser(userID string) bool {
+	if userID == "" {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var result bson.M
+	err := database.Malicious.FindOne(ctx, bson.M{"userId": userID}).Decode(&result)
+	return err == nil
+}
+
+// filterMaliciousComments removes comments from malicious users
+func filterMaliciousComments(comments []Comment) []Comment {
+	if len(comments) == 0 {
+		return comments
+	}
+
+	filtered := make([]Comment, 0, len(comments))
+	for _, comment := range comments {
+		// Convert userid (int64) to string for lookup
+		userIDStr := strconv.FormatInt(comment.UserID, 10)
+		if !isMaliciousUser(userIDStr) {
+			filtered = append(filtered, comment)
+		}
+	}
+	return filtered
+}
+
 // SearchByMongoID searches for a document by MongoDB ID
 func SearchByMongoID(c *gin.Context) {
 	mongoID := c.Param("id")
@@ -860,6 +891,10 @@ func SearchByMongoID(c *gin.Context) {
 		utils.BadRequestResponse(c, "MongoID parameter is required")
 		return
 	}
+
+	// Get blockMaliciousComment parameter (default: 1)
+	blockMaliciousComment := c.DefaultQuery("blockMaliciousComment", "1")
+	shouldBlock := blockMaliciousComment != "0"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -951,6 +986,11 @@ func SearchByMongoID(c *gin.Context) {
 	}
 
 	doc := parseDocument(source, score, highlight)
+
+	// Filter malicious comments if blockMaliciousComment is not 0
+	if shouldBlock && len(doc.Comments) > 0 {
+		doc.Comments = filterMaliciousComments(doc.Comments)
+	}
 
 	// Encrypt userId before returning
 	if doc.UserID != "" {

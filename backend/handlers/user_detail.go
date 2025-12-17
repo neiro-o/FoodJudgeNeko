@@ -239,9 +239,10 @@ func GetUserAvatar(c *gin.Context) {
 
 // UserInfoResponse represents the response for user info
 type UserInfoResponse struct {
-	UserName string `json:"userName"`
-	Likes    int64  `json:"likes"`
-	Replies  int64  `json:"replies"`
+	UserName  string `json:"userName"`
+	Likes     int64  `json:"likes"`
+	Replies   int64  `json:"replies"`
+	Malicious bool   `json:"malicious"`
 }
 
 // GetUserInfo returns user information including name, total likes, and total replies
@@ -320,10 +321,19 @@ func GetUserInfo(c *gin.Context) {
 		}
 	}
 
+	// Check if user is malicious
+	isMalicious := false
+	var maliciousDoc bson.M
+	err = database.Malicious.FindOne(ctx, bson.M{"userId": userID}).Decode(&maliciousDoc)
+	if err == nil {
+		isMalicious = true
+	}
+
 	utils.SuccessResponse(c, gin.H{
-		"userName": userName,
-		"likes":    totalLikes,
-		"replies":  totalReplies,
+		"userName":  userName,
+		"likes":     totalLikes,
+		"replies":   totalReplies,
+		"malicious": isMalicious,
 	})
 }
 
@@ -636,4 +646,64 @@ func GetRankings(c *gin.Context) {
 		"rankings": rankings,
 		"total":    len(rankings),
 	})
+}
+
+// ToggleMaliciousUser toggles the malicious status of a user (admin only)
+// POST /api/user_detail/toggle_malicious?userId=xxx
+func ToggleMaliciousUser(c *gin.Context) {
+	// Check if user is admin
+	if !utils.IsAdmin(c) {
+		utils.UnauthorizedResponse(c, "Admin access required")
+		return
+	}
+
+	targetUserID := c.Query("userId")
+	if targetUserID == "" {
+		utils.BadRequestResponse(c, "Missing userId parameter")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Check if user is currently marked as malicious
+	var maliciousDoc bson.M
+	err := database.Malicious.FindOne(ctx, bson.M{"userId": targetUserID}).Decode(&maliciousDoc)
+
+	isCurrentlyMalicious := err == nil
+
+	if isCurrentlyMalicious {
+		// Remove from malicious collection
+		_, err = database.Malicious.DeleteOne(ctx, bson.M{"userId": targetUserID})
+		if err != nil {
+			utils.InternalServerErrorResponse(c, "Failed to remove malicious tag")
+			return
+		}
+		utils.SuccessResponse(c, gin.H{
+			"malicious": false,
+			"message":   "User untagged as malicious",
+		})
+	} else {
+		// Add to malicious collection
+		maliciousDoc = bson.M{
+			"userId":    targetUserID,
+			"tagged":    true,
+			"tagged_at": time.Now(),
+			"tagged_by": "admin_manual",
+		}
+		_, err = database.Malicious.ReplaceOne(
+			ctx,
+			bson.M{"userId": targetUserID},
+			maliciousDoc,
+			options.Replace().SetUpsert(true),
+		)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, "Failed to tag user as malicious")
+			return
+		}
+		utils.SuccessResponse(c, gin.H{
+			"malicious": true,
+			"message":   "User tagged as malicious",
+		})
+	}
 }

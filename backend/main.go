@@ -104,6 +104,7 @@ func main() {
 		protected.GET("/invitations", handlers.ListInvitations)
 		protected.POST("/problem/upload", handlers.UploadProblem)
 		protected.POST("/problem/upload-multiple", handlers.UploadMultipleProblems)
+		protected.POST("/problem/upload_daily", handlers.UploadDaily)
 		protected.GET("/problem/search", handlers.Search)
 		protected.GET("/problem/recent", handlers.GetRecentProblems)
 		protected.GET("/problem/count", handlers.CountItems)
@@ -115,6 +116,7 @@ func main() {
 		protected.GET("/user_detail/user_info", handlers.GetUserInfo)
 		protected.GET("/user_detail/comments", handlers.GetUserComments)
 		protected.GET("/user_detail/rankings", handlers.GetRankings)
+		protected.POST("/user_detail/toggle_malicious", handlers.ToggleMaliciousUser)
 	}
 
 	// Start server

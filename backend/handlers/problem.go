@@ -33,6 +33,18 @@ type QueueItem struct {
 	UploadIP  string `json:"uploadIP"`
 }
 
+type DailyQueueItem struct {
+	UserID    string `json:"userId"`
+	DateID    string `json:"dateId"`
+	AccountID string `json:"accountId"`
+	UploadIP  string `json:"uploadIP"`
+}
+
+type UploadDailyRequest struct {
+	UserID string `json:"userId" binding:"required"`
+	DateID string `json:"dateId" binding:"required"`
+}
+
 func UploadProblem(c *gin.Context) {
 	// Get authenticated user ID (MongoDB ObjectID hex string)
 	accountID, exists := utils.GetUserID(c)
@@ -345,5 +357,61 @@ func CountItems(c *gin.Context) {
 
 	utils.SuccessResponse(c, gin.H{
 		"counts": counts,
+	})
+}
+
+// UploadDaily uploads a daily report to the daily queue
+// POST /api/problem/upload_daily
+func UploadDaily(c *gin.Context) {
+	// Get authenticated user ID (MongoDB ObjectID hex string)
+	accountID, exists := utils.GetUserID(c)
+	if !exists {
+		utils.UnauthorizedResponse(c, "User not authenticated")
+		return
+	}
+
+	// Parse request
+	var req UploadDailyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequestResponse(c, err.Error())
+		return
+	}
+
+	// Get client IP
+	uploadIP := getClientIP(c)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create daily queue item
+	queueItem := DailyQueueItem{
+		UserID:    req.UserID,
+		DateID:    req.DateID,
+		AccountID: accountID,
+		UploadIP:  uploadIP,
+	}
+
+	// Serialize queue item to JSON
+	itemJSON, err := json.Marshal(queueItem)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to serialize queue item")
+		return
+	}
+
+	// Push to Redis daily queue
+	queueName := config.AppConfig.Redis.Fields.DailyQueue
+	_, err = database.RedisClient.LPush(ctx, queueName, itemJSON).Result()
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to push to daily queue")
+		return
+	}
+
+	utils.SuccessResponse(c, gin.H{
+		"message": "Daily report uploaded successfully",
+		"data": gin.H{
+			"userId":   req.UserID,
+			"dateId":   req.DateID,
+			"uploadIP": uploadIP,
+		},
 	})
 }
