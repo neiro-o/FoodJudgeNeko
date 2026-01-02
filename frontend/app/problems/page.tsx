@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -14,6 +14,9 @@ export default function ProblemsPage() {
   const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
+  
+  // Ref to track the last processed URL keyword to prevent duplicate API calls
+  const lastProcessedUrlKeyword = useRef<string | null>(null);
 
   // Upload states
   const [uploadMode, setUploadMode] = useState<'single' | 'multiple'>('single');
@@ -65,6 +68,13 @@ export default function ProblemsPage() {
   useEffect(() => {
     if (isAuthenticated && !loading) {
       const urlKeyword = searchParams.get('q');
+      const trimmedKeyword = urlKeyword?.trim() || null;
+      
+      // Skip if we've already processed this URL keyword to avoid duplicate API calls
+      // This prevents double calls when handleSearch updates the URL
+      if (trimmedKeyword === lastProcessedUrlKeyword.current) {
+        return;
+      }
       
       // Get saved result limit from localStorage (since state may not be updated yet)
       let limit = 15;
@@ -78,27 +88,35 @@ export default function ProblemsPage() {
         }
       }
       
-      if (urlKeyword && urlKeyword.trim()) {
+      if (trimmedKeyword) {
+        // Mark this keyword as processed
+        lastProcessedUrlKeyword.current = trimmedKeyword;
+        
         // Search with the keyword from URL
         const performSearch = async () => {
           setSearchLoading(true);
           setSearchError('');
           try {
-            const response = await searchAPI.search(urlKeyword.trim(), limit);
+            const response = await searchAPI.search(trimmedKeyword, limit);
             setSearchResults(response.results);
             setSearchTotal(response.total);
-            setCurrentSearchKeyword(urlKeyword.trim());
+            setCurrentSearchKeyword(trimmedKeyword);
           } catch (error: any) {
             setSearchError(error.message || t('problems.search.errorFailed'));
             setSearchResults([]);
             setSearchTotal(0);
             setCurrentSearchKeyword('');
+            // Reset the ref on error so we can retry
+            lastProcessedUrlKeyword.current = null;
           } finally {
             setSearchLoading(false);
           }
         };
         performSearch();
       } else {
+        // Mark empty keyword as processed
+        lastProcessedUrlKeyword.current = null;
+        
         // Load recent problems
         const loadRecentProblems = async () => {
           setSearchLoading(true);
@@ -505,6 +523,9 @@ export default function ProblemsPage() {
       setCurrentSearchKeyword(keyword);
       setSearchKeyword(''); // Clear the input after successful search
       
+      // Mark this keyword as processed to prevent duplicate API call when URL updates
+      lastProcessedUrlKeyword.current = keyword;
+      
       // Update URL with search keyword
       const params = new URLSearchParams(searchParams.toString());
       params.set('q', keyword);
@@ -514,6 +535,8 @@ export default function ProblemsPage() {
       setSearchResults([]);
       setSearchTotal(0);
       setCurrentSearchKeyword('');
+      // Reset the ref on error so we can retry
+      lastProcessedUrlKeyword.current = null;
     } finally {
       setSearchLoading(false);
     }
