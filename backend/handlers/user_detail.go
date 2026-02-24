@@ -560,7 +560,7 @@ type RankingItem struct {
 	CommentCount int64  `json:"commentCount"`
 }
 
-// GetRankings returns the top 100 users by total likes
+// GetRankings returns the top 300 users by total likes
 // GET /api/user_detail/rankings
 func GetRankings(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -579,8 +579,8 @@ func GetRankings(c *gin.Context) {
 		}}},
 		// Sort by totalLikes descending
 		{{Key: "$sort", Value: bson.M{"totalLikes": -1}}},
-		// Limit to top 100
-		{{Key: "$limit", Value: 100}},
+		// Limit to top 300
+		{{Key: "$limit", Value: 300}},
 	}
 
 	cursor, err := database.Comments.Aggregate(ctx, pipeline)
