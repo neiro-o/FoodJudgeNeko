@@ -513,6 +513,187 @@ func Search122(ctx context.Context, ans int, limit int, orderByRandom bool) ([]E
 	return filteredResults, int64(totalValue), nil
 }
 
+// Search2026WaiTi searches problems with timestamp after 2026-01-01 00:00:00 (UTC+8)
+// where over 85% of comment choices are different from the document's answer.
+func Search2026WaiTi(ctx context.Context, limit int, orderByRandom bool) ([]ESDocument, int64, error) {
+	// 2026-01-01 00:00:00 UTC+8 = 2025-12-31 16:00:00 UTC
+	threshold := time.Date(2026, 1, 1, 0, 0, 0, 0, time.FixedZone("CST", 8*3600)).Unix()
+
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"range": map[string]interface{}{
+				"timestamp": map[string]interface{}{
+					"gt": threshold,
+				},
+			},
+		},
+		"_source": []string{"mongo_id", "user_review", "timestamp", "answer", "ratio_1", "ratio_2", "comments", "created_at"},
+	}
+
+	if orderByRandom {
+		query["sort"] = []map[string]interface{}{
+			{
+				"_script": map[string]interface{}{
+					"type":   "number",
+					"script": map[string]interface{}{"source": "Math.random()"},
+					"order":  "desc",
+				},
+			},
+		}
+	} else {
+		query["sort"] = []map[string]interface{}{
+			{
+				"timestamp": map[string]interface{}{
+					"order": "desc",
+				},
+			},
+		}
+	}
+
+	// Fetch extra to account for application-side filtering
+	fetchLimit := limit * 10
+	query["size"] = fetchLimit
+
+	queryJSON, err := json.Marshal(query)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to build search query: %v", err)
+	}
+
+	indexName := config.AppConfig.Elasticsearch.IndexName
+	res, err := database.ESClient.Search(
+		database.ESClient.Search.WithContext(ctx),
+		database.ESClient.Search.WithIndex(indexName),
+		database.ESClient.Search.WithBody(bytes.NewReader(queryJSON)),
+		database.ESClient.Search.WithTrackTotalHits(true),
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("Elasticsearch search failed: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return nil, 0, fmt.Errorf("error parsing error response: %v", err)
+		}
+		return nil, 0, fmt.Errorf("Elasticsearch error: %v", e["error"])
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse search results: %v", err)
+	}
+
+	hits, ok := result["hits"].(map[string]interface{})
+	if !ok {
+		return nil, 0, fmt.Errorf("invalid search response format")
+	}
+
+	total, _ := hits["total"].(map[string]interface{})
+	totalValue, _ := total["value"].(float64)
+
+	hitsList, ok := hits["hits"].([]interface{})
+	if !ok {
+		return nil, 0, fmt.Errorf("invalid hits format")
+	}
+
+	filteredResults := make([]ESDocument, 0, limit)
+	for _, hit := range hitsList {
+		if len(filteredResults) >= limit {
+			break
+		}
+		hitMap, ok := hit.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		source, ok := hitMap["_source"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		answer := 0
+		if v, ok := source["answer"].(float64); ok {
+			answer = int(v)
+		}
+		if answer != 1 && answer != 2 {
+			continue
+		}
+
+		// Parse comments
+		var parsedComments []Comment
+		if commentsRaw, ok := source["comments"].([]interface{}); ok {
+			for _, c := range commentsRaw {
+				if cm, ok := c.(map[string]interface{}); ok {
+					comment := Comment{}
+					if choice, ok := cm["choice"].(float64); ok {
+						comment.Choice = int(choice)
+					}
+					if ts, ok := cm["timestamp"].(float64); ok {
+						comment.Timestamp = int64(ts)
+					}
+					if name, ok := cm["name"].(string); ok {
+						comment.Name = name
+					}
+					if content, ok := cm["content"].(string); ok {
+						comment.Content = content
+					}
+					if likes, ok := cm["likes"].(float64); ok {
+						comment.Likes = int(likes)
+					}
+					parsedComments = append(parsedComments, comment)
+				}
+			}
+		}
+
+		if len(parsedComments) == 0 {
+			continue
+		}
+
+		// Count how many comments have choice != answer
+		differentCount := 0
+		for _, c := range parsedComments {
+			if c.Choice != answer {
+				differentCount++
+			}
+		}
+
+		// Over 85% of comments must be different from answer
+		ratio := float64(differentCount) / float64(len(parsedComments))
+		if ratio <= 0.85 {
+			continue
+		}
+
+		doc := ESDocument{}
+		doc.ESID = hitMap["_id"]
+		if v, ok := source["mongo_id"].(string); ok {
+			doc.MongoID = v
+		}
+		if v, ok := source["user_review"].(string); ok {
+			doc.UserReview = v
+		}
+		if v, ok := source["timestamp"].(float64); ok {
+			doc.Timestamp = int64(v)
+		}
+		doc.Answer = answer
+		if v, ok := source["ratio_1"].(float64); ok {
+			doc.Ratio1 = v
+		}
+		if v, ok := source["ratio_2"].(float64); ok {
+			doc.Ratio2 = v
+		}
+		doc.Hot1Answer = nil
+		if len(parsedComments) > 0 {
+			choice := parsedComments[0].Choice
+			doc.Hot1Answer = &choice
+		}
+		doc.CommentAnswer = calculateCommentAnswer(parsedComments)
+
+		filteredResults = append(filteredResults, doc)
+	}
+
+	return filteredResults, int64(totalValue), nil
+}
+
 func Search(c *gin.Context) {
 	var req SearchRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -596,6 +777,20 @@ func Search(c *gin.Context) {
 	// (4) Match full text "211": Search122, ans = 2
 	if keyword == "211" {
 		results, total, err := Search122(ctx, 2, req.Limit, orderByRandom)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
+			return
+		}
+		utils.SuccessResponse(c, SearchResponse{
+			Total:   total,
+			Results: results,
+		})
+		return
+	}
+
+	// (5) Match full text "2026歪题": Search2026WaiTi (ignores req.Limit, returns up to 100)
+	if keyword == "2026歪题" {
+		results, total, err := Search2026WaiTi(ctx, 100, orderByRandom)
 		if err != nil {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
