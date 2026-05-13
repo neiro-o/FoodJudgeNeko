@@ -16,7 +16,8 @@ export default function ProblemsPage() {
   const searchParams = useSearchParams();
   
   // Ref to track the last processed URL keyword to prevent duplicate API calls
-  const lastProcessedUrlKeyword = useRef<string | null>(null);
+  // Use a sentinel value distinct from null so that the initial empty-keyword load is not skipped
+  const lastProcessedUrlKeyword = useRef<string | undefined>(undefined);
 
   // Upload states
   const [uploadMode, setUploadMode] = useState<'single' | 'multiple'>('single');
@@ -75,8 +76,10 @@ export default function ProblemsPage() {
       const trimmedKeyword = urlKeyword?.trim() || null;
       
       // Skip if we've already processed this URL keyword to avoid duplicate API calls
-      // This prevents double calls when handleSearch updates the URL
-      if (trimmedKeyword === lastProcessedUrlKeyword.current) {
+      // lastProcessedUrlKeyword starts as `undefined` (never processed), so the first visit always runs.
+      // After processing: keyword string for keyword searches, '' for no-keyword loads.
+      const processedKey = trimmedKeyword ?? '';
+      if (processedKey === lastProcessedUrlKeyword.current) {
         return;
       }
       
@@ -100,26 +103,34 @@ export default function ProblemsPage() {
         const performSearch = async () => {
           setSearchLoading(true);
           setSearchError('');
+          setNotesSearchResults([]);
           try {
             const response = await searchAPI.search(trimmedKeyword, limit);
             setSearchResults(response.results);
             setSearchTotal(response.total);
             setCurrentSearchKeyword(trimmedKeyword);
+            // Also fetch notes search results
+            try {
+              const notesResponse = await searchAPI.notesSearch(trimmedKeyword, 5);
+              setNotesSearchResults(notesResponse || []);
+            } catch {
+              setNotesSearchResults([]);
+            }
           } catch (error: any) {
             setSearchError(error.message || t('problems.search.errorFailed'));
             setSearchResults([]);
             setSearchTotal(0);
             setCurrentSearchKeyword('');
             // Reset the ref on error so we can retry
-            lastProcessedUrlKeyword.current = null;
+            lastProcessedUrlKeyword.current = undefined;
           } finally {
             setSearchLoading(false);
           }
         };
         performSearch();
       } else {
-        // Mark empty keyword as processed
-        lastProcessedUrlKeyword.current = null;
+        // Mark empty keyword as processed (use empty string to distinguish from initial undefined)
+        lastProcessedUrlKeyword.current = '';
         
         // Load recent problems
         const loadRecentProblems = async () => {
@@ -522,15 +533,15 @@ export default function ProblemsPage() {
     setNotesSearchLoading(true);
     setNotesSearchResults([]);
 
+    // Mark as processed before any await to prevent useEffect from re-triggering
+    lastProcessedUrlKeyword.current = keyword;
+
     try {
       const response = await searchAPI.search(keyword, resultLimit);
       setSearchResults(response.results);
       setSearchTotal(response.total);
       setCurrentSearchKeyword(keyword);
       setSearchKeyword(''); // Clear the input after successful search
-      
-      // Mark this keyword as processed to prevent duplicate API call when URL updates
-      lastProcessedUrlKeyword.current = keyword;
       
       // Update URL with search keyword
       const params = new URLSearchParams(searchParams.toString());
@@ -552,7 +563,7 @@ export default function ProblemsPage() {
       setSearchTotal(0);
       setCurrentSearchKeyword('');
       // Reset the ref on error so we can retry
-      lastProcessedUrlKeyword.current = null;
+      lastProcessedUrlKeyword.current = undefined;
     } finally {
       setSearchLoading(false);
       setNotesSearchLoading(false);
