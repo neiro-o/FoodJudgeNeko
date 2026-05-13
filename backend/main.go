@@ -112,6 +112,9 @@ func main() {
 		protected.GET("/problem/by-mongoid/:id", handlers.SearchByMongoID)
 		protected.POST("/media/hash", handlers.GenerateMediaHash)
 
+		// Notes routes
+		protected.GET("/notes/search", handlers.SearchNotes)
+
 		// User detail routes
 		protected.GET("/user_detail/user_info", handlers.GetUserInfo)
 		protected.GET("/user_detail/comments", handlers.GetUserComments)

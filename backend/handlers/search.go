@@ -16,11 +16,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type SearchRequest struct {
 	Keyword string `form:"keyword" json:"keyword" binding:"required"`
 	Limit   int    `form:"limit" json:"limit" binding:"required,min=5,max=30"`
+}
+
+type SearchNotesRequest struct {
+	Keyword string `form:"keyword" json:"keyword" binding:"required"`
+	Limit   int    `form:"limit" json:"limit" binding:"required,min=1,max=100"`
+}
+
+type NoteData struct {
+	Text   string `json:"text"`
+	Answer string `json:"answer"`
+	Reply  string `json:"reply"`
 }
 
 type RecentProblemsRequest struct {
@@ -1061,6 +1073,59 @@ func Search(c *gin.Context) {
 		Total:   int64(totalValue),
 		Results: results,
 	})
+}
+
+// SearchNotes searches for notes in MongoDB by keyword in text field
+// Requires JWT authentication
+func SearchNotes(c *gin.Context) {
+	// Get authenticated user ID (JWT)
+	_, exists := utils.GetUserID(c)
+	if !exists {
+		utils.UnauthorizedResponse(c, "User not authenticated")
+		return
+	}
+
+	var req SearchNotesRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.BadRequestResponse(c, fmt.Sprintf("Invalid request: %v", err))
+		return
+	}
+
+	// Validate limit: ensure it's between 1 and 100
+	if req.Limit < 1 || req.Limit > 100 {
+		utils.BadRequestResponse(c, "limit must be between 1 and 100")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Build MongoDB query to search by keyword in text field
+	// Using regex for case-insensitive search
+	query := bson.M{
+		"text": bson.M{
+			"$regex":   req.Keyword,
+			"$options": "i",
+		},
+	}
+
+	// Execute find query with limit
+	opts := options.Find().SetLimit(int64(req.Limit))
+	cursor, err := database.Notes.Find(ctx, query, opts)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, fmt.Sprintf("Database query failed: %v", err))
+		return
+	}
+	defer cursor.Close(ctx)
+
+	// Parse results
+	results := make([]NoteData, 0)
+	if err := cursor.All(ctx, &results); err != nil {
+		utils.InternalServerErrorResponse(c, fmt.Sprintf("Failed to parse query results: %v", err))
+		return
+	}
+
+	utils.SuccessResponse(c, results)
 }
 
 func parseReplies(replies []interface{}) []Reply {

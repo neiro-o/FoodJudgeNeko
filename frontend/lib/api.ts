@@ -195,6 +195,15 @@ export interface SearchResponse {
   results: SearchResult[];
 }
 
+export interface NotesSearchItem {
+  text: string;
+  answer: number;
+}
+
+export interface NotesSearchResponse {
+  data: NotesSearchItem[];
+}
+
 export const searchAPI = {
   search: async (keyword: string, limit: number = 15): Promise<SearchResponse> => {
     const params = new URLSearchParams({
@@ -209,6 +218,14 @@ export const searchAPI = {
       limit: limit.toString(),
     });
     return apiRequest<SearchResponse>(`/problem/recent?${params.toString()}`);
+  },
+
+  notesSearch: async (keyword: string, limit: number = 5): Promise<NotesSearchResponse> => {
+    const params = new URLSearchParams({
+      keyword,
+      limit: limit.toString(),
+    });
+    return apiRequest<NotesSearchResponse>(`/notes/search?${params.toString()}`);
   },
 
   getByMongoId: async (mongoId: string, blockMaliciousComment: number = 1): Promise<any> => {

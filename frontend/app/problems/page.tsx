@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { problemAPI, searchAPI, SearchResult } from '@/lib/api';
+import { problemAPI, searchAPI, SearchResult, NotesSearchItem } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/components/ColumnCustomizer';
@@ -47,6 +47,10 @@ export default function ProblemsPage() {
   const [searchTotal, setSearchTotal] = useState(0);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
+
+  // Notes search states
+  const [notesSearchResults, setNotesSearchResults] = useState<NotesSearchItem[]>([]);
+  const [notesSearchLoading, setNotesSearchLoading] = useState(false);
 
   // Count states
   const [counts, setCounts] = useState<{ elasticsearch: number; mongodb: number; redis: number } | null>(null);
@@ -515,6 +519,8 @@ export default function ProblemsPage() {
     const keyword = searchKeyword.trim();
     setSearchError('');
     setSearchLoading(true);
+    setNotesSearchLoading(true);
+    setNotesSearchResults([]);
 
     try {
       const response = await searchAPI.search(keyword, resultLimit);
@@ -530,6 +536,16 @@ export default function ProblemsPage() {
       const params = new URLSearchParams(searchParams.toString());
       params.set('q', keyword);
       router.push(`/problems?${params.toString()}`);
+
+      // Fetch notes search results
+      try {
+        const notesResponse = await searchAPI.notesSearch(keyword, 5);
+        setNotesSearchResults(notesResponse.data || []);
+      } catch (notesError) {
+        // Silently fail for notes search, don't show error
+        console.error('Notes search failed:', notesError);
+        setNotesSearchResults([]);
+      }
     } catch (error: any) {
       setSearchError(error.message || t('problems.search.errorFailed'));
       setSearchResults([]);
@@ -539,6 +555,7 @@ export default function ProblemsPage() {
       lastProcessedUrlKeyword.current = null;
     } finally {
       setSearchLoading(false);
+      setNotesSearchLoading(false);
     }
   };
 
@@ -954,6 +971,46 @@ export default function ProblemsPage() {
             {!searchLoading && searchResults.length === 0 && searchKeyword && (
               <div className="text-center py-8 text-gray-500">
                 {t('problems.search.noResults')}
+              </div>
+            )}
+
+            {notesSearchResults.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  {t('problems.search.otherNotesTitle')}
+                </h3>
+                <div className="overflow-x-auto -mx-2 sm:mx-0 max-h-[600px] border border-gray-200 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          {t('problems.search.index')}
+                        </th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          {t('problems.search.problemTitle')}
+                        </th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          {t('problems.search.answer')}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {notesSearchResults.map((item, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-2 py-2 whitespace-nowrap text-sm text-gray-900">
+                            {index + 1}
+                          </td>
+                          <td className="px-2 py-2 text-sm text-gray-900 max-w-xs truncate">
+                            {item.text}
+                          </td>
+                          <td className="px-2 py-2 whitespace-nowrap text-sm">
+                            {renderAnswerCell(item.answer)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
