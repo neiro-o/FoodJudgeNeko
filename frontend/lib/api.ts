@@ -198,10 +198,7 @@ export interface SearchResponse {
 export interface NotesSearchItem {
   text: string;
   answer: number;
-}
-
-export interface NotesSearchResponse {
-  data: NotesSearchItem[];
+  reply: string;
 }
 
 export const searchAPI = {
@@ -220,12 +217,12 @@ export const searchAPI = {
     return apiRequest<SearchResponse>(`/problem/recent?${params.toString()}`);
   },
 
-  notesSearch: async (keyword: string, limit: number = 5): Promise<NotesSearchResponse> => {
+  notesSearch: async (keyword: string, limit: number = 5): Promise<NotesSearchItem[]> => {
     const params = new URLSearchParams({
       keyword,
       limit: limit.toString(),
     });
-    return apiRequest<NotesSearchResponse>(`/notes/search?${params.toString()}`);
+    return apiRequest<NotesSearchItem[]>(`/notes/search?${params.toString()}`);
   },
 
   getByMongoId: async (mongoId: string, blockMaliciousComment: number = 1): Promise<any> => {

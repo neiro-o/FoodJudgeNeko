@@ -540,7 +540,7 @@ export default function ProblemsPage() {
       // Fetch notes search results
       try {
         const notesResponse = await searchAPI.notesSearch(keyword, 5);
-        setNotesSearchResults(notesResponse.data || []);
+        setNotesSearchResults(notesResponse || []);
       } catch (notesError) {
         // Silently fail for notes search, don't show error
         console.error('Notes search failed:', notesError);
