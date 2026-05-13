@@ -31,7 +31,7 @@ type SearchNotesRequest struct {
 
 type NoteData struct {
 	Text   string `json:"text"`
-	Answer string `json:"answer"`
+	Answer int32  `json:"answer"`
 	Reply  string `json:"reply"`
 }
 
