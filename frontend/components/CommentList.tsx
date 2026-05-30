@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { ProblemComment } from '@/lib/api';
@@ -27,6 +27,8 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
   const { language } = useLanguage();
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
+  const [inputValue, setInputValue] = useState('1');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Pagination
   const totalPages = Math.ceil(comments.length / pageSize);
@@ -140,7 +142,11 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
         <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-gray-100">
           {/* Previous Button */}
           <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => {
+              const next = Math.max(1, currentPage - 1);
+              setCurrentPage(next);
+              setInputValue(String(next));
+            }}
             disabled={currentPage === 1}
             className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
@@ -149,26 +155,35 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
             </svg>
           </button>
 
-          {/* Page Numbers */}
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`min-w-[28px] h-7 text-sm rounded transition ${
-                  currentPage === page
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
+          {/* Page Input */}
+          <div className="flex items-center gap-1 text-sm text-gray-600">
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={() => {
+                const n = parseInt(inputValue, 10);
+                const clamped = isNaN(n) ? currentPage : Math.min(totalPages, Math.max(1, n));
+                setCurrentPage(clamped);
+                setInputValue(String(clamped));
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') inputRef.current?.blur();
+              }}
+              className="w-10 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:outline-none focus:border-indigo-400"
+            />
+            <span>/ {totalPages}</span>
           </div>
 
           {/* Next Button */}
           <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => {
+              const next = Math.min(totalPages, currentPage + 1);
+              setCurrentPage(next);
+              setInputValue(String(next));
+            }}
             disabled={currentPage === totalPages}
             className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
