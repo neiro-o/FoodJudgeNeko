@@ -98,10 +98,10 @@ export default function Home() {
 
           {/* Title and Subtitle */}
           <div className="flex flex-col">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-left">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-left">
               {t('home.title')}
             </h1>
-            <p className="text-gray-600 text-left">{t('home.subtitle')}</p>
+            <p className="text-gray-600 dark:text-gray-300 text-left">{t('home.subtitle')}</p>
           </div>
         </div>
       </div>

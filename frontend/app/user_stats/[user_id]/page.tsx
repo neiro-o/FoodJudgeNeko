@@ -169,20 +169,20 @@ export default function UserStatsPage() {
             <button
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 text-sm dark:text-gray-300"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Prev
             </button>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
               {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 text-sm"
+              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 text-sm dark:text-gray-300"
             >
               Next
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,9 +190,8 @@ export default function UserStatsPage() {
               </svg>
             </button>
           </div>
-          {/* Page jump input */}
           <form onSubmit={handleMobilePageJump} className="flex justify-center items-center gap-2">
-            <span className="text-sm text-gray-600">跳转到</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">跳转到</span>
             <input
               type="number"
               min="1"
@@ -200,9 +199,9 @@ export default function UserStatsPage() {
               value={mobilePageInput}
               onChange={(e) => setMobilePageInput(e.target.value)}
               placeholder={String(currentPage)}
-              className="w-16 px-2 py-1 text-sm text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+              className="w-16 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             />
-            <span className="text-sm text-gray-600">页</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">页</span>
             <button
               type="submit"
               disabled={!mobilePageInput || parseInt(mobilePageInput, 10) < 1 || parseInt(mobilePageInput, 10) > totalPages}
@@ -218,7 +217,7 @@ export default function UserStatsPage() {
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className="px-3 py-1 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300"
           >
             ←
           </button>
@@ -226,11 +225,11 @@ export default function UserStatsPage() {
             <>
               <button
                 onClick={() => handlePageChange(1)}
-                className="px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-100"
+                className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300"
               >
                 1
               </button>
-              {startPage > 2 && <span className="px-2">...</span>}
+              {startPage > 2 && <span className="px-2 dark:text-gray-400">...</span>}
             </>
           )}
           {pages.map((page) => (
@@ -240,7 +239,7 @@ export default function UserStatsPage() {
               className={`px-3 py-1 rounded-lg border ${
                 page === currentPage
                   ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'border-gray-300 hover:bg-gray-100'
+                  : 'border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300'
               }`}
             >
               {page}
@@ -248,10 +247,10 @@ export default function UserStatsPage() {
           ))}
           {endPage < totalPages && (
             <>
-              {endPage < totalPages - 1 && <span className="px-2">...</span>}
+              {endPage < totalPages - 1 && <span className="px-2 dark:text-gray-400">...</span>}
               <button
                 onClick={() => handlePageChange(totalPages)}
-                className="px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-100"
+                className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300"
               >
                 {totalPages}
               </button>
@@ -260,7 +259,7 @@ export default function UserStatsPage() {
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="px-3 py-1 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300"
           >
             →
           </button>
@@ -271,10 +270,10 @@ export default function UserStatsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <Navbar title={t('userStats.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500">{t('userStats.loading')}</div>
+          <div className="text-gray-500 dark:text-gray-400">{t('userStats.loading')}</div>
         </div>
       </div>
     );
@@ -282,7 +281,7 @@ export default function UserStatsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <Navbar title={t('userStats.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
           <div className="text-red-500">{error}</div>
@@ -292,12 +291,12 @@ export default function UserStatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Navbar title={t('userStats.title')} showBackButton backHref="/problems" />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* User Profile Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-start gap-4">
             {/* Avatar */}
             <div className="flex-shrink-0">
@@ -305,7 +304,7 @@ export default function UserStatsPage() {
                 <img
                   src={avatarUrl}
                   alt="Avatar"
-                  className={`w-16 h-16 rounded-full object-cover border-2 border-gray-200 ${
+                  className={`w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 ${
                     user?.is_admin ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''
                   }`}
                   onDoubleClick={(e) => {
@@ -320,7 +319,7 @@ export default function UserStatsPage() {
                   title={user?.is_admin ? 'Double-click to toggle malicious status' : undefined}
                 />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                   <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
                   </svg>
@@ -331,13 +330,13 @@ export default function UserStatsPage() {
             {/* User Info */}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   {userInfo?.userName || 'Unknown User'}
                 </h2>
                 {userInfo?.malicious && (
                   <div className="relative">
                     <span 
-                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-300 cursor-pointer hover:bg-red-200 transition-colors"
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border border-red-300 dark:border-red-700 cursor-pointer hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowMaliciousTooltip(!showMaliciousTooltip);
@@ -347,17 +346,14 @@ export default function UserStatsPage() {
                     </span>
                     {showMaliciousTooltip && (
                       <>
-                        {/* Backdrop to close on outside click */}
                         <div 
                           className="fixed inset-0 z-40"
                           onClick={() => setShowMaliciousTooltip(false)}
                         />
-                        {/* Tooltip */}
                         <div className="absolute left-0 top-full mt-2 z-50 w-80 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
                           <p className="whitespace-normal leading-relaxed">
                             {t('userStats.maliciousAccountTooltip')}
                           </p>
-                          {/* Arrow pointing up */}
                           <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
                         </div>
                       </>
@@ -365,7 +361,7 @@ export default function UserStatsPage() {
                   </div>
                 )}
               </div>
-              <div className="text-sm text-gray-600 space-y-1">
+              <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                 <p>{t('userStats.totalLikes', { count: userInfo?.likes || 0 })}</p>
                 <p>{t('userStats.totalReplies', { count: userInfo?.replies || 0 })}</p>
               </div>
@@ -376,11 +372,11 @@ export default function UserStatsPage() {
         {/* Toggle Malicious Dialog */}
         {showToggleDialog && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 {userInfo?.malicious ? 'Untag Malicious User' : 'Tag Malicious User'}
               </h3>
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                 {userInfo?.malicious
                   ? `Are you sure you want to remove the malicious tag from ${userInfo?.userName || 'this user'}?`
                   : `Are you sure you want to tag ${userInfo?.userName || 'this user'} as malicious?`}
@@ -389,7 +385,7 @@ export default function UserStatsPage() {
                 <button
                   onClick={() => setShowToggleDialog(false)}
                   disabled={toggling}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -424,17 +420,17 @@ export default function UserStatsPage() {
         )}
 
         {/* Comments Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             {t('userStats.comments', { count: totalComments })}
           </h3>
 
           {commentsLoading ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               {t('userStats.loading')}
             </div>
           ) : comments.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               {t('userStats.noComments')}
             </div>
           ) : (
@@ -442,10 +438,9 @@ export default function UserStatsPage() {
               {comments.map((comment) => (
                 <div
                   key={comment.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
                 >
                   <div className="flex items-start gap-3">
-                    {/* Comment Avatar - reuse the same avatar, click to go to problem */}
                     <div 
                       className="flex-shrink-0 cursor-pointer"
                       onClick={() => router.push(`/problems/${comment.problemId}`)}
@@ -455,13 +450,13 @@ export default function UserStatsPage() {
                         <img
                           src={avatarUrl}
                           alt="Avatar"
-                          className="w-10 h-10 rounded-full object-cover border border-gray-200 hover:ring-2 hover:ring-indigo-400 transition"
+                          className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700 hover:ring-2 hover:ring-indigo-400 transition"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239CA3AF"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>';
                           }}
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center hover:ring-2 hover:ring-indigo-400 transition">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center hover:ring-2 hover:ring-indigo-400 transition">
                           <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
                           </svg>
@@ -469,32 +464,28 @@ export default function UserStatsPage() {
                       )}
                     </div>
 
-                    {/* Comment Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
                           {comment.userName}
                         </span>
-                        {/* Choice Tag */}
                         {comment.choice === 1 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
                             {t('userStats.supportUser')}
                           </span>
                         )}
                         {comment.choice === 2 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                             {t('userStats.supportMerchant')}
                           </span>
                         )}
                       </div>
 
-                      {/* Comment Text */}
-                      <p className="text-gray-700 text-sm mb-2 break-words">
+                      <p className="text-gray-700 dark:text-gray-300 text-sm mb-2 break-words">
                         {comment.content}
                       </p>
 
-                      {/* Comment Footer */}
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span>{formatDate(comment.createTime)}</span>
                         <span className="flex items-center gap-1">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

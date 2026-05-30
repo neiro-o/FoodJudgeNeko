@@ -170,21 +170,21 @@ export default function ProblemType4({
   return (
     <div>
       {/* Problem Section */}
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">{problemTitle}</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemTitle}</h2>
       <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} />
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{problemDescription}</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemDescription}</h3>
 
       {/* Order Info Section */}
       {showOrderInfo && (
         <div className="mb-6">
-          <h3 className="text-base font-semibold text-gray-900 mb-3">{ordersTitle}</h3>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">{ordersTitle}</h3>
           <div className="flex gap-4">
             {/* Product Image */}
             {productImageUrl && (
               <div className="flex-shrink-0">
                 {isExternalUrl(orderInfo?.raw?.productImageUrl || '') && !imageUrlMap.has(orderInfo?.raw?.productImageUrl || '') ? (
                   // Show placeholder while loading proxied URL
-                  <div className="w-20 h-20 bg-gray-200 rounded flex items-center justify-center">
+                  <div className="w-20 h-20 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-400 border-t-transparent"></div>
                   </div>
                 ) : (
@@ -201,7 +201,7 @@ export default function ProblemType4({
             {/* Product Info */}
             <div className="flex-1 min-w-0">
               {/* Product Name */}
-              <p className="text-sm font-medium text-gray-900 break-words">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 break-words">
                 {orderInfo?.raw?.productName}
               </p>
               
@@ -214,10 +214,10 @@ export default function ProblemType4({
           
           {/* Others as Note */}
           {others && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <p className="text-sm text-gray-500">
+            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 <span className="font-medium">{noteTitle}: </span>
-                <span className="text-gray-600">{others}</span>
+                <span className="text-gray-600 dark:text-gray-300">{others}</span>
               </p>
             </div>
           )}

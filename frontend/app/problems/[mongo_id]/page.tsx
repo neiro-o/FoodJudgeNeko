@@ -180,8 +180,8 @@ export default function ProblemDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">{t('loading')}</div>
+      <div className="min-h-screen flex items-center justify-center dark:bg-gray-950">
+        <div className="text-gray-600 dark:text-gray-300">{t('loading')}</div>
       </div>
     );
   }
@@ -193,21 +193,21 @@ export default function ProblemDetailPage() {
   return (
     <>
       <PageTitle titleKey="pageTitle.problems" />
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <Navbar title={t('problems.title')} showBackButton={true} backHref="/problems" />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Loading state */}
           {loadingProblem && (
             <div className="flex items-center justify-center py-12">
-              <div className="text-gray-600">{t('loading')}</div>
+              <div className="text-gray-600 dark:text-gray-300">{t('loading')}</div>
             </div>
           )}
 
           {/* Error state */}
           {error && !loadingProblem && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-600">{error}</p>
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4">
+              <p className="text-red-600 dark:text-red-400">{error}</p>
             </div>
           )}
 
@@ -217,7 +217,7 @@ export default function ProblemDetailPage() {
               {/* Left Column (2/3 width on PC) */}
               <div className="w-full lg:w-2/3 flex flex-col gap-6">
                 {/* Layout 1: Problem Timeline */}
-                <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6">
                   {problem.problem_type === 1 && (
                     <ProblemType1
                       userReview={problem.user_review}
@@ -283,13 +283,13 @@ export default function ProblemDetailPage() {
               {/* Right Column (1/3 width on PC) */}
               <div className="w-full lg:w-1/3 flex flex-col gap-6">
                 {/* Layout 2: Comments */}
-                <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6">
                   <CommentList comments={comments} mongoId={mongoId} />
                 </div>
 
                 {/* Problem Operations */}
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                     {t('problemOps.title')}
                   </h3>
                   <div className="flex flex-wrap gap-2">
@@ -298,9 +298,9 @@ export default function ProblemDetailPage() {
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                         copyStatus?.type === 'link'
                           ? copyStatus.success
-                            ? 'bg-green-100 text-green-700 border border-green-300'
-                            : 'bg-red-100 text-red-700 border border-red-300'
-                          : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'
+                          : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-700'
                       }`}
                     >
                       {copyStatus?.type === 'link'
@@ -314,9 +314,9 @@ export default function ProblemDetailPage() {
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                         copyStatus?.type === 'json'
                           ? copyStatus.success
-                            ? 'bg-green-100 text-green-700 border border-green-300'
-                            : 'bg-red-100 text-red-700 border border-red-300'
-                          : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'
+                          : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-700'
                       }`}
                     >
                       {copyStatus?.type === 'json'
@@ -330,9 +330,9 @@ export default function ProblemDetailPage() {
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                         copyStatus?.type === 'yaml'
                           ? copyStatus.success
-                            ? 'bg-green-100 text-green-700 border border-green-300'
-                            : 'bg-red-100 text-red-700 border border-red-300'
-                          : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'
+                          : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-700'
                       }`}
                     >
                       {copyStatus?.type === 'yaml'

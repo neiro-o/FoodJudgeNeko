@@ -591,18 +591,18 @@ export default function ProblemsPage() {
   const renderAnswerCell = (answer: number | null | undefined) => {
     if (answer === 1) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
           1
         </span>
       );
     } else if (answer === 2) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
           2
         </span>
       );
     }
-    return <span className="text-gray-500">N/A</span>;
+    return <span className="text-gray-500 dark:text-gray-400">N/A</span>;
   };
 
   const formatTimestamp = (timestamp: number): string => {
@@ -622,8 +622,8 @@ export default function ProblemsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">{t('loading')}</div>
+      <div className="min-h-screen flex items-center justify-center dark:bg-gray-950">
+        <div className="text-gray-600 dark:text-gray-300">{t('loading')}</div>
       </div>
     );
   }
@@ -635,14 +635,14 @@ export default function ProblemsPage() {
   return (
     <>
       <PageTitle titleKey="pageTitle.problems" />
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         <Navbar title={t('problems.title')} />
 
         <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
         {/* Upload Section */}
-        <div className="bg-white rounded-lg shadow-sm mb-8">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm mb-8">
           <div className="p-4 sm:p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('problems.upload.title')}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{t('problems.upload.title')}</h2>
 
             {/* Mode Toggle */}
             <div className="mb-6">
@@ -652,7 +652,7 @@ export default function ProblemsPage() {
                   className={`px-4 py-2 rounded-lg font-medium transition ${
                     uploadMode === 'single'
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
                 >
                   {t('problems.upload.single')}
@@ -662,7 +662,7 @@ export default function ProblemsPage() {
                   className={`px-4 py-2 rounded-lg font-medium transition ${
                     uploadMode === 'multiple'
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
                 >
                   {t('problems.upload.multiple')}
@@ -671,8 +671,8 @@ export default function ProblemsPage() {
               
               {/* Hint for repeated clicks */}
               {showModeHint && (
-                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg animate-pulse">
-                  <p className="text-sm text-amber-700">
+                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg animate-pulse">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
                     {t('problems.upload.modeHint')}
                   </p>
                 </div>
@@ -680,14 +680,14 @@ export default function ProblemsPage() {
             </div>
 
             {uploadError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{uploadError}</p>
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg">
+                <p className="text-sm text-red-600 dark:text-red-400">{uploadError}</p>
               </div>
             )}
 
             {uploadSuccess && (
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-600">{uploadSuccess}</p>
+              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
+                <p className="text-sm text-green-600 dark:text-green-400">{uploadSuccess}</p>
               </div>
             )}
 
@@ -695,7 +695,7 @@ export default function ProblemsPage() {
             {uploadMode === 'single' && (
               <form onSubmit={handleSingleUpload} className="space-y-4">
                 <div>
-                  <label htmlFor="singleUrl" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="singleUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {t('problems.upload.url')}
                   </label>
                   <input
@@ -704,35 +704,35 @@ export default function ProblemsPage() {
                     value={singleUrl}
                     onChange={(e) => setSingleUrl(e.target.value)}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     placeholder={t('problems.upload.urlPlaceholder')}
                   />
                   {singleDailyParsed && (
-                    <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
                       <div className="text-sm">
-                        <div className="mb-1 text-blue-800 font-medium">Daily Report Detected</div>
+                        <div className="mb-1 text-blue-800 dark:text-blue-300 font-medium">Daily Report Detected</div>
                         <div className="mb-1 break-words">
-                          <span className="font-medium text-gray-700">User ID: </span>
-                          <span className="text-gray-900 break-all">{singleDailyParsed.userId}</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">User ID: </span>
+                          <span className="text-gray-900 dark:text-gray-100 break-all">{singleDailyParsed.userId}</span>
                         </div>
                         <div className="break-words">
-                          <span className="font-medium text-gray-700">Date ID: </span>
-                          <span className="text-gray-900 break-all">{singleDailyParsed.dateId}</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">Date ID: </span>
+                          <span className="text-gray-900 dark:text-gray-100 break-all">{singleDailyParsed.dateId}</span>
                         </div>
                       </div>
                     </div>
                   )}
                   {singleParsed && !singleDailyParsed && (
-                    <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                       <div className="text-sm">
                         <div className="mb-1 break-words">
-                          <span className="font-medium text-gray-700">{t('problems.upload.userId')}: </span>
-                          <span className="text-gray-900 break-all">{singleParsed.userId}</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">{t('problems.upload.userId')}: </span>
+                          <span className="text-gray-900 dark:text-gray-100 break-all">{singleParsed.userId}</span>
                         </div>
                         <div className="break-words">
-                          <span className="font-medium text-gray-700">{t('problems.upload.taskId')}: </span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">{t('problems.upload.taskId')}: </span>
                           <span 
-                            className="text-gray-900 break-all font-mono text-xs" 
+                            className="text-gray-900 dark:text-gray-100 break-all font-mono text-xs" 
                             title={singleParsed.taskId}
                           >
                             {truncateTaskId(singleParsed.taskId, 60)}
@@ -756,7 +756,7 @@ export default function ProblemsPage() {
             {uploadMode === 'multiple' && (
               <form onSubmit={handleMultipleUpload} className="space-y-4">
                 <div>
-                  <label htmlFor="multipleUrls" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="multipleUrls" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {t('problems.upload.multipleUrls')}
                   </label>
                   <textarea
@@ -764,26 +764,26 @@ export default function ProblemsPage() {
                     value={multipleUrls}
                     onChange={(e) => setMultipleUrls(e.target.value)}
                     rows={8}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-mono text-sm"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-mono text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     placeholder={t('problems.upload.multipleUrlsPlaceholder')}
                   />
                   {multipleUrls.trim() && (
-                    <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                       <div className="text-sm space-y-1">
                         <div>
-                          <span className="font-medium text-gray-700">{t('problems.upload.userIdsFound')}: </span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">{t('problems.upload.userIdsFound')}: </span>
                           <span className={multipleParsed.userIdCount === multipleParsed.taskIdCount ? 'text-green-600' : 'text-red-600'}>
                             {multipleParsed.userIdCount}
                           </span>
                         </div>
                         <div>
-                          <span className="font-medium text-gray-700">{t('problems.upload.taskIdsFound')}: </span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">{t('problems.upload.taskIdsFound')}: </span>
                           <span className={multipleParsed.userIdCount === multipleParsed.taskIdCount ? 'text-green-600' : 'text-red-600'}>
                             {multipleParsed.taskIdCount}
                           </span>
                         </div>
                         <div>
-                          <span className="font-medium text-gray-700">{t('problems.upload.validPairs')}: </span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">{t('problems.upload.validPairs')}: </span>
                           <span className={multipleParsed.isValid ? 'text-green-600' : 'text-red-600'}>
                             {multipleParsed.pairs.length}
                           </span>
@@ -810,9 +810,9 @@ export default function ProblemsPage() {
         </div>
 
         {/* Search Section */}
-        <div className="bg-white rounded-lg shadow-sm">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm">
           <div className="p-4 sm:p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('problems.search.title')}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">{t('problems.search.title')}</h2>
 
             {/* Search Form */}
             <form onSubmit={handleSearch} className="mb-6">
@@ -822,12 +822,12 @@ export default function ProblemsPage() {
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
                   placeholder={t('problems.search.placeholder')}
-                  className="flex-1 min-w-0 px-2 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  className="flex-1 min-w-0 px-2 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 />
                 <button
                   type="button"
                   onClick={() => setIsCustomizerOpen(true)}
-                  className="px-2 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition whitespace-nowrap flex items-center justify-center flex-shrink-0"
+                  className="px-2 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition whitespace-nowrap flex items-center justify-center flex-shrink-0"
                   title={t('problems.search.customizeColumns')}
                 >
                   <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -845,15 +845,15 @@ export default function ProblemsPage() {
             </form>
 
             {searchError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{searchError}</p>
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg">
+                <p className="text-sm text-red-600 dark:text-red-400">{searchError}</p>
               </div>
             )}
 
             {/* Counts Display */}
             {(counts && (!currentSearchKeyword)) && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-300">
                   {t('problems.search.counts', {
                     elasticsearch: counts.elasticsearch,
                     redis: counts.redis,
@@ -866,11 +866,11 @@ export default function ProblemsPage() {
             {/* Search Results Header */}
             {currentSearchKeyword && (
               <div className="mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {t('problems.search.resultsFor', { keyword: currentSearchKeyword })}
                 </h3>
                 {searchResults.length > 0 && (
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     {t('problems.search.found', { total: searchTotal, displayed: searchResults.length })}
                   </p>
                 )}
@@ -878,9 +878,9 @@ export default function ProblemsPage() {
             )}
 
             {searchResults.length > 0 && (
-              <div className="overflow-x-auto -mx-2 sm:mx-0 max-h-[600px] border border-gray-200 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0 z-10">
+              <div className="overflow-x-auto -mx-2 sm:mx-0 max-h-[600px] border border-gray-200 dark:border-gray-700 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                     <tr>
                       {columns
                         .filter(col => col.visible)
@@ -888,7 +888,7 @@ export default function ProblemsPage() {
                         .map((col) => (
                           <th
                             key={col.id}
-                            className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                            className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                           >
                             {col.id === 'index' && t('problems.search.index')}
                             {col.id === 'problemTitle' && t('problems.search.problemTitle')}
@@ -902,30 +902,30 @@ export default function ProblemsPage() {
                         ))}
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                     {searchResults.map((result, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
+                      <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                         {columns
                           .filter(col => col.visible)
                           .sort((a, b) => a.order - b.order)
                           .map((col) => {
                             if (col.id === 'index') {
                               return (
-                                <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm text-gray-900">
+                                <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                   {index + 1}
                                 </td>
                               );
                             }
                             if (col.id === 'problemTitle') {
                               return (
-                                <td key={col.id} className="px-2 py-2 text-sm text-gray-900 max-w-xs truncate">
+                                <td key={col.id} className="px-2 py-2 text-sm text-gray-900 dark:text-gray-100 max-w-xs truncate">
                                   {getProblemTitle(result)}
                                 </td>
                               );
                             }
                             if (col.id === 'time') {
                               return (
-                                <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm text-gray-500">
+                                <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                   {formatTimestamp(result.timestamp)}
                                 </td>
                               );
@@ -939,7 +939,7 @@ export default function ProblemsPage() {
                             }
                             if (col.id === 'ratio') {
                               return (
-                                <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm text-gray-900">
+                                <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                   {formatRatio(result.ratio_1, result.ratio_2)}
                                 </td>
                               );
@@ -963,7 +963,7 @@ export default function ProblemsPage() {
                                 <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm">
                                   <a
                                     href={`/problems/${result.mongo_id}`}
-                                    className="text-indigo-600 hover:text-indigo-800"
+                                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
                                   >
                                     {t('problems.search.view')}
                                   </a>
@@ -980,38 +980,38 @@ export default function ProblemsPage() {
             )}
 
             {!searchLoading && searchResults.length === 0 && searchKeyword && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 {t('problems.search.noResults')}
               </div>
             )}
 
             {notesSearchResults.length > 0 && (
               <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                   {t('problems.search.otherNotesTitle')}
                 </h3>
-                <div className="overflow-x-auto -mx-2 sm:mx-0 max-h-[600px] border border-gray-200 rounded-lg">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 sticky top-0 z-10">
+                <div className="overflow-x-auto -mx-2 sm:mx-0 max-h-[600px] border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                       <tr>
-                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('problems.search.index')}
                         </th>
-                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('problems.search.problemTitle')}
                         </th>
-                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           {t('problems.search.answer')}
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                       {notesSearchResults.map((item, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-2 py-2 whitespace-nowrap text-sm text-gray-900">
+                        <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td className="px-2 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                             {index + 1}
                           </td>
-                          <td className="px-2 py-2 text-sm text-gray-900 max-w-xs truncate">
+                          <td className="px-2 py-2 text-sm text-gray-900 dark:text-gray-100 max-w-xs truncate">
                             {item.text}
                           </td>
                           <td className="px-2 py-2 whitespace-nowrap text-sm">

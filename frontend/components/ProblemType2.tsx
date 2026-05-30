@@ -196,9 +196,9 @@ export default function ProblemType2({
   return (
     <div>
       {/* Problem Section */}
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">{problemTitle}</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemTitle}</h2>
       <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} />
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{problemDescription}</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemDescription}</h3>
       <div className="mb-6">
         <ChatTimeline messages={problemMessages} />
       </div>
@@ -206,7 +206,7 @@ export default function ProblemType2({
       {/* Appeals Section */}
       {appealMessages.length > 0 && (
         <>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">{appealsTitle}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{appealsTitle}</h3>
           <div className="mb-6">
             <ChatTimeline messages={appealMessages} />
           </div>
@@ -215,9 +215,9 @@ export default function ProblemType2({
 
       {/* Others Section */}
       {others && (
-        <div className="border-t border-gray-200 pt-4 mt-4">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">{othersTitle}</h3>
-          <p className="text-sm text-gray-600 whitespace-pre-wrap">{others}</p>
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">{othersTitle}</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{others}</p>
         </div>
       )}
     </div>

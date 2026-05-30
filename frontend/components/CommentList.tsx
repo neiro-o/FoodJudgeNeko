@@ -79,7 +79,7 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
 
   return (
     <div>
-      <h3 className="text-base font-semibold text-gray-900 mb-4">
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">
         {title} ({comments.length})
       </h3>
       
@@ -101,23 +101,23 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
             <div className="flex-1 min-w-0">
               {/* Header: Name + Tag */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-gray-900">{comment.name}</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{comment.name}</span>
                 {comment.choice === 1 ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
                     {language === 'zh' ? '适合展示' : 'Support User'}
                   </span>
                 ) : comment.choice === 2 ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
                     {language === 'zh' ? '不适合展示' : 'Support Merchant'}
                   </span>
                 ) : null}
               </div>
 
               {/* Comment Content */}
-              <p className="text-sm text-gray-700 mt-1">{comment.content}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">{comment.content}</p>
 
               {/* Footer: Time + Likes */}
-              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <span>{formatTimestamp(comment.timestamp)}</span>
                 <span className="flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,7 +131,7 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
         ))}
 
         {comments.length === 0 && (
-          <p className="text-sm text-gray-500 text-center py-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
             {language === 'zh' ? '暂无评论' : 'No comments yet'}
           </p>
         )}
@@ -139,7 +139,7 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-gray-100">
+        <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
           {/* Previous Button */}
           <button
             onClick={() => {
@@ -148,15 +148,15 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
               setInputValue(String(next));
             }}
             disabled={currentPage === 1}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
 
           {/* Page Input */}
-          <div className="flex items-center gap-1 text-sm text-gray-600">
+          <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
             <input
               ref={inputRef}
               type="text"
@@ -172,7 +172,7 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
               onKeyDown={(e) => {
                 if (e.key === 'Enter') inputRef.current?.blur();
               }}
-              className="w-10 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:outline-none focus:border-indigo-400"
+              className="w-10 text-center border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 text-sm focus:outline-none focus:border-indigo-400 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             />
             <span>/ {totalPages}</span>
           </div>
@@ -185,9 +185,9 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
               setInputValue(String(next));
             }}
             disabled={currentPage === totalPages}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>

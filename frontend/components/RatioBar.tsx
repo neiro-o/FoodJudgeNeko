@@ -1,6 +1,7 @@
 'use client';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface RatioBarProps {
   ratio1: number;
@@ -10,12 +11,13 @@ interface RatioBarProps {
 
 export default function RatioBar({ ratio1, ratio2, answer }: RatioBarProps) {
   const { language } = useLanguage();
+  const { isDark } = useTheme();
 
   // Colors based on answer
-  const leftColor = answer === 1 ? '#ffdfbf' : '#f3f4f6';
-  const rightColor = answer === 2 ? '#bce6ff' : '#f3f4f6';
-  const leftTextColor = answer === 1 ? '#d97706' : '#9ca3af';
-  const rightTextColor = answer === 2 ? '#0284c7' : '#9ca3af';
+  const leftColor = answer === 1 ? (isDark ? '#5a3a1a' : '#ffdfbf') : (isDark ? '#374151' : '#f3f4f6');
+  const rightColor = answer === 2 ? (isDark ? '#0c3a52' : '#bce6ff') : (isDark ? '#374151' : '#f3f4f6');
+  const leftTextColor = answer === 1 ? (isDark ? '#fbbf24' : '#d97706') : (isDark ? '#6b7280' : '#9ca3af');
+  const rightTextColor = answer === 2 ? (isDark ? '#38bdf8' : '#0284c7') : (isDark ? '#6b7280' : '#9ca3af');
 
   // Labels
   const leftLabel = language === 'zh' ? '适合展示' : 'Support User';
@@ -33,7 +35,7 @@ export default function RatioBar({ ratio1, ratio2, answer }: RatioBarProps) {
             backgroundColor: leftColor,
           }}
         >
-          <span className="text-sm font-semibold text-gray-700">
+          <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
             {Math.round(ratio1)}%
           </span>
         </div>
@@ -46,7 +48,7 @@ export default function RatioBar({ ratio1, ratio2, answer }: RatioBarProps) {
             backgroundColor: rightColor,
           }}
         >
-          <span className="text-sm font-medium text-gray-500">
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-300">
             {Math.round(ratio2)}%
           </span>
         </div>

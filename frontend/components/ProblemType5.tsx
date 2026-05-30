@@ -105,13 +105,13 @@ export default function ProblemType5({
   return (
     <div>
       {/* Problem Section */}
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">{problemTitle}</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemTitle}</h2>
       <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} />
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{problemDescription}</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{problemDescription}</h3>
       
       {/* Hint */}
-      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-        <p className="text-sm text-amber-800">
+      <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+        <p className="text-sm text-amber-800 dark:text-amber-300">
           <span className="font-medium">💡 </span>
           {hintText}
         </p>
@@ -125,14 +125,14 @@ export default function ProblemType5({
               <div key={index} className="flex-1 max-w-[45%]">
                 {isExternalUrl(pic) && !imageUrlMap.has(pic) ? (
                   // Show placeholder while loading
-                  <div className="w-full aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
+                  <div className="w-full aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-400 border-t-transparent"></div>
                   </div>
                 ) : (
                   <img
                     src={getImageUrl(pic)}
                     alt={`Trademark ${index + 1}`}
-                    className="w-full aspect-square object-contain rounded-lg border border-gray-200 bg-white cursor-pointer hover:opacity-90 transition"
+                    className="w-full aspect-square object-contain rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 cursor-pointer hover:opacity-90 transition"
                     onClick={() => setModalImage(pic)}
                   />
                 )}
@@ -143,18 +143,18 @@ export default function ProblemType5({
       )}
 
       {/* Info Section */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-gray-900 mb-3">{infoTitle}</h4>
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">{infoTitle}</h4>
         <div className="space-y-2 text-sm">
           {/* Dispute Content */}
-          <p className="text-gray-700">
-            <span className="text-gray-500 font-medium">{disputeLabel}: </span>
+          <p className="text-gray-700 dark:text-gray-300">
+            <span className="text-gray-500 dark:text-gray-400 font-medium">{disputeLabel}: </span>
             {userReview}
           </p>
           
           {/* Start Time */}
-          <p className="text-gray-700">
-            <span className="text-gray-500 font-medium">{startTimeLabel}: </span>
+          <p className="text-gray-700 dark:text-gray-300">
+            <span className="text-gray-500 dark:text-gray-400 font-medium">{startTimeLabel}: </span>
             {formatTimestamp(timestamp)}
           </p>
         </div>

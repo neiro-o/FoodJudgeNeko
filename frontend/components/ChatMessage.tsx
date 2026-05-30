@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import ImageModal from './ImageModal';
 
 export interface ChatMessageData {
@@ -24,6 +25,7 @@ export default function ChatMessage({
   merchantAvatar = '/avatars/avatar_2.png'
 }: ChatMessageProps) {
   const { t, language } = useLanguage();
+  const { isDark } = useTheme();
   const [modalImage, setModalImage] = useState<string | null>(null);
 
   // Determine if message is on the right (merchant)
@@ -99,7 +101,7 @@ export default function ChatMessage({
 
           {/* Message bubble */}
           <div
-            className={`px-4 py-2 rounded-lg text-gray-900 ${
+            className={`px-4 py-2 rounded-lg text-gray-900 dark:text-gray-100 ${
               message.role === 'merchant'
                 ? 'rounded-tr-none'
                 : 'rounded-tl-none'
@@ -107,10 +109,10 @@ export default function ChatMessage({
             style={{
               backgroundColor:
                 message.role === 'user'
-                  ? '#ffdfbf'
+                  ? (isDark ? '#5a3a1a' : '#ffdfbf')
                   : message.role === 'merchant'
-                  ? '#bce6ff'
-                  : '#f3f4f6',
+                  ? (isDark ? '#0c3a52' : '#bce6ff')
+                  : (isDark ? '#374151' : '#f3f4f6'),
             }}
           >
             <p className="whitespace-pre-wrap break-words">{message.content}</p>

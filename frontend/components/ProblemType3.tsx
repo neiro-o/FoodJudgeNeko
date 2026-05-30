@@ -226,9 +226,9 @@ export default function ProblemType3({
   return (
     <div>
       {/* Problem Section */}
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">{problemTitle}</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemTitle}</h2>
       <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} />
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{problemDescription}</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemDescription}</h3>
 
       {/* Appeals Section */}
       {appealMessages.length > 0 && (
@@ -241,45 +241,45 @@ export default function ProblemType3({
 
       {/* Others Section */}
       {others && (
-        <div className="border-t border-gray-200 pt-4 mt-4 mb-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">{othersTitle}</h3>
-          <p className="text-sm text-gray-600 whitespace-pre-wrap">{others}</p>
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 mb-6">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">{othersTitle}</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{others}</p>
         </div>
       )}
 
       {/* Orders Section */}
       {orderDetail && (
         <>
-          <h3 className="text-base font-semibold text-gray-900 mb-3">{ordersTitle}</h3>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">{ordersTitle}</h3>
           
           {/* Notes Subtitle */}
           <div className="flex flex-wrap gap-2 mb-2">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">{notesSubtitle}</h4>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{notesSubtitle}</h4>
           
           {/* Tags */}
             <span>
             {/* Invoice Tag */}
             {orderDetail.invoice ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
                 {language === 'zh' ? '开具发票' : 'Need Invoice'}
               </span>
             ) : (
-              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
+              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
                 {language === 'zh' ? '不开发票' : 'No Invoice'}
               </span>
             )}
             
             {/* Utensils Tag */}
             {orderDetail.utensils === 0 ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
                 {language === 'zh' ? '无需餐具（环保单）' : 'No utensil'}
               </span>
             ) : orderDetail.utensils === -1 ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
                 {language === 'zh' ? '需要餐具' : 'Need utensils'}
               </span>
             ) : (
-              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
                 {language === 'zh' ? `需要餐具×${orderDetail.utensils}` : `Need utensils × ${orderDetail.utensils}`}
               </span>
             )}
@@ -288,14 +288,14 @@ export default function ProblemType3({
           
           {/* Note Content */}
           {orderDetail.note && (
-            <p className="text-sm text-gray-600 mb-4">{orderDetail.note}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{orderDetail.note}</p>
           )}
           
           {/* Two Column Layout */}
           <div className="flex flex-col lg:flex-row">
             {/* Left: Items (2/3) */}
             <div className="w-full lg:w-2/3 lg:pr-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">{itemsSubtitle}</h4>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{itemsSubtitle}</h4>
               <div className="space-y-3">
                 {orders.map((order, index) => (
                   <div key={index} className="flex gap-3">
@@ -303,7 +303,7 @@ export default function ProblemType3({
                     <div className="flex-shrink-0">
                       {isExternalUrl(order.pic) && !imageUrlMap.has(order.pic) ? (
                         // Show placeholder while loading proxied URL
-                        <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
                           <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-400 border-t-transparent"></div>
                         </div>
                       ) : (
@@ -322,27 +322,27 @@ export default function ProblemType3({
                     {/* Product Info */}
                     <div className="flex-1 min-w-0">
                       {/* Name */}
-                      <p className="text-sm font-medium text-gray-900 break-words">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 break-words">
                         {order.name} {order.count > 1 && `×${order.count}`}
                       </p>
                       
                       {/* Selection */}
                       {order.selection && order.selection.length > 0 && (
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                           {order.selection.join('; ')}
                         </p>
                       )}
                       
                       {/* Others */}
                       {order.others && (
-                        <p className="text-xs text-gray-500 mt-0.5">{order.others}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{order.others}</p>
                       )}
                       
                       {/* Desc (expandable) */}
                       {order.desc && (
                         <button
                           onClick={() => toggleDesc(index)}
-                          className={`mt-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition ${
+                          className={`mt-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-1 rounded transition ${
                             expandedDescs.has(index) ? 'text-left' : ''
                           }`}
                         >
@@ -361,40 +361,40 @@ export default function ProblemType3({
             
             {/* Right: Delivery Info (1/3) */}
             <div className="w-full lg:w-1/3 mt-4 lg:mt-0">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">{deliverySubtitle}</h4>
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{deliverySubtitle}</h4>
               <div className="space-y-1 text-sm">
                 {/* Deliver By */}
-                <p className="text-gray-600">
-                  <span className="text-gray-500">{language === 'zh' ? '配送方式：' : 'Delivered by: '}</span>
-                  <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">{getDeliverByText(orderDetail.deliver_by)}</span>
+                <p className="text-gray-600 dark:text-gray-400">
+                  <span className="text-gray-500 dark:text-gray-500">{language === 'zh' ? '配送方式：' : 'Delivered by: '}</span>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">{getDeliverByText(orderDetail.deliver_by)}</span>
                 </p>
                 
                 {/* Order Started */}
-                <p className="text-gray-600">
-                  <span className="text-gray-500">{language === 'zh' ? '下单时间：' : 'Ordered at: '}</span>
+                <p className="text-gray-600 dark:text-gray-400">
+                  <span className="text-gray-500 dark:text-gray-500">{language === 'zh' ? '下单时间：' : 'Ordered at: '}</span>
                   {formatTimestamp(orderDetail.order_started)}
                 </p>
                 
                 {/* Order Finished (only if > 0) */}
                 {orderDetail.order_finished > 0 && (
-                  <p className="text-gray-600">
-                    <span className="text-gray-500">{language === 'zh' ? '送达时间：' : 'Finished at: '}</span>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    <span className="text-gray-500 dark:text-gray-500">{language === 'zh' ? '送达时间：' : 'Finished at: '}</span>
                     {formatTimestamp(orderDetail.order_finished)}
                   </p>
                 )}
                 
                 {/* Deliver Time (only if meituan) */}
                 {orderDetail.deliver_by === 'meituan' && orderDetail.deliver_time > 0 && (
-                  <p className="text-gray-600">
-                    <span className="text-gray-500">{language === 'zh' ? '配送时长：' : 'Delivery time: '}</span>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    <span className="text-gray-500 dark:text-gray-500">{language === 'zh' ? '配送时长：' : 'Delivery time: '}</span>
                     {formatDuration(orderDetail.deliver_time)}
                   </p>
                 )}
                 
                 {/* Total Time (not for user/self pickup) */}
                 {orderDetail.deliver_by !== 'user' && orderDetail.total_time > 0 && (
-                  <p className="text-gray-600">
-                    <span className="text-gray-500">{language === 'zh' ? '总时长：' : 'Total time: '}</span>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    <span className="text-gray-500 dark:text-gray-500">{language === 'zh' ? '总时长：' : 'Total time: '}</span>
                     {formatDuration(orderDetail.total_time)}
                   </p>
                 )}

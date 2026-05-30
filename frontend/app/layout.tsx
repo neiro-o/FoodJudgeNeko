@@ -3,6 +3,7 @@ import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ProblemsStateProvider } from '@/contexts/ProblemsStateContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 
 export const metadata: Metadata = {
   title: '掉心心',
@@ -15,13 +16,15 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <LanguageProvider>
-          <AuthProvider>
-            <ProblemsStateProvider>{children}</ProblemsStateProvider>
-          </AuthProvider>
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <ProblemsStateProvider>{children}</ProblemsStateProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
