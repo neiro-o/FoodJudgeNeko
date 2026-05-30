@@ -1923,7 +1923,7 @@ func GetProblemComments(c *gin.Context) {
 		}
 	}
 
-	cursor, err := database.Comments.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "createTime", Value: -1}}))
+	cursor, err := database.Comments.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "approveCount", Value: -1}, {Key: "createTime", Value: -1}}))
 	if err != nil {
 		utils.InternalServerErrorResponse(c, "Failed to find comments")
 		return
@@ -1979,7 +1979,7 @@ func GetProblemComments(c *gin.Context) {
 			"id":        "",
 			"choice":    0,
 			"content":   "",
-			"likes":     166,
+			"likes":     int64(0),
 			"name":      "",
 			"timestamp": int64(0),
 			"userid":    int64(0),
@@ -2007,6 +2007,9 @@ func GetProblemComments(c *gin.Context) {
 			if n, err := strconv.ParseInt(v, 10, 64); err == nil {
 				comment["userid"] = n
 			}
+		}
+		if v, ok := doc["approveCount"]; ok {
+			comment["likes"] = toInt64PC(v)
 		}
 		comment["images"] = toStringSlicePC(doc["images"])
 		comment["audios"] = toStringSlicePC(doc["audios"])

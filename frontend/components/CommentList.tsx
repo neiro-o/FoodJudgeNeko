@@ -56,14 +56,14 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
   // Get default avatar path: hash over userid + comment timestamp + mongoId → 1-9
   const getDefaultAvatarPath = (userid: number, timestamp: number): string => {
     const seed = `${userid}:${timestamp}:${mongoId}`;
-    return `/avatars/anime_kangaroo_avatar_${avatarHash(seed)}.png`;
+    return `/avatars/anime_kangaroo_avatar_${String(avatarHash(seed)).padStart(2, '0')}.png`;
   };
 
   // Handle avatar error - fall back to default avatar
   const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>, userid: number, timestamp: number) => {
     const target = e.target as HTMLImageElement;
     const defaultPath = getDefaultAvatarPath(userid, timestamp);
-    if (!target.src.includes('/avatars/anime_kangaroo_avatar_')) {
+    if (!target.src.includes('anime_kangaroo_avatar_')) {
       target.src = defaultPath;
     }
   };
