@@ -19,6 +19,10 @@ import argparse
 import yaml
 
 
+KeywordRule = Tuple[str, int, bool]
+EXCEPTION_USER_IDS = {"504249549", "111", "35440012"}
+
+
 def load_config():
     """
     Load configuration from crawlv2/config.yml
@@ -63,20 +67,22 @@ def build_mongo_connection_string(config: Dict) -> str:
         return f"mongodb://{host}:{port}/{database}"
 
 
-def load_keywords(file_path: str) -> List[Tuple[str, int]]:
+def load_keywords(file_path: str) -> List[KeywordRule]:
     """
-    Load keywords and counts from a text file.
+    Load keywords, counts, and case sensitivity from a text file.
     
-    Format: keyword,count (one per line)
+    Format: keyword,count[,case_mode] (one per line)
+    case_mode is optional and defaults to case-insensitive.
     Example:
         keyword1,5
-        keyword2,10
+        keyword2,10,i
+        Keyword3,3,s
     
     Args:
         file_path: Path to the keywords file.
     
     Returns:
-        List of (keyword, count) tuples.
+        List of (keyword, count, case_sensitive) tuples.
     """
     keywords = []
     if not os.path.exists(file_path):
@@ -91,15 +97,23 @@ def load_keywords(file_path: str) -> List[Tuple[str, int]]:
             
             try:
                 parts = line.split(',')
-                if len(parts) != 2:
+                if len(parts) not in (2, 3):
                     print(f"Warning: Line {line_num} has invalid format, skipping: {line}")
                     continue
                 
                 keyword = parts[0].strip()
                 count = int(parts[1].strip())
+                case_mode = parts[2].strip().lower() if len(parts) == 3 else "i"
+                if case_mode in ("i", "insensitive", "case-insensitive", "ignorecase"):
+                    case_sensitive = False
+                elif case_mode in ("s", "sensitive", "case-sensitive", "case_sensitive"):
+                    case_sensitive = True
+                else:
+                    print(f"Warning: Line {line_num} has invalid case mode, skipping: {line}")
+                    continue
                 
                 if keyword:
-                    keywords.append((keyword, count))
+                    keywords.append((keyword, count, case_sensitive))
             except ValueError as e:
                 print(f"Warning: Line {line_num} has invalid count, skipping: {line} ({e})")
                 continue
@@ -149,7 +163,12 @@ def ensure_malicious_collection(db: Database, malicious_collection_name: str) ->
         print(f"⚠ Error creating malicious indexes: {e}")
 
 
-def count_keyword_in_comments(comments_collection: Collection, user_id: str, keyword: str) -> int:
+def count_keyword_in_comments(
+    comments_collection: Collection,
+    user_id: str,
+    keyword: str,
+    case_sensitive: bool
+) -> int:
     """
     Count how many times a keyword appears in a user's comments.
     
@@ -157,14 +176,19 @@ def count_keyword_in_comments(comments_collection: Collection, user_id: str, key
         comments_collection: MongoDB comments collection.
         user_id: User ID to search for.
         keyword: Keyword to count.
+        case_sensitive: Whether uppercase/lowercase must match exactly.
     
     Returns:
         Number of comments containing the keyword.
     """
+    regex_query = {"$regex": keyword}
+    if not case_sensitive:
+        regex_query["$options"] = "i"
+
     # Count documents where userId matches and content contains the keyword
     count = comments_collection.count_documents({
         "userId": user_id,
-        "content": {"$regex": keyword, "$options": "i"}  # Case-insensitive
+        "content": regex_query
     })
     if count > 0:
         print(user_id, count)
@@ -173,7 +197,7 @@ def count_keyword_in_comments(comments_collection: Collection, user_id: str, key
 
 def tag_malicious_users(
     db: Database,
-    keywords: List[Tuple[str, int]],
+    keywords: List[KeywordRule],
     config: Dict
 ) -> None:
     """
@@ -181,7 +205,7 @@ def tag_malicious_users(
     
     Args:
         db: MongoDB database instance.
-        keywords: List of (keyword, threshold) tuples.
+        keywords: List of (keyword, threshold, case_sensitive) tuples.
         config: Configuration dictionary.
     """
     # Get collection names from config
@@ -197,8 +221,9 @@ def tag_malicious_users(
     malicious_collection = db[malicious_collection_name]
     
     print(f"Processing keywords: {len(keywords)}")
-    for keyword, threshold in keywords:
-        print(f"  - '{keyword}' (threshold: {threshold})")
+    for keyword, threshold, case_sensitive in keywords:
+        case_mode = "case-sensitive" if case_sensitive else "case-insensitive"
+        print(f"  - '{keyword}' (threshold: {threshold}, {case_mode})")
     print()
     
     # Get all unique user IDs from comments
@@ -210,11 +235,16 @@ def tag_malicious_users(
     # Process each user
     tagged_count = 0
     already_tagged = 0
+    exception_count = 0
     checked_count = 0
     
     for idx, user_id in enumerate(user_ids, 1):
         if idx % 100 == 0:
             print(f"Processing user {idx}/{len(user_ids)}...")
+
+        if str(user_id) in EXCEPTION_USER_IDS:
+            exception_count += 1
+            continue
         
         # Check if user is already tagged
         existing = malicious_collection.find_one({"userId": user_id})
@@ -226,14 +256,15 @@ def tag_malicious_users(
         is_malicious = False
         matched_keywords = []
         
-        for keyword, threshold in keywords:
-            count = count_keyword_in_comments(comments_collection, user_id, keyword)
+        for keyword, threshold, case_sensitive in keywords:
+            count = count_keyword_in_comments(comments_collection, user_id, keyword, case_sensitive)
             if count >= threshold:
                 is_malicious = True
                 matched_keywords.append({
                     "keyword": keyword,
                     "count": count,
-                    "threshold": threshold
+                    "threshold": threshold,
+                    "case_sensitive": case_sensitive
                 })
         
         if is_malicious:
@@ -257,6 +288,7 @@ def tag_malicious_users(
     print()
     print(f"Summary:")
     print(f"  Total users checked: {checked_count}")
+    print(f"  Exceptions skipped: {exception_count}")
     print(f"  Already tagged: {already_tagged}")
     print(f"  Newly tagged: {tagged_count}")
     print(f"  Total malicious users: {malicious_collection.count_documents({})}")
@@ -266,7 +298,7 @@ def main():
     parser = argparse.ArgumentParser(description='Tag malicious users based on keyword frequency')
     parser.add_argument(
         'keywords_file',
-        help='Path to keywords file (format: keyword,count per line)'
+        help='Path to keywords file (format: keyword,count[,case_mode] per line)'
     )
     parser.add_argument(
         '--config',
