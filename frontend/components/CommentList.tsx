@@ -3,24 +3,27 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import type { ProblemComment } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
-interface Comment {
-  userid: number;
-  name: string;
-  content: string;
-  timestamp: number;
-  choice: number;
-  likes: number;
-}
-
 interface CommentListProps {
-  comments: Comment[];
+  comments: ProblemComment[];
+  mongoId?: string;
   pageSize?: number;
 }
 
-export default function CommentList({ comments, pageSize = 8 }: CommentListProps) {
+// djb2-style hash over a string → 1-9
+function avatarHash(input: string): number {
+  let h = 5381;
+  for (let i = 0; i < input.length; i++) {
+    h = ((h << 5) + h) ^ input.charCodeAt(i);
+    h = h >>> 0; // keep uint32
+  }
+  return (h % 9) + 1;
+}
+
+export default function CommentList({ comments, mongoId = '', pageSize = 8 }: CommentListProps) {
   const { language } = useLanguage();
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,22 +49,21 @@ export default function CommentList({ comments, pageSize = 8 }: CommentListProps
   // Get avatar URL from API with token
   const getAvatarUrl = (userid: number): string => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (!token) return getDefaultAvatarPath(userid);
+    if (!token) return getDefaultAvatarPath(userid, 0);
     return `${API_BASE_URL}/user_detail/avatar?userId=${userid}&token=${encodeURIComponent(token)}`;
   };
 
-  // Get default avatar path based on userid (fallback)
-  const getDefaultAvatarPath = (userid: number): string => {
-    const avatarIndex = (userid % 9) + 1;
-    return `/avatars/comment_avt_${avatarIndex}.png`;
+  // Get default avatar path: hash over userid + comment timestamp + mongoId → 1-9
+  const getDefaultAvatarPath = (userid: number, timestamp: number): string => {
+    const seed = `${userid}:${timestamp}:${mongoId}`;
+    return `/avatars/anime_kangaroo_avatar_${avatarHash(seed)}.png`;
   };
 
   // Handle avatar error - fall back to default avatar
-  const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>, userid: number) => {
+  const handleAvatarError = (e: React.SyntheticEvent<HTMLImageElement>, userid: number, timestamp: number) => {
     const target = e.target as HTMLImageElement;
-    const defaultPath = getDefaultAvatarPath(userid);
-    // Only change if not already using the default
-    if (!target.src.includes('/avatars/comment_avt_')) {
+    const defaultPath = getDefaultAvatarPath(userid, timestamp);
+    if (!target.src.includes('/avatars/anime_kangaroo_avatar_')) {
       target.src = defaultPath;
     }
   };
@@ -80,8 +82,8 @@ export default function CommentList({ comments, pageSize = 8 }: CommentListProps
       </h3>
       
       <div className="space-y-4">
-        {currentComments.map((comment, index) => (
-          <div key={startIndex + index} className="flex gap-3">
+        {currentComments.map((comment) => (
+          <div key={comment.id} className="flex gap-3">
             {/* Avatar */}
             <div className="flex-shrink-0">
               <img
@@ -89,7 +91,7 @@ export default function CommentList({ comments, pageSize = 8 }: CommentListProps
                 alt={comment.name}
                 className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
                 onClick={() => handleAvatarClick(comment.userid)}
-                onError={(e) => handleAvatarError(e, comment.userid)}
+                onError={(e) => handleAvatarError(e, comment.userid, comment.timestamp)}
               />
             </div>
 

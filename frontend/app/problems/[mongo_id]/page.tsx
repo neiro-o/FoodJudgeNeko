@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useParams } from 'next/navigation';
-import { searchAPI } from '@/lib/api';
+import { searchAPI, ProblemComment } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ProblemType1 from '@/components/ProblemType1';
@@ -107,6 +107,7 @@ export default function ProblemDetailPage() {
   const mongoId = params.mongo_id as string;
 
   const [problem, setProblem] = useState<ProblemData | null>(null);
+  const [comments, setComments] = useState<ProblemComment[]>([]);
   const [loadingProblem, setLoadingProblem] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<{ type: string; success: boolean } | null>(null);
@@ -160,8 +161,12 @@ export default function ProblemDetailPage() {
           const blockMaliciousComment = typeof window !== 'undefined' 
             ? (localStorage.getItem('blockMaliciousComment') !== 'false' ? 1 : 0)
             : 1;
-          const data = await searchAPI.getByMongoId(mongoId, blockMaliciousComment);
+          const [data, commentsRes] = await Promise.all([
+            searchAPI.getByMongoId(mongoId, blockMaliciousComment),
+            searchAPI.getProblemComments(mongoId, blockMaliciousComment),
+          ]);
           setProblem(data);
+          setComments(commentsRes.data ?? []);
         } catch (err: any) {
           console.error('Failed to fetch problem:', err);
           setError(err.message || 'Failed to fetch problem');
@@ -279,9 +284,7 @@ export default function ProblemDetailPage() {
               <div className="w-full lg:w-1/3 flex flex-col gap-6">
                 {/* Layout 2: Comments */}
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  {problem.comments && (
-                    <CommentList comments={problem.comments} />
-                  )}
+                  <CommentList comments={comments} mongoId={mongoId} />
                 </div>
 
                 {/* Problem Operations */}

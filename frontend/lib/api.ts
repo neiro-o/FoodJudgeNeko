@@ -231,7 +231,37 @@ export const searchAPI = {
     });
     return apiRequest<any>(`/problem/by-mongoid/${mongoId}?${params.toString()}`);
   },
+
+  getProblemComments: async (problemId: string, ignore: number = 1): Promise<ProblemCommentsResponse> => {
+    const params = new URLSearchParams({ ignore: ignore.toString() });
+    return apiRequest<ProblemCommentsResponse>(`/problem/comments/${problemId}?${params.toString()}`);
+  },
 };
+
+export interface ProblemReply {
+  replyid: string;
+  userid: number;
+  name: string;
+  likes: number;
+  timestamp: number;
+}
+
+export interface ProblemComment {
+  id: string;
+  choice: number;
+  content: string;
+  likes: number;
+  name: string;
+  timestamp: number;
+  userid: number;
+  images: string[];
+  audios: string[];
+  replies: ProblemReply[];
+}
+
+export interface ProblemCommentsResponse {
+  data: ProblemComment[];
+}
 
 // Media API
 export interface MediaHashResponse {

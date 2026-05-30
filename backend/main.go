@@ -110,6 +110,7 @@ func main() {
 		protected.GET("/problem/count", handlers.CountItems)
 		protected.GET("/problem/by-esid/:id", handlers.SearchByESID)
 		protected.GET("/problem/by-mongoid/:id", handlers.SearchByMongoID)
+		protected.GET("/problem/comments/:problemId", handlers.GetProblemComments)
 		protected.POST("/media/hash", handlers.GenerateMediaHash)
 
 		// Notes routes

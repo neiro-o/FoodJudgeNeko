@@ -1885,3 +1885,183 @@ func GetRecentProblems(c *gin.Context) {
 		Results: results,
 	})
 }
+
+// GetProblemComments returns comments for a problem
+// GET /api/problem/comments/:problemId?ignore=0|1
+func GetProblemComments(c *gin.Context) {
+	problemID := c.Param("problemId")
+	if problemID == "" {
+		utils.BadRequestResponse(c, "Missing problemId")
+		return
+	}
+
+	ignoreStr := c.DefaultQuery("ignore", "0")
+	ignore := ignoreStr != "0"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"problemId": problemID}
+
+	if ignore {
+		maliciousCursor, err := database.Malicious.Find(ctx, bson.M{})
+		if err == nil {
+			var maliciousIDs []string
+			for maliciousCursor.Next(ctx) {
+				var mdoc bson.M
+				if err := maliciousCursor.Decode(&mdoc); err != nil {
+					continue
+				}
+				if uid, ok := mdoc["userId"].(string); ok {
+					maliciousIDs = append(maliciousIDs, uid)
+				}
+			}
+			maliciousCursor.Close(ctx)
+			if len(maliciousIDs) > 0 {
+				filter["userId"] = bson.M{"$nin": maliciousIDs}
+			}
+		}
+	}
+
+	cursor, err := database.Comments.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "createTime", Value: -1}}))
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to find comments")
+		return
+	}
+	defer cursor.Close(ctx)
+
+	toInt64PC := func(v interface{}) int64 {
+		switch val := v.(type) {
+		case int32:
+			return int64(val)
+		case int64:
+			return val
+		case float64:
+			return int64(val)
+		case string:
+			if parsed, err := strconv.ParseInt(val, 10, 64); err == nil {
+				return parsed
+			}
+		}
+		return 0
+	}
+
+	toStringSlicePC := func(v interface{}) []string {
+		if v == nil {
+			return []string{}
+		}
+		switch val := v.(type) {
+		case []interface{}:
+			result := make([]string, 0, len(val))
+			for _, item := range val {
+				if s, ok := item.(string); ok {
+					result = append(result, s)
+				}
+			}
+			return result
+		case string:
+			if val == "" {
+				return []string{}
+			}
+			return []string{val}
+		}
+		return []string{}
+	}
+
+	var comments []gin.H
+	for cursor.Next(ctx) {
+		var doc bson.M
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+
+		comment := gin.H{
+			"id":        "",
+			"choice":    0,
+			"content":   "",
+			"likes":     166,
+			"name":      "",
+			"timestamp": int64(0),
+			"userid":    int64(0),
+			"images":    []string{},
+			"audios":    []string{},
+			"replies":   []gin.H{},
+		}
+
+		if id, ok := doc["_id"].(interface{ Hex() string }); ok {
+			comment["id"] = id.Hex()
+		}
+		if v, ok := doc["choice"]; ok {
+			comment["choice"] = int(toInt64PC(v))
+		}
+		if v, ok := doc["content"].(string); ok {
+			comment["content"] = v
+		}
+		if v, ok := doc["userName"].(string); ok {
+			comment["name"] = v
+		}
+		if v, ok := doc["createTime"]; ok {
+			comment["timestamp"] = toInt64PC(v)
+		}
+		if v, ok := doc["userId"].(string); ok {
+			if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+				comment["userid"] = n
+			}
+		}
+		comment["images"] = toStringSlicePC(doc["images"])
+		comment["audios"] = toStringSlicePC(doc["audios"])
+
+		var replies []gin.H
+		if replys, ok := doc["replys"].([]interface{}); ok {
+			for _, r := range replys {
+				rMap, ok := r.(bson.M)
+				if !ok {
+					continue
+				}
+				reply := gin.H{
+					"replyid":   "",
+					"userid":    int64(0),
+					"name":      "",
+					"likes":     int64(0),
+					"timestamp": int64(0),
+				}
+				if v, ok := rMap["replyId"].(string); ok {
+					reply["replyid"] = v
+				}
+				if ub, ok := rMap["userBasic"].(bson.M); ok {
+					if v, ok := ub["userId"].(string); ok {
+						if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+							reply["userid"] = n
+						}
+					}
+					if v, ok := ub["userName"].(string); ok {
+						reply["name"] = v
+					}
+				}
+				if v, ok := rMap["approveCount"]; ok {
+					reply["likes"] = toInt64PC(v)
+				}
+				if v, ok := rMap["createTime"]; ok {
+					ts := toInt64PC(v)
+					if ts > 1e12 {
+						ts = ts / 1000
+					}
+					reply["timestamp"] = ts
+				}
+				replies = append(replies, reply)
+			}
+		}
+		if replies == nil {
+			replies = []gin.H{}
+		}
+		comment["replies"] = replies
+
+		comments = append(comments, comment)
+	}
+
+	if comments == nil {
+		comments = []gin.H{}
+	}
+
+	utils.SuccessResponse(c, gin.H{"data": comments})
+}
