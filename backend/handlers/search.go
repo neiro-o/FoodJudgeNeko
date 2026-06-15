@@ -51,35 +51,43 @@ func escapeWildcard(s string) string {
 	return re.ReplaceAllString(s, `\$1`)
 }
 
-// calculateFuzziness calculates fuzziness based on keyword length
-// - 1-4 chars: fuzziness = 0
-// - 5-8 chars: fuzziness = 1
-// - 9+ chars: fuzziness = 2 (capped at 2, Elasticsearch max is 2)
+// calculateFuzziness calculates fuzziness based on the keyword's CHARACTER
+// length (runes), not byte length. A CJK character is 3 bytes, so byte length
+// massively over-counts Chinese keywords.
+//
+// We only ever need 0 or 1 here: BuildBoolQuery caps fuzziness at 1 because the
+// edit distance is applied per n-gram token, and an edit distance of 2 on a 2-3
+// char token matches almost anything. An edit distance of 1 is enough to absorb
+// a single typo or a punctuation/full-width vs half-width difference
+// (e.g. "好，" vs "好,") inside a token.
 func calculateFuzziness(keyword string) int {
-	length := len(keyword)
-	if length <= 4 {
-		return 0
-	} else if length <= 8 {
-		return 1
+	if utf8.RuneCountInString(keyword) <= 1 {
+		return 0 // single char is handled by the dedicated wildcard branch
 	}
-	return 2 // Cap at 2 - Elasticsearch only allows 0, 1, or 2
+	return 1 // allow 1-edit typo tolerance for any multi-character keyword
 }
 
-// calculateMinScore calculates minimum score threshold based on keyword length
-// Shorter keywords need higher thresholds to avoid random matches
-// Longer keywords are more specific, so lower thresholds are acceptable
+// calculateMinScore calculates the minimum score threshold based on the
+// keyword's CHARACTER length (runes). Shorter keywords need higher thresholds
+// to avoid random n-gram matches; longer keywords are more specific.
+//
+// The thresholds are kept intentionally lenient so that fuzzy (typo / punctuation)
+// matches survive the cutoff while exact phrase matches still rank first via their
+// higher boost in BuildBoolQuery. Tune these against real data if needed.
 func calculateMinScore(keyword string) float64 {
-	length := len(keyword)
-	if length <= 3 {
-		return 20.0 // Very short: strict matching needed
-	} else if length <= 6 {
-		return 15.0 // Short: high threshold
-	} else if length <= 10 {
-		return 10.0 // Medium: moderate threshold
-	} else if length <= 15 {
-		return 5.0 // Long: lower threshold
+	runeLen := utf8.RuneCountInString(keyword)
+	switch {
+	case runeLen <= 2:
+		return 8.0 // very short: strict-ish, but still allow 1-edit typos through
+	case runeLen <= 3:
+		return 6.0
+	case runeLen <= 5:
+		return 4.0
+	case runeLen <= 8:
+		return 2.5
+	default:
+		return 1.5 // long, specific queries: keep recall high
 	}
-	return 2.0 // Very long: very low threshold, these are specific queries
 }
 
 type SearchResponse struct {
@@ -671,7 +679,7 @@ func Search2026WaiTi(ctx context.Context, limit int, orderByRandom bool) ([]ESDo
 
 		// Over 85% of comments must be different from answer
 		ratio := float64(differentCount) / float64(len(parsedComments))
-		if ratio <= 0.85 {
+		if ratio <= 0.667 {
 			continue
 		}
 
@@ -818,18 +826,41 @@ func Search(c *gin.Context) {
 	// Use the cleaned keyword (without rand/random) for the actual search
 	var query map[string]interface{}
 
-	// For single character keywords, use wildcard query on user_review field
+	// For single character keywords, the n-gram tokenizer (min_gram=2) produces
+	// no tokens, so a normal match query can't work. We use a bool/should that
+	// prioritizes whole-field (全字) matches over substring matches:
+	//   - term on user_review.keyword: the review IS exactly this character (boost 10)
+	//   - wildcard *x*: the character appears somewhere in the review (boost 1)
+	// Sorting by relevance (default) therefore surfaces exact whole-字 matches first.
 	if isSingleCharacter(keyword) {
 		// Escape special wildcard characters
 		escapedKeyword := escapeWildcard(keyword)
 
 		query = map[string]interface{}{
 			"query": map[string]interface{}{
-				"wildcard": map[string]interface{}{
-					"user_review": map[string]interface{}{
-						"value":            fmt.Sprintf("*%s*", escapedKeyword),
-						"case_insensitive": true,
+				"bool": map[string]interface{}{
+					"should": []map[string]interface{}{
+						// Priority 1: review is exactly this single character (whole-字 match)
+						{
+							"term": map[string]interface{}{
+								"user_review.keyword": map[string]interface{}{
+									"value": keyword,
+									"boost": 10.0,
+								},
+							},
+						},
+						// Priority 2: character appears anywhere in the review (substring)
+						{
+							"wildcard": map[string]interface{}{
+								"user_review": map[string]interface{}{
+									"value":            fmt.Sprintf("*%s*", escapedKeyword),
+									"case_insensitive": true,
+									"boost":            1.0,
+								},
+							},
+						},
 					},
+					"minimum_should_match": 1,
 				},
 			},
 			"size": req.Limit,
@@ -850,19 +881,6 @@ func Search(c *gin.Context) {
 				"pre_tags":  []string{"<mark>"},
 				"post_tags": []string{"</mark>"},
 			},
-		}
-
-		// Add sorting: random if requested, otherwise by relevance (default)
-		if orderByRandom {
-			query["sort"] = []map[string]interface{}{
-				{
-					"_script": map[string]interface{}{
-						"type":   "number",
-						"script": map[string]interface{}{"source": "Math.random()"},
-						"order":  "desc",
-					},
-				},
-			}
 		}
 	} else {
 		// For multi-character keywords, use the normal query builder

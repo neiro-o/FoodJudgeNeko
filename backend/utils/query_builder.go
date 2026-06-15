@@ -1,5 +1,7 @@
 package utils
 
+import "unicode/utf8"
+
 // BuildBoolQuery constructs the Elasticsearch bool query for keyword search
 // Optimized for N-gram indexing (character-level 2-3 gram tokens)
 // Requirements:
@@ -17,24 +19,25 @@ func BuildBoolQuery(keyword string, fuzziness int) map[string]interface{} {
 	// Use prefix_length to require first character(s) to match exactly
 	// This prevents "小猫" matching "小8" (different characters)
 	// But allow "小喵" to match "小猫" (similar characters, 1 char difference)
+	// Use CHARACTER (rune) length, not byte length: a CJK char is 3 bytes, so
+	// byte length would over-count Chinese keywords and skew the logic below.
+	runeLen := utf8.RuneCountInString(keyword)
+
 	effectiveFuzziness := fuzziness
 	if effectiveFuzziness > 1 {
-		effectiveFuzziness = 1 // Cap at 1 for typo tolerance (1 character error)
+		effectiveFuzziness = 1 // Cap at 1: fuzziness is applied per n-gram token,
+		// and an edit distance of 2 on a 2-3 char token matches almost anything.
 	}
-	// Allow fuzziness even for 2-char keywords (e.g., "小喵" -> "小猫")
-	// The prefix_length will ensure first char matches, preventing "小8" matching "小猫"
-	if len(keyword) <= 1 {
+	// Allow fuzziness even for 2-char keywords (e.g., "小喵" -> "小猫", or "好，" -> "好,").
+	// prefix_length keeps the first char of each token fixed to limit noise.
+	if runeLen <= 1 {
 		effectiveFuzziness = 0 // Single char: exact match only
 	}
 
-	// Calculate prefix_length: require at least first character to match exactly
-	// This ensures "小猫" won't match "小8" (first char matches, but second is too different)
-	// For 2-char keywords, require first char exact match
-	// For longer keywords, can be more lenient
+	// prefix_length requires the first character of each n-gram token to match
+	// exactly, so a token like "小猫" can fuzzy-match "小喵" (1 edit on the 2nd char)
+	// but not "8猫". This bounds typo tolerance to "similar" characters.
 	prefixLength := 1
-	if len(keyword) >= 3 {
-		prefixLength = 1 // Still require first char for Chinese
-	}
 
 	// Build field query with multiple matching strategies
 	buildFieldQuery := func(fieldName string, boost float64) map[string]interface{} {
@@ -81,9 +84,12 @@ func BuildBoolQuery(keyword string, fuzziness int) map[string]interface{} {
 					fieldName: map[string]interface{}{
 						"query":         keyword,
 						"fuzziness":     effectiveFuzziness,
-						"prefix_length": prefixLength, // Require first char(s) to match exactly
+						"prefix_length": prefixLength, // Require first char to match exactly
 						"operator":      "and",
-						"boost":         boost, // Lower boost for fuzzy matches
+						// Boosted enough to clear min_score (so typo/punctuation matches
+						// are returned), but kept below the exact-match clauses above so
+						// exact results always rank first.
+						"boost": boost * 1.5,
 					},
 				},
 			})
@@ -138,9 +144,9 @@ func BuildBoolQuery(keyword string, fuzziness int) map[string]interface{} {
 					fieldName: map[string]interface{}{
 						"query":         keyword,
 						"fuzziness":     effectiveFuzziness,
-						"prefix_length": prefixLength, // Require first char(s) to match exactly
+						"prefix_length": prefixLength, // Require first char to match exactly
 						"operator":      "and",
-						"boost":         boost,
+						"boost":         boost * 1.5,
 					},
 				},
 			})

@@ -106,6 +106,7 @@ func main() {
 		protected.POST("/problem/upload-multiple", handlers.UploadMultipleProblems)
 		protected.POST("/problem/upload_daily", handlers.UploadDaily)
 		protected.GET("/problem/search", handlers.Search)
+		protected.GET("/bot/search", handlers.BotSearch)
 		protected.GET("/problem/recent", handlers.GetRecentProblems)
 		protected.GET("/problem/count", handlers.CountItems)
 		protected.GET("/problem/by-esid/:id", handlers.SearchByESID)
