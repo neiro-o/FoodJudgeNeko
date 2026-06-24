@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"mtv2/backend/config"
@@ -123,126 +121,17 @@ func calculateOCRMinimumShouldMatch(keyword string) string {
 	}
 }
 
-func normalizeBotSearchHalfWidth(keyword string) string {
-	var b strings.Builder
-	for _, r := range keyword {
-		switch {
-		case r == '。':
-			b.WriteRune('.')
-		case r == '、':
-			b.WriteRune(',')
-		case r == '【':
-			b.WriteRune('[')
-		case r == '】':
-			b.WriteRune(']')
-		case r == '《':
-			b.WriteRune('<')
-		case r == '》':
-			b.WriteRune('>')
-		case r == '“' || r == '”':
-			b.WriteRune('"')
-		case r == '‘' || r == '’':
-			b.WriteRune('\'')
-		case r == '\u3000':
-			b.WriteRune(' ')
-		case r >= '！' && r <= '～':
-			b.WriteRune(r - 0xFEE0)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-func botFullWidthVariant(keyword string) string {
-	punctuationMap := map[rune]rune{
-		',':  '，',
-		'.':  '。',
-		'?':  '？',
-		'!':  '！',
-		':':  '：',
-		';':  '；',
-		'(':  '（',
-		')':  '）',
-		'[':  '【',
-		']':  '】',
-		'<':  '《',
-		'>':  '》',
-		'"':  '”',
-		'\'': '’',
-	}
-
-	var b strings.Builder
-	for _, r := range keyword {
-		if fullWidth, ok := punctuationMap[r]; ok {
-			b.WriteRune(fullWidth)
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
-}
-
+// botSearchKeywordVariants delegates to the shared utils implementation so that
+// bot search and main search use identical punctuation/case normalisation.
 func botSearchKeywordVariants(keyword string) []string {
-	variants := []string{
-		keyword,
-		strings.ToLower(keyword),
-		strings.ToUpper(keyword),
-		normalizeBotSearchHalfWidth(keyword),
-	}
-
-	halfWidth := normalizeBotSearchHalfWidth(keyword)
-	variants = append(variants,
-		strings.ToLower(halfWidth),
-		strings.ToUpper(halfWidth),
-		botFullWidthVariant(halfWidth),
-		botFullWidthVariant(strings.ToLower(halfWidth)),
-		botFullWidthVariant(strings.ToUpper(halfWidth)),
-	)
-
-	seen := make(map[string]bool, len(variants))
-	result := make([]string, 0, len(variants))
-	for _, variant := range variants {
-		if variant == "" || seen[variant] {
-			continue
-		}
-		seen[variant] = true
-		result = append(result, variant)
-	}
-	return result
+	return utils.SearchKeywordVariants(keyword)
 }
 
+// botSingleCharacterExactVariants delegates to the shared utils implementation.
 func botSingleCharacterExactVariants(keyword string) []interface{} {
-	keywords := botSearchKeywordVariants(keyword)
-	result := make([]interface{}, 0, len(keywords))
-	for _, variant := range keywords {
-		runes := []rune(variant)
-		if len(runes) != 1 {
-			continue
-		}
-		result = append(result, variant)
-
-		lower := string(unicode.ToLower(runes[0]))
-		upper := string(unicode.ToUpper(runes[0]))
-		if lower != variant {
-			result = append(result, lower)
-		}
-		if upper != variant {
-			result = append(result, upper)
-		}
-	}
-
-	seen := make(map[interface{}]bool, len(result))
-	unique := make([]interface{}, 0, len(result))
-	for _, variant := range result {
-		if seen[variant] {
-			continue
-		}
-		seen[variant] = true
-		unique = append(unique, variant)
-	}
-	return unique
+	return utils.SingleCharVariants(keyword)
 }
+
 
 func buildBotExactSingleCharacterQuery(keyword string, dateRange *botDateRange) map[string]interface{} {
 	return map[string]interface{}{

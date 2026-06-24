@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -42,6 +44,39 @@ type RecentProblemsRequest struct {
 // isSingleCharacter checks if the keyword is a single character (handles Unicode properly)
 func isSingleCharacter(keyword string) bool {
 	return utf8.RuneCountInString(keyword) == 1
+}
+
+// matchRank returns a priority rank for a document relative to the search keyword:
+//
+//	0 – user_review exactly equals the keyword (or a punctuation/case variant)
+//	1 – keyword appears exactly once in user_review
+//	2 – keyword appears 2+ times in user_review (repeated; ranks below single match)
+//	3 – keyword not found in user_review (matched via other fields)
+//
+// Lower rank = higher priority when sorting. Within the same rank, the ES
+// relevance score (_score) is used as a tiebreaker.
+// This corrects BM25 term-frequency inflation where a review containing
+// "不好吃不好吃" would outscore a review that is just "不好吃".
+func matchRank(userReview, keyword string) int {
+	variants := utils.SearchKeywordVariants(keyword)
+
+	bestCount := -1
+	for _, v := range variants {
+		if strings.EqualFold(userReview, v) || userReview == v {
+			return 0
+		}
+		c := strings.Count(strings.ToLower(userReview), strings.ToLower(v))
+		if c > 0 && (bestCount < 0 || c < bestCount) {
+			bestCount = c
+		}
+	}
+	if bestCount < 0 {
+		return 3
+	}
+	if bestCount == 1 {
+		return 1
+	}
+	return 2
 }
 
 // escapeWildcard escapes special wildcard characters for Elasticsearch wildcard query
@@ -732,7 +767,12 @@ func Search(c *gin.Context) {
 
 	// Extract random keyword and check if random ordering is requested
 	cleanedKeyword, orderByRandom := extractRandomKeyword(req.Keyword)
-	keyword := cleanedKeyword
+
+	// Strip a trailing date suffix (e.g. "不好吃 2026/6/23" or "不好吃 6-23") and
+	// build the corresponding timestamp filter.  The special keyword checks below
+	// still use the clean keyword (without the date part).
+	keyword, searchDate := utils.ExtractTrailingDate(cleanedKeyword)
+	dateFilter := utils.BuildDateFilter(searchDate)
 
 	// Check for special search patterns
 	// (1) Match full text "5149" or "4951": SearchByRatio1, ratio = 51, 49
@@ -829,39 +869,46 @@ func Search(c *gin.Context) {
 	// For single character keywords, the n-gram tokenizer (min_gram=2) produces
 	// no tokens, so a normal match query can't work. We use a bool/should that
 	// prioritizes whole-field (全字) matches over substring matches:
-	//   - term on user_review.keyword: the review IS exactly this character (boost 10)
-	//   - wildcard *x*: the character appears somewhere in the review (boost 1)
-	// Sorting by relevance (default) therefore surfaces exact whole-字 matches first.
+	//   T0  terms on user_review.keyword (all case/punctuation variants) → boost 500
+	//   T1  wildcard *x* (substring)                                     → boost 1
+	// Relevance sorting therefore surfaces exact whole-字 reviews first.
 	if isSingleCharacter(keyword) {
-		// Escape special wildcard characters
 		escapedKeyword := escapeWildcard(keyword)
+		charVariants := utils.SingleCharVariants(keyword)
+
+		singleCharBool := map[string]interface{}{
+			"should": []map[string]interface{}{
+				// T0: review is exactly this character (all variants)
+				{
+					"constant_score": map[string]interface{}{
+						"filter": map[string]interface{}{
+							"terms": map[string]interface{}{
+								"user_review.keyword": charVariants,
+							},
+						},
+						"boost": 500.0,
+					},
+				},
+				// T1: character appears anywhere in the review (substring)
+				{
+					"wildcard": map[string]interface{}{
+						"user_review": map[string]interface{}{
+							"value":            fmt.Sprintf("*%s*", escapedKeyword),
+							"case_insensitive": true,
+							"boost":            1.0,
+						},
+					},
+				},
+			},
+			"minimum_should_match": 1,
+		}
+		if dateFilter != nil {
+			singleCharBool["filter"] = []map[string]interface{}{dateFilter}
+		}
 
 		query = map[string]interface{}{
 			"query": map[string]interface{}{
-				"bool": map[string]interface{}{
-					"should": []map[string]interface{}{
-						// Priority 1: review is exactly this single character (whole-字 match)
-						{
-							"term": map[string]interface{}{
-								"user_review.keyword": map[string]interface{}{
-									"value": keyword,
-									"boost": 10.0,
-								},
-							},
-						},
-						// Priority 2: character appears anywhere in the review (substring)
-						{
-							"wildcard": map[string]interface{}{
-								"user_review": map[string]interface{}{
-									"value":            fmt.Sprintf("*%s*", escapedKeyword),
-									"case_insensitive": true,
-									"boost":            1.0,
-								},
-							},
-						},
-					},
-					"minimum_should_match": 1,
-				},
+				"bool": singleCharBool,
 			},
 			"size": req.Limit,
 			"highlight": map[string]interface{}{
@@ -889,7 +936,7 @@ func Search(c *gin.Context) {
 		minScore := calculateMinScore(keyword)
 
 		// Build Elasticsearch query using the centralized query builder
-		boolQuery := utils.BuildBoolQuery(keyword, fuzziness)
+		boolQuery := utils.BuildBoolQuery(keyword, fuzziness, dateFilter)
 
 		query = map[string]interface{}{
 			"query": map[string]interface{}{
@@ -1085,6 +1132,20 @@ func Search(c *gin.Context) {
 		}
 
 		results = append(results, doc)
+	}
+
+	// Go-side stable re-rank: prioritise exact/single matches over repeated ones.
+	// Only applied when not in random-order mode (random mode bypasses ES scoring
+	// entirely, so re-ranking on match count would be misleading).
+	if !orderByRandom && len(results) > 1 {
+		sort.SliceStable(results, func(i, j int) bool {
+			ri := matchRank(results[i].UserReview, keyword)
+			rj := matchRank(results[j].UserReview, keyword)
+			if ri != rj {
+				return ri < rj
+			}
+			return results[i].Score > results[j].Score
+		})
 	}
 
 	utils.SuccessResponse(c, SearchResponse{
@@ -2085,4 +2146,34 @@ func GetProblemComments(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, gin.H{"data": comments})
+}
+
+// QuickSearchRequest is the request for the quick keyword search endpoint.
+type QuickSearchRequest struct {
+	Keyword string `form:"keyword" binding:"required"`
+}
+
+// QuickSearch returns only the answer fields for a keyword without computing
+// hot-comment or comment-section answers. It reuses the bot-search ES pipeline
+// which is already optimised for single-result, answer-only retrieval.
+func QuickSearch(c *gin.Context) {
+	var req QuickSearchRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.BadRequestResponse(c, fmt.Sprintf("Invalid request: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	results, total, err := executeBotSearch(ctx, req.Keyword, nil)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
+		return
+	}
+
+	utils.SuccessResponse(c, BotSearchResponse{
+		Total:   total,
+		Results: results,
+	})
 }
