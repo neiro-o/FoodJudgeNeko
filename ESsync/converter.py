@@ -332,13 +332,13 @@ def convert_bson_to_es_type1(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
             
             # Build others field
             spec = safe_get(product, "spec", default="")
-            min_order = safe_get(product, "minOrderCount", default="")
+            min_order_count = safe_get(product, "minOrderCount", default="")
             
             others_parts = []
             if spec:
                 others_parts.append(spec)
-            if min_order:
-                others_parts.append(f"Minimum per order: {min_order}")
+            if isinstance(min_order_count, (int, float)) and min_order_count > 1:
+                others_parts.append(f"Minimum per order: {min_order_count}")
             others_str = ", ".join(others_parts) if others_parts else ""
             
             # Get selection (attrValueList)
@@ -520,14 +520,27 @@ def convert_bson_to_es_type2(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
     except (ValueError, TypeError):
         es_doc["timestamp"] = 0
     
-    # Others: category list + " in " + city
+    # Others: category list + optional poiName + optional poiAvgPrice + city
     poi_categories = safe_get(bson_doc, "detail", "taskInfo", "voteContent", "merchant", "poiCategoryList", default=[])
     city = safe_get(bson_doc, "detail", "taskInfo", "voteContent", "merchant", "city", default="")
+    _poi_name_others = safe_get(bson_doc, "detail", "taskInfo", "voteContent", "merchant", "poiName")
+    _poi_avg_price_others = safe_get(bson_doc, "detail", "taskInfo", "voteContent", "merchant", "poiAvgPrice")
     if isinstance(poi_categories, list) and poi_categories:
         categories_str = ",".join(poi_categories)
     else:
         categories_str = ""
-    es_doc["others"] = f"{categories_str} in {city}" if city else categories_str
+    others_str = categories_str
+    if _poi_name_others:
+        others_str += f" - {_poi_name_others}"
+    try:
+        _avg = int(_poi_avg_price_others) if _poi_avg_price_others is not None else 0
+    except (ValueError, TypeError):
+        _avg = 0
+    if _avg > 0:
+        others_str += f" | 人均 {_avg} 元"
+    if city:
+        others_str += f" ({city})"
+    es_doc["others"] = others_str
     
     # Problem type: 2 for this function
     es_doc["problem_type"] = 2
@@ -840,15 +853,15 @@ def convert_bson_to_es_type3(bson_doc: Dict[str, Any]) -> Dict[str, Any]:
             # Build others field: spec, price, minOrderCount
             spec = safe_get(product, "spec", default="")
             price = safe_get(product, "price", default="")
-            min_order = safe_get(product, "minOrderCount", default="")
+            min_order_count = safe_get(product, "minOrderCount", default="")
             
             others_parts = []
             if spec:
                 others_parts.append(spec)
             if price:
                 others_parts.append(f"Price: {price}")
-            if min_order:
-                others_parts.append(f"Minimum per order: {min_order}")
+            if isinstance(min_order_count, (int, float)) and min_order_count > 1:
+                others_parts.append(f"Minimum per order: {min_order_count}")
             others_str = ", ".join(others_parts) if others_parts else ""
             
             # Get selection (attrValueList)
