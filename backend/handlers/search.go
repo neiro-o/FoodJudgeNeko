@@ -2057,6 +2057,54 @@ func GetProblemComments(c *gin.Context) {
 		return []string{}
 	}
 
+	// toAudiosPC parses the "audios" field, which is an array of objects:
+	// [{"url": "...", "duration": 2, "audioText": "..."}]
+	toAudiosPC := func(v interface{}) []gin.H {
+		result := []gin.H{}
+		if v == nil {
+			return result
+		}
+
+		var items []interface{}
+		switch val := v.(type) {
+		case bson.A:
+			items = val
+		case []interface{}:
+			items = val
+		default:
+			return result
+		}
+
+		for _, item := range items {
+			var itemMap map[string]interface{}
+			switch m := item.(type) {
+			case bson.M:
+				itemMap = m
+			case map[string]interface{}:
+				itemMap = m
+			default:
+				continue
+			}
+
+			audio := gin.H{
+				"url":       "",
+				"duration":  0,
+				"audioText": "",
+			}
+			if u, ok := itemMap["url"].(string); ok {
+				audio["url"] = u
+			}
+			if d, ok := itemMap["duration"]; ok {
+				audio["duration"] = int(toInt64PC(d))
+			}
+			if t, ok := itemMap["audioText"].(string); ok {
+				audio["audioText"] = t
+			}
+			result = append(result, audio)
+		}
+		return result
+	}
+
 	var comments []gin.H
 	for cursor.Next(ctx) {
 		var doc bson.M
@@ -2073,7 +2121,7 @@ func GetProblemComments(c *gin.Context) {
 			"timestamp":    int64(0),
 			"userid":       int64(0),
 			"images":       []string{},
-			"audios":       []string{},
+			"audios":       []gin.H{},
 			"replies":      []gin.H{},
 			"locationInfo": nil,
 		}
@@ -2102,7 +2150,7 @@ func GetProblemComments(c *gin.Context) {
 			comment["likes"] = toInt64PC(v)
 		}
 		comment["images"] = toStringSlicePC(doc["images"])
-		comment["audios"] = toStringSlicePC(doc["audios"])
+		comment["audios"] = toAudiosPC(doc["audios"])
 		if v, ok := doc["locationInfo"].(string); ok && v != "" {
 			comment["locationInfo"] = v
 		}

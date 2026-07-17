@@ -67,7 +67,7 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
       const urls: { url: string; isAudio: boolean }[] = [];
       currentComments.forEach((comment) => {
         (comment.images || []).forEach((url) => urls.push({ url, isAudio: false }));
-        (comment.audios || []).forEach((url) => urls.push({ url, isAudio: true }));
+        (comment.audios || []).forEach((audio) => urls.push({ url: audio.url, isAudio: true }));
       });
 
       const uniqueUrls = Array.from(new Map(urls.map((u) => [u.url, u])).values());
@@ -87,6 +87,14 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
     preload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentComments]);
+
+  // Format a duration in seconds as M:SS
+  const formatDuration = (seconds: number): string => {
+    const total = Math.max(0, Math.round(seconds || 0));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   // Format timestamp to YYYY/MM/DD H:MM:SS (GMT+8)
   const formatTimestamp = (ts: number): string => {
@@ -170,15 +178,26 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
 
               {/* Audio player bar(s) */}
               {comment.audios && comment.audios.length > 0 && (
-                <div className="mt-2 space-y-1.5">
-                  {comment.audios.map((audioUrl, idx) => (
-                    <audio
-                      key={idx}
-                      controls
-                      preload="none"
-                      src={getProxiedMediaUrl(audioUrl)}
-                      className="w-full h-8 max-w-md"
-                    />
+                <div className="mt-2 space-y-2 max-w-md">
+                  {comment.audios.map((audio, idx) => (
+                    <div key={idx}>
+                      <div className="flex items-center gap-2">
+                        <audio
+                          controls
+                          preload="none"
+                          src={getProxiedMediaUrl(audio.url)}
+                          className="flex-1 h-8"
+                        />
+                        <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                          {formatDuration(audio.duration)}
+                        </span>
+                      </div>
+                      {audio.audioText && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {audio.audioText}
+                        </p>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}

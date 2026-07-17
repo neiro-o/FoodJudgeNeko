@@ -246,6 +246,12 @@ export interface ProblemReply {
   timestamp: number;
 }
 
+export interface ProblemCommentAudio {
+  url: string;
+  duration: number;
+  audioText: string;
+}
+
 export interface ProblemComment {
   id: string;
   choice: number;
@@ -255,7 +261,7 @@ export interface ProblemComment {
   timestamp: number;
   userid: number;
   images: string[];
-  audios: string[];
+  audios: ProblemCommentAudio[];
   replies: ProblemReply[];
   locationInfo: string | null;
 }
