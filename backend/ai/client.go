@@ -39,10 +39,25 @@ type chatCompletionResponse struct {
 		Message struct {
 			Content string `json:"content"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 	Error *struct {
 		Message string `json:"message"`
 	} `json:"error"`
+}
+
+// TruncatedResponseError indicates the provider cut the completion short
+// (finish_reason == "length") before it could finish writing valid JSON,
+// most commonly because max_tokens was too small for the requested output.
+// Content still holds whatever partial text the model produced, so callers
+// can surface it for debugging instead of only reporting a generic JSON
+// parse failure.
+type TruncatedResponseError struct {
+	Content string
+}
+
+func (e *TruncatedResponseError) Error() string {
+	return "response was truncated by the provider (finish_reason=length), likely because max_tokens is too small for the requested output"
 }
 
 // ProviderError wraps a failure from a single provider attempt so callers can
@@ -71,7 +86,14 @@ func requestChatCompletion(ctx context.Context, p Provider, messages []Message, 
 		Model:       p.Model,
 		Messages:    messages,
 		Temperature: 0.7,
-		MaxTokens:   1400,
+		// The structured output can include up to 300 evidence-linked
+		// samples worth of context and a fairly large JSON schema
+		// (roast + profile + up to 5 evidence items + limitations).
+		// Chinese text also tends to burn more tokens per character than
+		// English, so a small budget here silently truncates the JSON
+		// mid-object (finish_reason=length) rather than erroring cleanly.
+		// 4096 gives enough headroom while still bounding cost/latency.
+		MaxTokens: 4096,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to encode request: %w", err)
@@ -113,7 +135,12 @@ func requestChatCompletion(ctx context.Context, p Provider, messages []Message, 
 		return "", fmt.Errorf("empty completion from provider")
 	}
 
-	return parsed.Choices[0].Message.Content, nil
+	choice := parsed.Choices[0]
+	if choice.FinishReason == "length" {
+		return "", &TruncatedResponseError{Content: choice.Message.Content}
+	}
+
+	return choice.Message.Content, nil
 }
 
 // GenerateWithFallback tries each provider in order (typically DeepSeek then

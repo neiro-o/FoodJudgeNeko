@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,10 +24,14 @@ func newTestServer(t *testing.T, statusCode int, content string, checkAuth strin
 				Message struct {
 					Content string `json:"content"`
 				} `json:"message"`
+				FinishReason string `json:"finish_reason"`
 			}{
-				{Message: struct {
-					Content string `json:"content"`
-				}{Content: content}},
+				{
+					Message: struct {
+						Content string `json:"content"`
+					}{Content: content},
+					FinishReason: "stop",
+				},
 			}
 			_ = json.NewEncoder(w).Encode(resp)
 		}
@@ -115,6 +120,53 @@ func TestGenerateWithFallback_SkipsUnconfiguredProviders(t *testing.T) {
 	}
 	if content != "hello" || used.Name != "openrouter" {
 		t.Errorf("expected the configured provider to be used, got content=%q used=%q", content, used.Name)
+	}
+}
+
+func newTruncatedTestServer(t *testing.T, partialContent string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		resp := chatCompletionResponse{}
+		resp.Choices = []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
+		}{
+			{
+				Message: struct {
+					Content string `json:"content"`
+				}{Content: partialContent},
+				FinishReason: "length",
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+}
+
+func TestGenerateWithFallback_TruncatedResponseSurfacesPartialContent(t *testing.T) {
+	truncated := newTruncatedTestServer(t, `{"roast": "some partial`)
+	defer truncated.Close()
+
+	providers := []Provider{
+		{Name: "deepseek", BaseURL: truncated.URL, APIKey: "any", Model: "m"},
+	}
+
+	var capturedErr error
+	_, _, err := GenerateWithFallback(context.Background(), providers, []Message{{Role: "user", Content: "hi"}}, 5*time.Second, func(provider string, e error) {
+		capturedErr = e
+	})
+	if err == nil {
+		t.Fatal("expected an error when the provider truncates its response")
+	}
+
+	var truncatedErr *TruncatedResponseError
+	if !errors.As(capturedErr, &truncatedErr) {
+		t.Fatalf("expected a *TruncatedResponseError, got %T: %v", capturedErr, capturedErr)
+	}
+	if truncatedErr.Content != `{"roast": "some partial` {
+		t.Errorf("expected partial content to be preserved, got %q", truncatedErr.Content)
 	}
 }
 

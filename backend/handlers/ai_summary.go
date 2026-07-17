@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -50,6 +51,13 @@ const (
 	// different problems can't turn one summary generation into hundreds
 	// of extra round trips.
 	aiSummaryMaxProblemLookups = 100
+
+	// aiSummaryRawDebugRunes bounds how much of a provider's raw (unparsed
+	// or truncated) response we echo back into LastError when generation
+	// fails, so the failure is debuggable from the cached doc/API response
+	// without risking an unbounded blob if a provider ever returns
+	// something huge.
+	aiSummaryRawDebugRunes = 2000
 )
 
 // generationLocks prevents two concurrent POST requests for the same user
@@ -273,8 +281,12 @@ func generateAIUserSummary(ctx context.Context, userID string) (*aiUserSummaryDo
 	}
 
 	var attemptErrors []string
+	var lastRawDebug string // raw/partial content from the most recent failed attempt, for debugging
 	raw, usedProvider, genErr := ai.GenerateWithFallback(ctx, providers, messages, aiSummaryProviderTimeout, func(provider string, err error) {
 		attemptErrors = append(attemptErrors, fmt.Sprintf("%s: %v", provider, err))
+		if truncated := extractTruncatedContent(err); truncated != "" {
+			lastRawDebug = truncated
+		}
 	})
 
 	now := time.Now()
@@ -282,11 +294,15 @@ func generateAIUserSummary(ctx context.Context, userID string) (*aiUserSummaryDo
 		if len(attemptErrors) > 0 {
 			fmt.Printf("AI summary generation for user %s: all providers failed: %s\n", userID, strings.Join(attemptErrors, "; "))
 		}
+		lastError := genErr.Error()
+		if lastRawDebug != "" {
+			lastError += "\n[raw provider output]\n" + truncateRunesLocal(lastRawDebug, aiSummaryRawDebugRunes)
+		}
 		failDoc := aiUserSummaryDoc{
 			UserID:        userID,
 			Status:        "failed",
 			InputSnapshot: stats,
-			LastError:     genErr.Error(),
+			LastError:     lastError,
 			LastAttemptAt: &now,
 		}
 		upsertAIUserSummary(userID, failDoc)
@@ -296,11 +312,12 @@ func generateAIUserSummary(ctx context.Context, userID string) (*aiUserSummaryDo
 	result, parseErr := ai.ParseAndSanitizeUserSummaryResult(raw, allowedIDs)
 	if parseErr != nil {
 		combinedErr := fmt.Errorf("provider %s returned an invalid response: %w", usedProvider.Name, parseErr)
+		lastError := combinedErr.Error() + "\n[raw provider output]\n" + truncateRunesLocal(raw, aiSummaryRawDebugRunes)
 		failDoc := aiUserSummaryDoc{
 			UserID:        userID,
 			Status:        "failed",
 			InputSnapshot: stats,
-			LastError:     combinedErr.Error(),
+			LastError:     lastError,
 			LastAttemptAt: &now,
 		}
 		upsertAIUserSummary(userID, failDoc)
@@ -553,6 +570,18 @@ func extractAudioText(v interface{}) string {
 		}
 	}
 	return strings.Join(texts, " / ")
+}
+
+// extractTruncatedContent unwraps a (possibly provider-wrapped) error to see
+// if it's an ai.TruncatedResponseError, returning the partial content the
+// model produced before hitting max_tokens, or "" if the error isn't that
+// specific case.
+func extractTruncatedContent(err error) string {
+	var truncated *ai.TruncatedResponseError
+	if errors.As(err, &truncated) {
+		return truncated.Content
+	}
+	return ""
 }
 
 func truncateRunesLocal(s string, max int) string {
