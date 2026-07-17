@@ -65,6 +65,7 @@ def ensure_comments_indexes(db, config):
         ([("userId", ASCENDING)], {}),
         ([("problemId", ASCENDING)], {}),
         ([("commentId", ASCENDING)], {}),
+        ([("userName", ASCENDING)], {}),
     ]
     
     try:
@@ -231,6 +232,112 @@ def sync_comments(config):
     return total_problems_processed, total_comments_upserted
 
 
+def ensure_user_rankings_indexes(collection):
+    """Ensure indexes exist on a user_rankings collection for rank-ordered pagination"""
+    try:
+        collection.create_index([("rank", ASCENDING)], unique=True)
+        collection.create_index([("userId", ASCENDING)], unique=True)
+    except OperationFailure as e:
+        print(f"⚠ Warning creating user_rankings indexes: {e}")
+
+
+def sync_user_rankings(config):
+    """
+    Recompute total likes (sum of approveCount) per user across all their
+    comments, rank every user by total likes, and store the result in a
+    dedicated collection so the rankings API can serve paginated results
+    with a simple indexed lookup instead of aggregating the full comments
+    collection on every request.
+
+    The result is built in a temporary collection and then atomically
+    swapped into place (rename with dropTarget) so readers never see a
+    half-written ranking table while this job is running.
+    """
+    connection_string = config['mongodb']['connection_string']
+    database_name = config['mongodb']['database_name']
+    comments_collection_name = config['mongodb']['collections']['comments']
+    user_rankings_collection_name = config['mongodb']['collections'].get(
+        'user_rankings', 'user_rankings'
+    )
+
+    print(f"Connecting to MongoDB at {connection_string}...")
+    try:
+        client = MongoClient(connection_string, serverSelectionTimeoutMS=5000)
+        client.server_info()
+        print(f"✓ Connected to MongoDB successfully")
+    except Exception as e:
+        print(f"✗ Failed to connect to MongoDB: {e}")
+        raise
+
+    db = client[database_name]
+    comments_collection = db[comments_collection_name]
+    tmp_collection_name = f"{user_rankings_collection_name}_tmp"
+    tmp_collection = db[tmp_collection_name]
+
+    print(f"Recomputing user rankings from {comments_collection_name}...")
+
+    # Start from a clean temp collection in case a previous run crashed
+    # midway and left it around.
+    tmp_collection.drop()
+
+    pipeline = [
+        # Only non-anonymous comments carry a usable userName; comments
+        # from the same user are otherwise indistinguishable for display.
+        {"$match": {"isAnonymous": False}},
+        {"$group": {
+            "_id": "$userId",
+            "userName": {"$first": "$userName"},
+            "likes": {"$sum": "$approveCount"},
+            "commentCount": {"$sum": 1},
+        }},
+        {"$sort": {"likes": -1}},
+    ]
+
+    total_users = 0
+    batch = []
+    batch_size = 1000
+    rank = 0
+
+    cursor = comments_collection.aggregate(pipeline, allowDiskUse=True)
+    for doc in cursor:
+        rank += 1
+        batch.append({
+            "userId": doc["_id"],
+            "userName": doc.get("userName") or "",
+            "likes": int(doc.get("likes") or 0),
+            "commentCount": int(doc.get("commentCount") or 0),
+            "rank": rank,
+        })
+        if len(batch) >= batch_size:
+            tmp_collection.insert_many(batch)
+            total_users += len(batch)
+            batch = []
+
+    if batch:
+        tmp_collection.insert_many(batch)
+        total_users += len(batch)
+
+    if total_users == 0:
+        # Nothing to rank (e.g. empty comments collection); just make sure
+        # the live collection reflects that instead of leaving stale data.
+        db[user_rankings_collection_name].drop()
+        print(f"✓ User rankings updated: 0 users ranked")
+        client.close()
+        return total_users
+
+    ensure_user_rankings_indexes(tmp_collection)
+
+    # Atomically swap the freshly built table into place. dropTarget=True
+    # replaces the previous live collection in a single server-side rename,
+    # so readers never observe a partially populated ranking table.
+    tmp_collection.rename(user_rankings_collection_name, dropTarget=True)
+
+    print(f"✓ User rankings updated: {total_users} users ranked")
+
+    client.close()
+    return total_users
+
+
 def main():
     print("=" * 60)
     print("mtv2 Comment Synchronization Script")
@@ -252,13 +359,22 @@ def main():
     except Exception as e:
         print(f"✗ Comment sync failed: {e}")
         sys.exit(1)
-    
+
+    print()
+
+    try:
+        total_ranked_users = sync_user_rankings(config)
+    except Exception as e:
+        print(f"✗ User rankings sync failed: {e}")
+        sys.exit(1)
+
     print()
     print("=" * 60)
     print("Sync Summary")
     print("=" * 60)
     print(f"✓ Problems processed: {problems_processed}")
     print(f"✓ Comments upserted: {comments_upserted}")
+    print(f"✓ Users ranked: {total_ranked_users}")
     print("=" * 60)
 
 

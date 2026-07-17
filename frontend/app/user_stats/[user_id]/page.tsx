@@ -3,11 +3,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import ImageModal from '@/components/ImageModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { userDetailAPI, UserInfoResponse, UserComment, UserCommentsResponse } from '@/lib/api';
+import { userDetailAPI, mediaAPI, UserInfoResponse, UserComment, UserCommentsResponse, AIUserSummaryResponse } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+
+// Check if URL is from an external (proxy-required) domain
+function isExternalMediaUrl(url: string): boolean {
+  if (!url || url.startsWith('/') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return false;
+  }
+  try {
+    const urlObj = new URL(url);
+    const host = urlObj.hostname.toLowerCase();
+    return (
+      host.includes('meituan.com') ||
+      host.includes('meituan.net') ||
+      host.includes('sankuai.com')
+    );
+  } catch {
+    return false;
+  }
+}
 
 export default function UserStatsPage() {
   const params = useParams();
@@ -30,8 +49,28 @@ export default function UserStatsPage() {
   const [showMaliciousTooltip, setShowMaliciousTooltip] = useState(false);
   const [showToggleDialog, setShowToggleDialog] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [modalImage, setModalImage] = useState<string | null>(null);
+  const [mediaUrlMap, setMediaUrlMap] = useState<Map<string, string>>(new Map());
+
+  const [aiSummary, setAiSummary] = useState<AIUserSummaryResponse | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(true);
+  const [aiSummaryGenerating, setAiSummaryGenerating] = useState(false);
+  const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
+  const [showFunGuesses, setShowFunGuesses] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
 
   const LIMIT = 10;
+
+  // Resolve a media URL through the proxy for external domains, caching the result
+  const getProxiedMediaUrl = (url: string): string => mediaUrlMap.get(url) || url;
+
+  // Format a duration in seconds as M:SS
+  const formatDuration = (seconds: number): string => {
+    const total = Math.max(0, Math.round(seconds || 0));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   // Build avatar URL with auth token
   const getAvatarUrl = useCallback(() => {
@@ -93,6 +132,66 @@ export default function UserStatsPage() {
     }
   }, [userId, loading, fetchComments, searchParams]);
 
+  // Fetch any cached AI summary (does not trigger generation)
+  useEffect(() => {
+    const fetchAiSummary = async () => {
+      try {
+        setAiSummaryLoading(true);
+        const summary = await userDetailAPI.getAISummary(userId);
+        setAiSummary(summary);
+      } catch (err) {
+        console.error('Failed to fetch AI summary:', err);
+      } finally {
+        setAiSummaryLoading(false);
+      }
+    };
+
+    if (userId) {
+      fetchAiSummary();
+    }
+  }, [userId]);
+
+  // Manually trigger AI summary generation (or fetch a still-fresh cache)
+  const handleGenerateAiSummary = async () => {
+    setAiSummaryGenerating(true);
+    setAiSummaryError(null);
+    try {
+      const summary = await userDetailAPI.generateAISummary(userId);
+      setAiSummary(summary);
+    } catch (err: any) {
+      setAiSummaryError(err?.message || 'Unknown error');
+    } finally {
+      setAiSummaryGenerating(false);
+    }
+  };
+
+  // Preload proxied URLs for images/audios in the current comments
+  useEffect(() => {
+    const preload = async () => {
+      const urls: { url: string; isAudio: boolean }[] = [];
+      comments.forEach((comment) => {
+        (comment.images || []).forEach((url) => urls.push({ url, isAudio: false }));
+        (comment.audios || []).forEach((audio) => urls.push({ url: audio.url, isAudio: true }));
+      });
+
+      const uniqueUrls = Array.from(new Map(urls.map((u) => [u.url, u])).values());
+      for (const { url, isAudio } of uniqueUrls) {
+        if (!isExternalMediaUrl(url) || mediaUrlMap.has(url)) continue;
+        try {
+          const proxiedUrl = isAudio
+            ? await mediaAPI.getAudioUrl(url)
+            : await mediaAPI.getImageUrl(url);
+          setMediaUrlMap((prev) => new Map(prev).set(url, proxiedUrl));
+        } catch (error) {
+          console.error('Failed to preload comment media:', url, error);
+        }
+      }
+    };
+
+    preload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comments]);
+
   // Close tooltip on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -113,6 +212,18 @@ export default function UserStatsPage() {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
+    });
+  };
+
+  // Format a unix-seconds timestamp with date + time (used for AI summary generatedAt)
+  const formatDateTime = (timestamp: number) => {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
@@ -419,6 +530,188 @@ export default function UserStatsPage() {
           </div>
         )}
 
+        {/* AI Comment Profile Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {t('aiSummary.title')}
+            </h3>
+            {!aiSummaryLoading && aiSummary && aiSummary.status === 'ready' && (
+              <button
+                onClick={handleGenerateAiSummary}
+                disabled={aiSummaryGenerating || !aiSummary.stale}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                  aiSummary.stale
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                }`}
+              >
+                {aiSummaryGenerating ? t('aiSummary.generating') : t('aiSummary.refresh')}
+              </button>
+            )}
+          </div>
+
+          {aiSummaryLoading ? (
+            <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm">
+              {t('aiSummary.loading')}
+            </div>
+          ) : aiSummary && aiSummary.status === 'ready' && aiSummary.result ? (
+            <div className="space-y-4">
+              {aiSummary.generatedAt && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {t('aiSummary.lastGenerated', {
+                    date: formatDateTime(aiSummary.generatedAt),
+                    provider: aiSummary.provider || '',
+                  })}
+                </p>
+              )}
+
+              {/* Roast */}
+              <div className="p-4 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-100 dark:border-indigo-900">
+                <p className="text-gray-800 dark:text-gray-100 leading-relaxed">
+                  {aiSummary.result.roast}
+                </p>
+              </div>
+
+              {/* Profile summary */}
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {aiSummary.result.profile.summary}
+              </p>
+
+              {/* Feature groups */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  ['aiSummary.expressionStyle', aiSummary.result.profile.expressionStyle],
+                  ['aiSummary.opinionTendency', aiSummary.result.profile.opinionTendency],
+                  ['aiSummary.interactionPattern', aiSummary.result.profile.interactionPattern],
+                ] as const).map(([labelKey, items]) =>
+                  items && items.length > 0 ? (
+                    <div key={labelKey} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        {t(labelKey)}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {items.map((item, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null
+                )}
+              </div>
+
+              {/* Limitations */}
+              {aiSummary.result.limitations && aiSummary.result.limitations.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    {t('aiSummary.limitations')}
+                  </p>
+                  <ul className="list-disc list-inside text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                    {aiSummary.result.limitations.map((limitation, idx) => (
+                      <li key={idx}>{limitation}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Fun guesses (entertainment only, collapsed by default) */}
+              <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+                <button
+                  onClick={() => setShowFunGuesses(!showFunGuesses)}
+                  className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1"
+                >
+                  <span>{showFunGuesses ? '▾' : '▸'}</span>
+                  {t('aiSummary.funGuessToggle')}
+                </button>
+                {showFunGuesses && (
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {([
+                      ['aiSummary.gender', aiSummary.result.profile.genderGuess],
+                      ['aiSummary.mbti', aiSummary.result.profile.mbtiGuess],
+                    ] as const).map(([labelKey, guess]) => (
+                      <div key={labelKey} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {t(labelKey)}
+                        </p>
+                        <p className="text-sm text-gray-800 dark:text-gray-200 mt-0.5">
+                          {guess.value}
+                        </p>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                          {guess.disclaimer}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Supporting evidence (collapsed by default) */}
+              {aiSummary.result.evidence && aiSummary.result.evidence.length > 0 && (
+                <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+                  <button
+                    onClick={() => setShowEvidence(!showEvidence)}
+                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-1"
+                  >
+                    <span>{showEvidence ? '▾' : '▸'}</span>
+                    {t('aiSummary.evidenceToggle')}
+                  </button>
+                  {showEvidence && (
+                    <ul className="mt-2 space-y-2">
+                      {aiSummary.result.evidence.map((item, idx) => (
+                        <li key={idx} className="text-xs text-gray-600 dark:text-gray-300 p-2 rounded bg-gray-50 dark:bg-gray-800">
+                          <p className="font-medium text-gray-700 dark:text-gray-200">{item.claim}</p>
+                          <p className="mt-0.5">{item.reason}</p>
+                          {item.evidenceIds && item.evidenceIds.length > 0 && (
+                            <p className="mt-1 text-gray-400 dark:text-gray-500">
+                              {item.evidenceIds.map((id) => t('aiSummary.sample', { id })).join('、')}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {aiSummaryError && (
+                <p className="text-xs text-red-500">{t('aiSummary.error', { message: aiSummaryError })}</p>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              {aiSummary && aiSummary.status === 'failed' && (
+                <p className="text-sm text-red-500 mb-3">
+                  {t('aiSummary.error', { message: aiSummary.lastError || 'Unknown error' })}
+                </p>
+              )}
+              {aiSummaryError && (
+                <p className="text-sm text-red-500 mb-3">{t('aiSummary.error', { message: aiSummaryError })}</p>
+              )}
+              {!aiSummaryError && (!aiSummary || aiSummary.status === 'none') && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  {t('aiSummary.emptyState')}
+                </p>
+              )}
+              <button
+                onClick={handleGenerateAiSummary}
+                disabled={aiSummaryGenerating}
+                className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {aiSummaryGenerating
+                  ? t('aiSummary.generating')
+                  : aiSummary && aiSummary.status === 'failed'
+                  ? t('aiSummary.retry')
+                  : t('aiSummary.generate')}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Comments Section */}
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
@@ -485,6 +778,50 @@ export default function UserStatsPage() {
                         {comment.content}
                       </p>
 
+                      {/* Audio player bar(s) */}
+                      {comment.audios && comment.audios.length > 0 && (
+                        <div className="space-y-2 max-w-md mb-2">
+                          {comment.audios.map((audio, idx) => (
+                            <div key={idx}>
+                              <div className="flex items-center gap-2">
+                                <audio
+                                  controls
+                                  preload="none"
+                                  src={getProxiedMediaUrl(audio.url)}
+                                  className="flex-1 h-8"
+                                />
+                                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                                  {formatDuration(audio.duration)}
+                                </span>
+                              </div>
+                              {audio.audioText && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  {audio.audioText}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Image thumbnails */}
+                      {comment.images && comment.images.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {comment.images.map((imageUrl, idx) => (
+                            <img
+                              key={idx}
+                              src={getProxiedMediaUrl(imageUrl)}
+                              alt={`${comment.userName} image ${idx + 1}`}
+                              className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setModalImage(imageUrl);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span>{formatDate(comment.createTime)}</span>
                         <span className="flex items-center gap-1">
@@ -505,6 +842,13 @@ export default function UserStatsPage() {
           {renderPagination()}
         </div>
       </div>
+
+      {/* Image Modal */}
+      <ImageModal
+        imageUrl={modalImage ? getProxiedMediaUrl(modalImage) : ''}
+        isOpen={!!modalImage}
+        onClose={() => setModalImage(null)}
+      />
     </div>
   );
 }

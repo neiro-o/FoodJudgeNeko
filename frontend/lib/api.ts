@@ -340,6 +340,8 @@ export interface UserComment {
   isAnonymous: boolean;
   voteOperate: string;
   choice: number;
+  images: string[];
+  audios: ProblemCommentAudio[];
 }
 
 export interface UserCommentsResponse {
@@ -355,11 +357,67 @@ export interface RankingItem {
   userName: string;
   likes: number;
   commentCount: number;
+  rank: number;
 }
 
 export interface RankingsResponse {
   rankings: RankingItem[];
   total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface UserSearchResultItem {
+  userId: string;
+  userName: string;
+}
+
+export interface UserSearchResponse {
+  users: UserSearchResultItem[];
+}
+
+// AI user summary ("犀利点评 + 用户画像")
+export interface AIUserSummaryGuess {
+  value: string;
+  confidence: string;
+  disclaimer: string;
+}
+
+export interface AIUserSummaryProfile {
+  summary: string;
+  expressionStyle: string[];
+  opinionTendency: string[];
+  interactionPattern: string[];
+  genderGuess: AIUserSummaryGuess;
+  mbtiGuess: AIUserSummaryGuess;
+}
+
+export interface AIUserSummaryEvidence {
+  claim: string;
+  evidenceIds: string[];
+  reason: string;
+}
+
+export interface AIUserSummaryResult {
+  roast: string;
+  profile: AIUserSummaryProfile;
+  evidence: AIUserSummaryEvidence[];
+  limitations: string[];
+}
+
+export type AIUserSummaryStatus = 'none' | 'ready' | 'failed';
+
+export interface AIUserSummaryResponse {
+  status: AIUserSummaryStatus;
+  result?: AIUserSummaryResult;
+  provider?: string;
+  model?: string;
+  promptVersion?: string;
+  generatedAt?: number; // unix seconds
+  expiresAt?: number; // unix seconds
+  stale: boolean;
+  lastError?: string;
 }
 
 export const userDetailAPI = {
@@ -382,12 +440,27 @@ export const userDetailAPI = {
     return apiRequest<UserCommentsResponse>(`/user_detail/comments?${params.toString()}`);
   },
 
-  getRankings: async (): Promise<RankingsResponse> => {
-    return apiRequest<RankingsResponse>('/user_detail/rankings');
+  getRankings: async (page: number = 1): Promise<RankingsResponse> => {
+    return apiRequest<RankingsResponse>(`/user_detail/rankings?page=${page}`);
+  },
+
+  searchUsers: async (keyword: string, limit: number = 10): Promise<UserSearchResponse> => {
+    const params = new URLSearchParams({ keyword, limit: limit.toString() });
+    return apiRequest<UserSearchResponse>(`/user_detail/search_users?${params.toString()}`);
   },
 
   toggleMalicious: async (userId: string): Promise<{ malicious: boolean; message: string }> => {
     return apiRequest<{ malicious: boolean; message: string }>(`/user_detail/toggle_malicious?userId=${userId}`, {
+      method: 'POST',
+    });
+  },
+
+  getAISummary: async (userId: string): Promise<AIUserSummaryResponse> => {
+    return apiRequest<AIUserSummaryResponse>(`/user_detail/ai_summary?userId=${userId}`);
+  },
+
+  generateAISummary: async (userId: string): Promise<AIUserSummaryResponse> => {
+    return apiRequest<AIUserSummaryResponse>(`/user_detail/ai_summary?userId=${userId}`, {
       method: 'POST',
     });
   },

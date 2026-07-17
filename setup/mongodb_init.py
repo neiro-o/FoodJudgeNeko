@@ -50,6 +50,10 @@ def create_indexes(db, config):
         'notes': [
             # ([("created_at", DESCENDING)], {}),
         ],
+        'ai_user_summaries': [
+            ([("userId", ASCENDING)], {"unique": True}),
+            ([("generatedAt", DESCENDING)], {}),
+        ],
     }
     
     # Create indexes for each collection in config

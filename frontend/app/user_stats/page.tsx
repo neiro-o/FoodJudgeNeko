@@ -1,21 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { userDetailAPI, RankingItem } from '@/lib/api';
+import { userDetailAPI, RankingItem, UserSearchResultItem } from '@/lib/api';
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export default function RankingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
 
   const [rankings, setRankings] = useState<RankingItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mobilePageInput, setMobilePageInput] = useState('');
+
+  // User search (nickname typeahead)
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchResults, setSearchResults] = useState<UserSearchResultItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestSeq = useRef(0);
 
   // Build avatar URL with auth token
   const getAvatarUrl = (userId: string) => {
@@ -24,28 +40,117 @@ export default function RankingsPage() {
     return `${API_BASE_URL}/user_detail/avatar?userId=${userId}&token=${encodeURIComponent(token)}`;
   };
 
-  // Fetch rankings
+  // Fetch a page of rankings
+  const fetchRankings = useCallback(async (page: number) => {
+    try {
+      setLoading(true);
+      const response = await userDetailAPI.getRankings(page);
+      setRankings(response.rankings);
+      setTotal(response.total);
+      setTotalPages(response.totalPages);
+      setCurrentPage(response.page);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch rankings:', err);
+      setError('Failed to load rankings');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchRankings = async () => {
+    const pageParam = searchParams.get('page');
+    const initialPage = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1;
+    fetchRankings(initialPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Debounce user search: wait for typing to settle before hitting the API
+  useEffect(() => {
+    const keyword = searchKeyword.trim();
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    if (!keyword) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      const requestId = ++searchRequestSeq.current;
       try {
-        setLoading(true);
-        const response = await userDetailAPI.getRankings();
-        setRankings(response.rankings);
-        setError(null);
+        const response = await userDetailAPI.searchUsers(keyword);
+        if (requestId === searchRequestSeq.current) {
+          setSearchResults(response.users);
+        }
       } catch (err) {
-        console.error('Failed to fetch rankings:', err);
-        setError('Failed to load rankings');
+        console.error('Failed to search users:', err);
+        if (requestId === searchRequestSeq.current) {
+          setSearchResults([]);
+        }
       } finally {
-        setLoading(false);
+        if (requestId === searchRequestSeq.current) {
+          setSearchLoading(false);
+        }
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
       }
     };
+  }, [searchKeyword]);
 
-    fetchRankings();
+  // Close search dropdown when clicking outside of it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Navigate to user detail page
   const handleUserClick = (userId: string) => {
     router.push(`/user_stats/${userId}`);
+  };
+
+  const handleSearchResultClick = (userId: string) => {
+    setSearchOpen(false);
+    setSearchKeyword('');
+    setSearchResults([]);
+    router.push(`/user_stats/${userId}`);
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      if (page === 1) {
+        newParams.delete('page');
+      } else {
+        newParams.set('page', String(page));
+      }
+      const paramString = newParams.toString();
+      router.push(`/user_stats${paramString ? `?${paramString}` : ''}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Handle mobile page jump
+  const handleMobilePageJump = (e: React.FormEvent) => {
+    e.preventDefault();
+    const page = parseInt(mobilePageInput, 10);
+    if (!isNaN(page) && page >= 1 && page <= totalPages) {
+      handlePageChange(page);
+      setMobilePageInput('');
+    }
   };
 
   // Get rank badge color
@@ -54,6 +159,130 @@ export default function RankingsPage() {
     if (rank === 2) return 'bg-gray-300 text-gray-700';
     if (rank === 3) return 'bg-amber-600 text-white';
     return 'bg-gray-100 text-gray-600';
+  };
+
+  // Render pagination
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const pages = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return (
+      <div className="px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-800">
+        {/* Mobile pagination - prev/next with page jump */}
+        <div className="flex sm:hidden flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 text-sm dark:text-gray-300"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              {t('rankings.prev')}
+            </button>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {t('rankings.pageOf', { page: currentPage, totalPages })}
+            </span>
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 text-sm dark:text-gray-300"
+            >
+              {t('rankings.next')}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          <form onSubmit={handleMobilePageJump} className="flex justify-center items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('rankings.jumpTo')}</span>
+            <input
+              type="number"
+              min="1"
+              max={totalPages}
+              value={mobilePageInput}
+              onChange={(e) => setMobilePageInput(e.target.value)}
+              placeholder={String(currentPage)}
+              className="w-16 px-2 py-1 text-sm text-center border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t('rankings.page')}</span>
+            <button
+              type="submit"
+              disabled={!mobilePageInput || parseInt(mobilePageInput, 10) < 1 || parseInt(mobilePageInput, 10) > totalPages}
+              className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 transition"
+            >
+              {t('rankings.go')}
+            </button>
+          </form>
+        </div>
+
+        {/* Desktop pagination - full page numbers */}
+        <div className="hidden sm:flex justify-center items-center gap-2">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300"
+          >
+            ←
+          </button>
+          {startPage > 1 && (
+            <>
+              <button
+                onClick={() => handlePageChange(1)}
+                className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300"
+              >
+                1
+              </button>
+              {startPage > 2 && <span className="px-2 dark:text-gray-400">...</span>}
+            </>
+          )}
+          {pages.map((page) => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-3 py-1 rounded-lg border ${
+                page === currentPage
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          {endPage < totalPages && (
+            <>
+              {endPage < totalPages - 1 && <span className="px-2 dark:text-gray-400">...</span>}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-300"
+          >
+            →
+          </button>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -86,10 +315,68 @@ export default function RankingsPage() {
       <Navbar title={t('rankings.title')} showBackButton backHref="/problems" />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* User search (nickname typeahead) */}
+        <div className="relative mb-4" ref={searchContainerRef}>
+          <div className="relative">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+            </svg>
+            <input
+              type="text"
+              value={searchKeyword}
+              onChange={(e) => {
+                setSearchKeyword(e.target.value);
+                setSearchOpen(true);
+              }}
+              onFocus={() => setSearchOpen(true)}
+              placeholder={t('rankings.searchPlaceholder')}
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none shadow-sm"
+            />
+          </div>
+
+          {searchOpen && searchKeyword.trim() && (
+            <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-100 dark:border-gray-800 max-h-72 overflow-y-auto">
+              {searchLoading ? (
+                <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{t('rankings.searchLoading')}</div>
+              ) : searchResults.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{t('rankings.searchNoResults')}</div>
+              ) : (
+                searchResults.map((user) => (
+                  <button
+                    key={user.userId}
+                    onClick={() => handleSearchResultClick(user.userId)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                  >
+                    <img
+                      src={getAvatarUrl(user.userId)}
+                      alt="Avatar"
+                      className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239CA3AF"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>';
+                      }}
+                    />
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.userName}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">{t('rankings.title')}</h2>
+            {total > 0 && (
+              <span className="text-sm text-indigo-100">
+                {t('rankings.totalUsers', { count: total })}
+              </span>
+            )}
           </div>
 
           {rankings.length === 0 ? (
@@ -107,7 +394,7 @@ export default function RankingsPage() {
               </div>
 
               {/* Rankings list */}
-              {rankings.map((item, index) => (
+              {rankings.map((item) => (
                 <div
                   key={item.userId}
                   className="px-4 sm:px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer"
@@ -115,8 +402,8 @@ export default function RankingsPage() {
                 >
                   {/* Mobile layout */}
                   <div className="flex sm:hidden items-center gap-3">
-                    <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${getRankBadgeClass(index + 1)}`}>
-                      {index + 1}
+                    <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${getRankBadgeClass(item.rank)}`}>
+                      {item.rank}
                     </span>
                     <img
                       src={getAvatarUrl(item.userId)}
@@ -148,8 +435,8 @@ export default function RankingsPage() {
                   {/* Desktop layout */}
                   <div className="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                     <div className="col-span-1">
-                      <span className={`inline-flex w-8 h-8 rounded-full items-center justify-center text-sm font-bold ${getRankBadgeClass(index + 1)}`}>
-                        {index + 1}
+                      <span className={`inline-flex w-8 h-8 rounded-full items-center justify-center text-sm font-bold ${getRankBadgeClass(item.rank)}`}>
+                        {item.rank}
                       </span>
                     </div>
                     <div className="col-span-7 flex items-center gap-3">
@@ -179,6 +466,9 @@ export default function RankingsPage() {
               ))}
             </div>
           )}
+
+          {/* Pagination */}
+          {renderPagination()}
         </div>
       </div>
     </div>

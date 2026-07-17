@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -22,29 +23,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// getClientIPForAvatar extracts the client IP address from the request
-func getClientIPForAvatar(c *gin.Context) string {
-	// Check X-Forwarded-For header (for proxies/load balancers)
-	ip := c.GetHeader("X-Forwarded-For")
-	if ip != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		ips := strings.Split(ip, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
-		}
-	}
-
-	// Check X-Real-IP header
-	ip = c.GetHeader("X-Real-IP")
-	if ip != "" {
-		return strings.TrimSpace(ip)
-	}
-
-	// Fall back to RemoteAddr
-	ip = c.ClientIP()
-	return ip
-}
-
 // validateTokenFromQuery validates the token passed as query parameter
 // Returns true if valid, false otherwise
 func validateTokenFromQuery(c *gin.Context) bool {
@@ -58,11 +36,13 @@ func validateTokenFromQuery(c *gin.Context) bool {
 		return false
 	}
 
-	// Validate IP address
-	clientIP := getClientIPForAvatar(c)
-	if claims.IPAddress != clientIP {
-		return false
-	}
+	// Note: intentionally not validating claims.IPAddress against the current
+	// client IP here. Unlike AuthMiddleware (used for normal Bearer-token
+	// requests), this endpoint used to reject requests whenever the client's
+	// IP changed (mobile network switch, VPN, carrier NAT reassignment, etc.),
+	// causing avatars to silently fall back to the default image. Keep the
+	// validation consistent with AuthMiddleware: signature + blacklist +
+	// token version only.
 
 	// Check if token is blacklisted in Redis
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -505,6 +485,9 @@ func GetUserComments(c *gin.Context) {
 			}
 		}
 
+		comment["images"] = toStringSlice(doc["images"])
+		comment["audios"] = toCommentAudios(doc["audios"])
+
 		comments = append(comments, comment)
 	}
 
@@ -558,34 +541,66 @@ type RankingItem struct {
 	UserName     string `json:"userName"`
 	Likes        int64  `json:"likes"`
 	CommentCount int64  `json:"commentCount"`
+	Rank         int64  `json:"rank"`
 }
 
-// GetRankings returns the top 300 users by total likes
-// GET /api/user_detail/rankings
+// rankingsPageSize is the fixed number of users returned per rankings page.
+const rankingsPageSize = 100
+
+// toInt64 converts common BSON numeric types to int64
+func toInt64(v interface{}) int64 {
+	switch val := v.(type) {
+	case int32:
+		return int64(val)
+	case int64:
+		return val
+	case float64:
+		return int64(val)
+	default:
+		return 0
+	}
+}
+
+// GetRankings returns users ranked by total likes, paginated at 100 per page.
+// The ranking data itself is precomputed by setup/comment_sync.py
+// (sync_user_rankings) into the user_rankings collection, so this endpoint
+// only does a cheap indexed lookup instead of aggregating the full
+// comments collection on every request.
+// GET /api/user_detail/rankings?page=1
 func GetRankings(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Aggregation pipeline to group by userId and sum approveCount
-	pipeline := mongo.Pipeline{
-		// Match only non-anonymous comments to get userName
-		{{Key: "$match", Value: bson.M{"isAnonymous": false}}},
-		// Group by userId
-		{{Key: "$group", Value: bson.M{
-			"_id":          "$userId",
-			"userName":     bson.M{"$first": "$userName"},
-			"totalLikes":   bson.M{"$sum": "$approveCount"},
-			"commentCount": bson.M{"$sum": 1},
-		}}},
-		// Sort by totalLikes descending
-		{{Key: "$sort", Value: bson.M{"totalLikes": -1}}},
-		// Limit to top 300
-		{{Key: "$limit", Value: 300}},
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
 	}
 
-	cursor, err := database.Comments.Aggregate(ctx, pipeline)
+	total, err := database.UserRankings.CountDocuments(ctx, bson.M{})
 	if err != nil {
-		utils.InternalServerErrorResponse(c, "Failed to aggregate rankings")
+		utils.InternalServerErrorResponse(c, "Failed to count rankings")
+		return
+	}
+
+	totalPages := int64(0)
+	if total > 0 {
+		totalPages = (total + rankingsPageSize - 1) / rankingsPageSize
+	}
+
+	// Clamp page to the last available page once we know how many exist,
+	// so an out-of-range page doesn't just return an empty list.
+	if totalPages > 0 && int64(page) > totalPages {
+		page = int(totalPages)
+	}
+
+	findOptions := options.Find().
+		SetSort(bson.M{"rank": 1}).
+		SetSkip(int64(page-1) * rankingsPageSize).
+		SetLimit(rankingsPageSize)
+
+	cursor, err := database.UserRankings.Find(ctx, bson.M{}, findOptions)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to fetch rankings")
 		return
 	}
 	defer cursor.Close(ctx)
@@ -602,37 +617,23 @@ func GetRankings(c *gin.Context) {
 			"userName":     "",
 			"likes":        int64(0),
 			"commentCount": int64(0),
+			"rank":         int64(0),
 		}
 
-		if v, ok := doc["_id"].(string); ok {
+		if v, ok := doc["userId"].(string); ok {
 			item["userId"] = v
 		}
 		if v, ok := doc["userName"].(string); ok {
 			item["userName"] = v
 		}
-
-		// Handle totalLikes
-		if v, ok := doc["totalLikes"]; ok {
-			switch val := v.(type) {
-			case int32:
-				item["likes"] = int64(val)
-			case int64:
-				item["likes"] = val
-			case float64:
-				item["likes"] = int64(val)
-			}
+		if v, ok := doc["likes"]; ok {
+			item["likes"] = toInt64(v)
 		}
-
-		// Handle commentCount
 		if v, ok := doc["commentCount"]; ok {
-			switch val := v.(type) {
-			case int32:
-				item["commentCount"] = int64(val)
-			case int64:
-				item["commentCount"] = val
-			case float64:
-				item["commentCount"] = int64(val)
-			}
+			item["commentCount"] = toInt64(v)
+		}
+		if v, ok := doc["rank"]; ok {
+			item["rank"] = toInt64(v)
 		}
 
 		rankings = append(rankings, item)
@@ -643,8 +644,11 @@ func GetRankings(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, gin.H{
-		"rankings": rankings,
-		"total":    len(rankings),
+		"rankings":   rankings,
+		"total":      total,
+		"page":       page,
+		"pageSize":   rankingsPageSize,
+		"totalPages": totalPages,
 	})
 }
 
@@ -706,4 +710,77 @@ func ToggleMaliciousUser(c *gin.Context) {
 			"message":   "User tagged as malicious",
 		})
 	}
+}
+
+// searchUsersMaxLimit caps how many distinct users a single search can
+// return, so an overly broad keyword can't trigger an unbounded response.
+const searchUsersMaxLimit = 20
+
+// SearchUsers finds distinct users whose nickname (as it appears on any of
+// their comments) matches the given keyword, case-insensitive substring
+// match. A user may have posted under slightly different nicknames over
+// time; each match still resolves to one row per userId (first nickname
+// seen), since userId is what the rest of the user_detail API keys off of.
+// GET /api/user_detail/search_users?keyword=xxx&limit=20
+func SearchUsers(c *gin.Context) {
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	if keyword == "" {
+		utils.BadRequestResponse(c, "Missing keyword parameter")
+		return
+	}
+
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if err != nil || limit < 1 {
+		limit = 10
+	}
+	if limit > searchUsersMaxLimit {
+		limit = searchUsersMaxLimit
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// QuoteMeta escapes any regex metacharacters in the user-supplied
+	// keyword so it's always treated as a literal substring, never as an
+	// (expensive or malformed) regex pattern.
+	pattern := regexp.QuoteMeta(keyword)
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{
+			"isAnonymous": false,
+			"userName":    bson.M{"$regex": pattern, "$options": "i"},
+		}}},
+		{{Key: "$group", Value: bson.M{
+			"_id":      "$userId",
+			"userName": bson.M{"$first": "$userName"},
+		}}},
+		{{Key: "$limit", Value: limit}},
+	}
+
+	cursor, err := database.Comments.Aggregate(ctx, pipeline)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to search users")
+		return
+	}
+	defer cursor.Close(ctx)
+
+	users := []gin.H{}
+	for cursor.Next(ctx) {
+		var row struct {
+			UserID   string `bson:"_id"`
+			UserName string `bson:"userName"`
+		}
+		if err := cursor.Decode(&row); err != nil {
+			continue
+		}
+		if row.UserID == "" {
+			continue
+		}
+		users = append(users, gin.H{
+			"userId":   row.UserID,
+			"userName": row.UserName,
+		})
+	}
+
+	utils.SuccessResponse(c, gin.H{"users": users})
 }

@@ -452,7 +452,15 @@ Get paginated comments for a user, sorted by approveCount (desc) and createTime 
         "replyTotal": 34,
         "isAnonymous": false,
         "voteOperate": "DOWN",
-        "choice": 1
+        "choice": 1,
+        "images": ["https://..."],
+        "audios": [
+          {
+            "url": "https://...",
+            "duration": 2,
+            "audioText": "语音转文字内容"
+          }
+        ]
       }
     ],
     "total": 42,
@@ -469,9 +477,12 @@ Get paginated comments for a user, sorted by approveCount (desc) and createTime 
 
 ### Get Rankings
 
-**GET** `/api/user_detail/rankings`
+**GET** `/api/user_detail/rankings?page=1`
 
-Get top 100 users ranked by total likes (approveCount) across all their comments.
+Get users ranked by total likes (approveCount) across all their comments, paginated at 100 users per page.
+
+**Query Parameters:**
+- `page` (optional, default `1`): 1-indexed page number. Out-of-range pages are clamped to the last available page.
 
 **Response:**
 ```json
@@ -484,20 +495,117 @@ Get top 100 users ranked by total likes (approveCount) across all their comments
         "userId": "3417484203",
         "userName": "用户昵称",
         "likes": 15890,
-        "commentCount": 234
+        "commentCount": 234,
+        "rank": 1
       },
       {
         "userId": "1234567890",
         "userName": "另一个用户",
         "likes": 12345,
-        "commentCount": 156
+        "commentCount": 156,
+        "rank": 2
       }
     ],
-    "total": 100
+    "total": 4523,
+    "page": 1,
+    "pageSize": 100,
+    "totalPages": 46
   }
 }
 ```
 
 **Notes:**
 - Only includes users with non-anonymous comments (to get userName)
-- Returns up to 100 users sorted by total likes (descending)
+- Rankings are precomputed by `setup/comment_sync.py` (`sync_user_rankings`) into the `user_rankings` collection each time the comment sync job runs, rather than aggregated from the full `comments` collection on every request. Ranking freshness therefore matches the sync schedule.
+- `rank` is each user's 1-based position in the full leaderboard, so it stays correct across pages (not just the item's position within the current page).
+
+### Search Users
+
+**GET** `/api/user_detail/search_users?keyword=xxx&limit=10`
+
+Finds distinct users whose nickname (as it appears on any of their comments) contains the given keyword, case-insensitive. Intended for a typeahead/autocomplete search box (e.g. above the rankings list) that resolves a nickname to a `userId` for navigation.
+
+**Query Parameters:**
+- `keyword` (required): Substring to match against `userName`. Matched literally (regex metacharacters are escaped), case-insensitive.
+- `limit` (optional, default `10`, max `20`): Maximum number of distinct users to return.
+
+**Response:**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "users": [
+      { "userId": "3417484203", "userName": "用户昵称A" },
+      { "userId": "1234567890", "userName": "用户昵称AB" }
+    ]
+  }
+}
+```
+
+**Notes:**
+- Only considers non-anonymous comments (same restriction as Rankings, since anonymous comments don't carry a usable `userName`).
+- A user may have posted under different nicknames over time; results are de-duplicated by `userId`, keeping the first nickname encountered for that user.
+- No dedicated text index is used; matching is a case-insensitive substring `$regex` over the `userName` field (which has a plain index for filtering). Intended for interactive, short keyword queries rather than full-text search.
+
+### Get AI User Summary
+
+**GET** `/api/user_detail/ai_summary?userId=xxx`
+
+Returns the cached AI-generated "犀利点评 + 用户画像" for a user, if one exists, without triggering generation.
+
+**Query Parameters:**
+- `userId` (required): The user ID to look up
+
+**Response:**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "status": "ready",
+    "result": {
+      "roast": "...",
+      "profile": {
+        "summary": "...",
+        "expressionStyle": ["..."],
+        "opinionTendency": ["..."],
+        "interactionPattern": ["..."],
+        "genderGuess": { "value": "无法从文本判断", "confidence": "low", "disclaimer": "非事实、不可用于判断真实身份" },
+        "mbtiGuess": { "value": "无法从文本判断", "confidence": "low", "disclaimer": "非心理测量、不可用于判断真实人格" }
+      },
+      "evidence": [
+        { "claim": "...", "evidenceIds": ["c1", "c5"], "reason": "..." }
+      ],
+      "limitations": ["..."]
+    },
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "promptVersion": "user_profile_summary_v1",
+    "generatedAt": 1752745200,
+    "expiresAt": 1753350000,
+    "stale": false
+  }
+}
+```
+
+`status` is one of `none` (never generated), `ready` (has a result), or `failed` (last attempt errored; `lastError` is included). `stale` is `true` once `generatedAt` is more than 7 days old — the frontend uses this to show a refresh button instead of re-fetching automatically.
+
+### Generate AI User Summary
+
+**POST** `/api/user_detail/ai_summary?userId=xxx`
+
+Generates a new AI summary if there is no cached result or the cached result is older than 7 days; otherwise returns the existing cache unchanged. Generation calls DeepSeek first, then falls back to OpenRouter if DeepSeek fails, times out, or returns an invalid structured response. Only up to 120 of the user's highest-liked comments (redacted: no username/userId/avatars/media URLs) are sent to the model.
+
+**Query Parameters:**
+- `userId` (required): The user ID to summarize
+
+**Response:** Same shape as the GET endpoint above.
+
+**Error Response (409):** returned if a generation for this user is already in progress (e.g. a double click); retry after a few seconds.
+```json
+{
+  "code": 409,
+  "message": "AI summary is already being generated for this user, please retry shortly"
+}
+```

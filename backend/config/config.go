@@ -12,12 +12,15 @@ type Config struct {
 		ConnectionString string `yaml:"connection_string"`
 		DatabaseName     string `yaml:"database_name"`
 		Collections      struct {
-			Accounts      string `yaml:"accounts"`
-			Invitations   string `yaml:"invitations"`
-			ProcessedList string `yaml:"processed_list"`
-			Problems      string `yaml:"problems"`
-			Notes         string `yaml:"notes"`
-			Comments      string `yaml:"comments"`
+			Accounts        string `yaml:"accounts"`
+			Invitations     string `yaml:"invitations"`
+			ProcessedList   string `yaml:"processed_list"`
+			Problems        string `yaml:"problems"`
+			Notes           string `yaml:"notes"`
+			Comments        string `yaml:"comments"`
+			Malicious       string `yaml:"malicious"`
+			UserRankings    string `yaml:"user_rankings"`
+			AIUserSummaries string `yaml:"ai_user_summaries"`
 		} `yaml:"collections"`
 	} `yaml:"mongodb"`
 	Redis struct {
@@ -41,6 +44,23 @@ type Config struct {
 		JWTSecret      string   `yaml:"jwt_secret"`
 		AllowedOrigins []string `yaml:"allowed_origins"`
 	} `yaml:"server"`
+	AI struct {
+		DeepSeek   AIProviderConfig `yaml:"deepseek"`
+		OpenRouter AIProviderConfig `yaml:"openrouter"`
+	} `yaml:"ai"`
+}
+
+// AIProviderConfig holds the connection settings for a single OpenAI-compatible
+// chat completion provider (e.g. DeepSeek, OpenRouter).
+type AIProviderConfig struct {
+	BaseURL string `yaml:"base_url"`
+	Key     string `yaml:"key"`
+	Model   string `yaml:"model"`
+}
+
+// Configured reports whether this provider has enough settings to be called.
+func (p AIProviderConfig) Configured() bool {
+	return p.BaseURL != "" && p.Key != "" && p.Model != ""
 }
 
 var AppConfig *Config

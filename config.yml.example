@@ -5,6 +5,11 @@ mongodb:
     accounts: "accounts"
     invitations: "invitations"
     problems: "problems"
+    notes: "notes"
+    comments: "comments"
+    malicious: "malicious"
+    user_rankings: "user_rankings"
+    ai_user_summaries: "ai_user_summaries"
 
 redis:
   host: "localhost"
@@ -21,4 +26,17 @@ elasticsearch:
 server:
   port: 8080
   jwt_secret: "gGCLachWP5Rfz8MxN6MpTdTPu3LPT9tK1KbDHQrhI+Vw0Demqlsn0D6hxhglAIxkYB+1Rsp+jDLLLUfNJZvM1A=="
+
+# AI user-summary providers, tried in order: deepseek first, then openrouter
+# as a fallback if deepseek is unreachable, times out, or returns an
+# invalid/unparseable structured response.
+ai:
+  deepseek:
+    base_url: "https://api.deepseek.com"
+    key: ""
+    model: "deepseek-chat"
+  openrouter:
+    base_url: "https://openrouter.ai/api/v1"
+    key: ""
+    model: "openai/gpt-4o-mini"
 
