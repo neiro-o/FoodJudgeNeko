@@ -595,7 +595,7 @@ Returns the cached AI-generated "犀利点评 + 用户画像" for a user, if one
 
 **POST** `/api/user_detail/ai_summary?userId=xxx`
 
-Generates a new AI summary if there is no cached result or the cached result is older than 7 days; otherwise returns the existing cache unchanged. Generation calls DeepSeek first, then falls back to OpenRouter if DeepSeek fails, times out, or returns an invalid structured response. Only up to 120 of the user's highest-liked comments (redacted: no username/userId/avatars/media URLs) are sent to the model.
+Generates a new AI summary if there is no cached result or the cached result is older than 7 days; otherwise returns the existing cache unchanged. Generation calls DeepSeek first, then falls back to OpenRouter if DeepSeek fails, times out, or returns an invalid structured response. Only up to 300 of the user's highest-liked comments (redacted: no username/userId/avatars/media URLs) are sent to the model. Samples are added highest-liked first and capped by a total input-length budget rather than just the 300-item count, so a user with unusually long/numerous comments may end up with fewer than 300 samples — the model always sees the most-liked ones first.
 
 **Query Parameters:**
 - `userId` (required): The user ID to summarize

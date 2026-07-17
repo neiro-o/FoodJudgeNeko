@@ -93,7 +93,7 @@ func TestParseAndSanitizeUserSummaryResult_InvalidJSONFails(t *testing.T) {
 	}
 }
 
-func TestParseAndSanitizeUserSummaryResult_EmptyGuessBecomesUnknown(t *testing.T) {
+func TestParseAndSanitizeUserSummaryResult_EmptyGuessGetsForcedFallback(t *testing.T) {
 	raw := `{
 		"roast": "x",
 		"profile": {
@@ -106,11 +106,35 @@ func TestParseAndSanitizeUserSummaryResult_EmptyGuessBecomesUnknown(t *testing.T
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Profile.GenderGuess.Value != UnknownGuessValue {
-		t.Errorf("expected empty gender guess to become %q, got %q", UnknownGuessValue, result.Profile.GenderGuess.Value)
+	if result.Profile.GenderGuess.Value == "" || isAvoidantGuess(result.Profile.GenderGuess.Value) {
+		t.Errorf("expected a concrete forced gender guess, got %q", result.Profile.GenderGuess.Value)
 	}
-	if result.Profile.MBTIGuess.Value != UnknownGuessValue {
-		t.Errorf("expected empty mbti guess to become %q, got %q", UnknownGuessValue, result.Profile.MBTIGuess.Value)
+	if result.Profile.MBTIGuess.Value == "" || isAvoidantGuess(result.Profile.MBTIGuess.Value) {
+		t.Errorf("expected a concrete forced mbti guess, got %q", result.Profile.MBTIGuess.Value)
+	}
+	if result.Profile.GenderGuess.Confidence != "low" || result.Profile.MBTIGuess.Confidence != "low" {
+		t.Errorf("expected forced guesses to keep confidence=low")
+	}
+}
+
+func TestParseAndSanitizeUserSummaryResult_AvoidantGuessGetsForcedFallback(t *testing.T) {
+	raw := `{
+		"roast": "x",
+		"profile": {
+			"summary": "y",
+			"genderGuess": {"value": "无法从文本判断"},
+			"mbtiGuess": {"value": "不确定"}
+		}
+	}`
+	result, err := ParseAndSanitizeUserSummaryResult(raw, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if isAvoidantGuess(result.Profile.GenderGuess.Value) {
+		t.Errorf("expected avoidant gender guess to be replaced, got %q", result.Profile.GenderGuess.Value)
+	}
+	if isAvoidantGuess(result.Profile.MBTIGuess.Value) {
+		t.Errorf("expected avoidant mbti guess to be replaced, got %q", result.Profile.MBTIGuess.Value)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"mtv2/backend/ai"
 	"mtv2/backend/config"
@@ -25,13 +26,30 @@ import (
 // Tuning constants for the AI user-summary feature. Kept together so the
 // input budget/cache lifetime is easy to audit and adjust.
 const (
-	aiSummaryMaxComments          = 120
+	aiSummaryMaxComments          = 300
 	aiSummaryCacheTTL             = 7 * 24 * time.Hour
 	aiSummaryCommentContentRunes  = 300
 	aiSummaryProblemContextRunes  = 200
 	aiSummaryProviderTimeout      = 60 * time.Second
 	aiSummaryGenerationCtxTimeout = 130 * time.Second
 	aiSummaryDBTimeout            = 20 * time.Second
+
+	// With up to aiSummaryMaxComments (300) highest-liked comments now in
+	// play, sending every one at full length could blow past a model's
+	// context window. Instead of a flat per-comment cap, we track a total
+	// rune budget across all sample content/audio/problemContext combined
+	// (samples are processed highest-liked first, see the Mongo sort in
+	// buildAIUserSummaryInput) and stop adding samples once the budget is
+	// spent. This keeps prompt size bounded regardless of comment count,
+	// while still preferring the most-liked (most representative) comments
+	// and giving each of them their full length when there's headroom.
+	aiSummarySampleBudgetRunes = 40000
+	// aiSummaryMaxProblemLookups caps how many *distinct* problems we'll
+	// query Mongo for best-effort context, independent of the rune budget
+	// above, so a user with hundreds of comments across hundreds of
+	// different problems can't turn one summary generation into hundreds
+	// of extra round trips.
+	aiSummaryMaxProblemLookups = 100
 )
 
 // generationLocks prevents two concurrent POST requests for the same user
@@ -361,7 +379,7 @@ func buildAIUserSummaryInput(ctx context.Context, userID string) (aiUserSummaryI
 	stats := aiUserSummaryInputStats{}
 
 	// Total comment count + choice breakdown across ALL of the user's
-	// comments (not just the sampled top-120), so the stats block reflects
+	// comments (not just the sampled top comments), so the stats block reflects
 	// the full history even though only a sample of the text is sent.
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{"userId": userID}}},
@@ -425,7 +443,16 @@ func buildAIUserSummaryInput(ctx context.Context, userID string) (aiUserSummaryI
 	samples := make([]aiCommentSample, 0, aiSummaryMaxComments)
 	allowedIDs := make(map[string]bool, aiSummaryMaxComments)
 
+	remainingBudget := aiSummarySampleBudgetRunes
+
 	for commentCursor.Next(ctx) {
+		// Comments are sorted highest-liked-first (see findOptions above),
+		// so once the budget runs dry we stop rather than spend it on the
+		// long tail of lower-signal comments.
+		if remainingBudget <= 0 {
+			break
+		}
+
 		var doc bson.M
 		if err := commentCursor.Decode(&doc); err != nil {
 			continue
@@ -445,7 +472,7 @@ func buildAIUserSummaryInput(ctx context.Context, userID string) (aiUserSummaryI
 		if problemID, ok := doc["problemId"].(string); ok && problemID != "" {
 			if cached, ok := problemContextCache[problemID]; ok {
 				sample.ProblemContext = cached
-			} else {
+			} else if len(problemContextCache) < aiSummaryMaxProblemLookups {
 				fetched := fetchProblemContextBestEffort(problemID)
 				problemContextCache[problemID] = fetched
 				sample.ProblemContext = fetched
@@ -460,6 +487,9 @@ func buildAIUserSummaryInput(ctx context.Context, userID string) (aiUserSummaryI
 
 		samples = append(samples, sample)
 		allowedIDs[sampleID] = true
+		remainingBudget -= utf8.RuneCountInString(sample.Content) +
+			utf8.RuneCountInString(sample.AudioText) +
+			utf8.RuneCountInString(sample.ProblemContext)
 	}
 
 	stats.SampledCommentCount = len(samples)

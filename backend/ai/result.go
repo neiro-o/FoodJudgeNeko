@@ -3,6 +3,7 @@ package ai
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"strings"
 	"unicode/utf8"
 )
@@ -38,9 +39,6 @@ type UserSummaryEvidence struct {
 }
 
 const (
-	// UnknownGuessValue is what we force into gender/MBTI guesses that the
-	// model left empty or that reference no valid evidence sample.
-	UnknownGuessValue = "无法从文本判断"
 	// GenderGuessDisclaimer and MBTIGuessDisclaimer are always re-applied by
 	// ParseAndSanitizeUserSummaryResult regardless of what the model
 	// returned, so the "entertainment only, not fact" framing can never be
@@ -55,6 +53,26 @@ const (
 	maxRoastRunes          = 400
 	maxSummaryRunes        = 200
 )
+
+// genderGuessFallbacks and mbtiGuessFallbacks are the concrete, always-committal
+// values used when the model leaves a guess empty or dodges with an avoidance
+// phrase (e.g. "无法判断"). We deliberately never fall back to an "unknown"
+// placeholder here: the guess is explicitly entertainment-only and disclaimed,
+// so it's safe to always force a specific pick rather than a copout.
+var genderGuessFallbacks = []string{"更像男性表达", "更像女性表达"}
+
+var mbtiGuessFallbacks = []string{
+	"INTJ", "INTP", "ENTJ", "ENTP",
+	"INFJ", "INFP", "ENFJ", "ENFP",
+	"ISTJ", "ISFJ", "ESTJ", "ESFJ",
+	"ISTP", "ISFP", "ESTP", "ESFP",
+}
+
+// avoidancePhrases are fragments that indicate the model dodged the guess
+// instead of committing to one, despite the prompt forbidding this.
+var avoidancePhrases = []string{
+	"无法判断", "无法从文本判断", "不确定", "难以判断", "不清楚", "未知", "无法确定", "不好判断",
+}
 
 // ParseAndSanitizeUserSummaryResult decodes the raw model output (tolerating
 // accidental markdown code fences) into a UserSummaryResult, validates that
@@ -86,8 +104,13 @@ func ParseAndSanitizeUserSummaryResult(raw string, allowedEvidenceIDs map[string
 	result.Profile.OpinionTendency = sanitizeFeatureList(result.Profile.OpinionTendency)
 	result.Profile.InteractionPattern = sanitizeFeatureList(result.Profile.InteractionPattern)
 
-	result.Profile.GenderGuess = sanitizeGuess(result.Profile.GenderGuess, GenderGuessDisclaimer)
-	result.Profile.MBTIGuess = sanitizeGuess(result.Profile.MBTIGuess, MBTIGuessDisclaimer)
+	// Seed the deterministic fallback pick off content the model actually
+	// generated for this user, so the forced guess is stable across
+	// re-parses of the same response but still varies between users.
+	seed := result.Roast + "|" + result.Profile.Summary
+
+	result.Profile.GenderGuess = sanitizeGuess(result.Profile.GenderGuess, GenderGuessDisclaimer, genderGuessFallbacks, seed+"|gender")
+	result.Profile.MBTIGuess = sanitizeGuess(result.Profile.MBTIGuess, MBTIGuessDisclaimer, mbtiGuessFallbacks, seed+"|mbti")
 
 	result.Evidence = sanitizeEvidence(result.Evidence, allowedEvidenceIDs)
 
@@ -133,16 +156,39 @@ func sanitizeFeatureList(items []string) []string {
 	return result
 }
 
-func sanitizeGuess(guess UserSummaryGuess, disclaimer string) UserSummaryGuess {
+func sanitizeGuess(guess UserSummaryGuess, disclaimer string, fallbacks []string, seed string) UserSummaryGuess {
 	value := strings.TrimSpace(guess.Value)
-	if value == "" {
-		value = UnknownGuessValue
+	if value == "" || isAvoidantGuess(value) {
+		value = pickDeterministic(fallbacks, seed)
 	}
 	return UserSummaryGuess{
 		Value:      truncateRunes(value, maxFeatureItemRunes),
 		Confidence: "low",
 		Disclaimer: disclaimer,
 	}
+}
+
+// isAvoidantGuess reports whether the model dodged committing to a guess
+// (e.g. "无法判断") instead of following the prompt's instruction to always
+// give a specific, low-confidence, entertainment-only pick.
+func isAvoidantGuess(value string) bool {
+	for _, phrase := range avoidancePhrases {
+		if strings.Contains(value, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
+// pickDeterministic selects one of the candidates based on a hash of seed,
+// so the same model output always resolves to the same forced fallback.
+func pickDeterministic(candidates []string, seed string) string {
+	if len(candidates) == 0 {
+		return ""
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(seed))
+	return candidates[h.Sum32()%uint32(len(candidates))]
 }
 
 func sanitizeEvidence(items []UserSummaryEvidence, allowedEvidenceIDs map[string]bool) []UserSummaryEvidence {

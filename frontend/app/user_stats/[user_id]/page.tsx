@@ -546,7 +546,11 @@ export default function UserStatsPage() {
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
                 }`}
               >
-                {aiSummaryGenerating ? t('aiSummary.generating') : t('aiSummary.refresh')}
+                {aiSummaryGenerating
+                  ? t('aiSummary.generating')
+                  : aiSummary.stale
+                    ? t('aiSummary.refresh')
+                    : t('aiSummary.refreshLocked')}
               </button>
             )}
           </div>
