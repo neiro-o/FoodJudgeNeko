@@ -203,6 +203,12 @@ const translations: Record<Language, Record<string, string>> = {
     'aiSummary.mbti': 'MBTI guess',
     'aiSummary.evidenceToggle': 'Show supporting evidence',
     'aiSummary.sample': 'Sample {id}',
+    'aiSummary.qualityStars': 'Comment Quality',
+    'aiSummary.qualityStars.1': 'Trash',
+    'aiSummary.qualityStars.2': 'NPC',
+    'aiSummary.qualityStars.3': 'Solid',
+    'aiSummary.qualityStars.4': 'Top-tier',
+    'aiSummary.qualityStars.5': 'Fire',
 
     // Rankings page
     'rankings.title': 'Rankings',
@@ -421,6 +427,12 @@ const translations: Record<Language, Record<string, string>> = {
     'aiSummary.mbti': 'MBTI 猜测',
     'aiSummary.evidenceToggle': '查看依据评论',
     'aiSummary.sample': '样本 {id}',
+    'aiSummary.qualityStars': '评论质量',
+    'aiSummary.qualityStars.1': '拉完了',
+    'aiSummary.qualityStars.2': 'NPC',
+    'aiSummary.qualityStars.3': '人上人',
+    'aiSummary.qualityStars.4': '顶级',
+    'aiSummary.qualityStars.5': '夯',
 
     // Rankings page
     'rankings.title': '排行榜',

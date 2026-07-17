@@ -570,6 +570,29 @@ export default function UserStatsPage() {
                 </p>
               )}
 
+              {/* Comment quality stars (1-5); omit when absent on older summaries */}
+              {typeof aiSummary.result.commentQualityStars === 'number' &&
+                aiSummary.result.commentQualityStars >= 1 &&
+                aiSummary.result.commentQualityStars <= 5 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {t('aiSummary.qualityStars')}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800"
+                    title={`${aiSummary.result.commentQualityStars}/5`}
+                  >
+                    <span className="tracking-tight" aria-hidden="true">
+                      {'★'.repeat(aiSummary.result.commentQualityStars)}
+                      {'☆'.repeat(5 - aiSummary.result.commentQualityStars)}
+                    </span>
+                    <span>
+                      {t(`aiSummary.qualityStars.${aiSummary.result.commentQualityStars}`)}
+                    </span>
+                  </span>
+                </div>
+              )}
+
               {/* Roast */}
               <div className="p-4 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-100 dark:border-indigo-900">
                 <p className="text-gray-800 dark:text-gray-100 leading-relaxed">

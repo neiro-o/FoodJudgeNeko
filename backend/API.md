@@ -577,7 +577,8 @@ Returns the cached AI-generated "犀利点评 + 用户画像" for a user, if one
       "evidence": [
         { "claim": "...", "evidenceIds": ["c1", "c5"], "reason": "..." }
       ],
-      "limitations": ["..."]
+      "limitations": ["..."],
+      "commentQualityStars": 3
     },
     "provider": "deepseek",
     "model": "deepseek-v4-flash",
@@ -589,7 +590,7 @@ Returns the cached AI-generated "犀利点评 + 用户画像" for a user, if one
 }
 ```
 
-`status` is one of `none` (never generated), `ready` (has a result), or `failed` (last attempt errored; `lastError` is included). `stale` is `true` once `generatedAt` is more than 7 days old — the frontend uses this to show a refresh button instead of re-fetching automatically.
+`status` is one of `none` (never generated), `ready` (has a result), or `failed` (last attempt errored; `lastError` is included). `stale` is `true` once `generatedAt` is more than 7 days old — the frontend uses this to show a refresh button instead of re-fetching automatically. `commentQualityStars` is an integer 1–5 rating of comment quality; older cached summaries may omit it (`null`/absent).
 
 ### Generate AI User Summary
 

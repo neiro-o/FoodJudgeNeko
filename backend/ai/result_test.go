@@ -19,7 +19,8 @@ func validResultJSON() string {
 		"evidence": [
 			{"claim": "表达简短", "evidenceIds": ["c1", "c99"], "reason": "多条评论都很短。"}
 		],
-		"limitations": ["样本有限"]
+		"limitations": ["样本有限"],
+		"commentQualityStars": 3
 	}`
 }
 
@@ -58,6 +59,9 @@ func TestParseAndSanitizeUserSummaryResult_Valid(t *testing.T) {
 	ids := result.Evidence[0].EvidenceIDs
 	if len(ids) != 1 || ids[0] != "c1" {
 		t.Errorf("expected evidenceIds to be filtered to allowed IDs only, got %v", ids)
+	}
+	if result.CommentQualityStars == nil || *result.CommentQualityStars != 3 {
+		t.Errorf("expected commentQualityStars=3, got %v", result.CommentQualityStars)
 	}
 }
 
@@ -186,5 +190,27 @@ func TestParseAndSanitizeUserSummaryResult_MissingLimitationsGetsDefault(t *test
 	}
 	if len(result.Limitations) == 0 {
 		t.Error("expected a default limitation to be filled in when the model omits it")
+	}
+}
+
+func TestParseAndSanitizeUserSummaryResult_MissingStarsStaysNil(t *testing.T) {
+	raw := `{"roast": "x", "profile": {"summary": "y"}}`
+	result, err := ParseAndSanitizeUserSummaryResult(raw, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.CommentQualityStars != nil {
+		t.Errorf("expected missing commentQualityStars to stay nil, got %v", *result.CommentQualityStars)
+	}
+}
+
+func TestParseAndSanitizeUserSummaryResult_OutOfRangeStarsBecomesNil(t *testing.T) {
+	raw := `{"roast": "x", "profile": {"summary": "y"}, "commentQualityStars": 9}`
+	result, err := ParseAndSanitizeUserSummaryResult(raw, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.CommentQualityStars != nil {
+		t.Errorf("expected out-of-range commentQualityStars to become nil, got %v", *result.CommentQualityStars)
 	}
 }

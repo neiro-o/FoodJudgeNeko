@@ -259,9 +259,14 @@ func generateAIUserSummary(ctx context.Context, userID string) (*aiUserSummaryDo
 		return nil, fmt.Errorf("failed to build input: %w", err)
 	}
 
+	systemPrompt, err := ai.BuildUserProfileSummaryPrompt()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build system prompt: %w", err)
+	}
+
 	userPrompt := renderUserPrompt(stats, samples)
 	messages := []ai.Message{
-		{Role: "system", Content: ai.UserProfileSummaryPromptV1},
+		{Role: "system", Content: systemPrompt},
 		{Role: "user", Content: userPrompt},
 	}
 

@@ -94,7 +94,8 @@ Content-Type: application/json
         "reason": "该评论样本呈现的模式"
       }
     ],
-    "limitations": ["样本和统计数据的限制"]
+    "limitations": ["样本和统计数据的限制"],
+    "commentQualityStars": 3
   },
   "provider": "deepseek",
   "model": "…",
@@ -104,6 +105,8 @@ Content-Type: application/json
   "stale": false
 }
 ```
+
+`commentQualityStars` 为 1–5 的评论质量打星；旧缓存可能缺失，缺失时不要展示该行。前端文案对应：1 拉完了、2 NPC、3 人上人、4 顶级、5 夯。
 
 状态处理：
 
@@ -131,6 +134,8 @@ AI 评论行为总结（生成于 {generatedAt}）：
 
 犀利点评：
 {result.roast}
+
+评论质量：{commentQualityStars}星（1拉完了/2NPC/3人上人/4顶级/5夯；字段缺失则整行省略）
 
 表达风格：{expressionStyle，用“、”连接；为空则“暂无足够证据”}
 观点倾向：{opinionTendency，用“、”连接；为空则“暂无足够证据”}

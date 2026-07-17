@@ -11,10 +11,11 @@ import (
 // UserSummaryResult is the structured "犀利点评 + 用户画像" produced by the model.
 // Field names/tags mirror the JSON schema in prompts/user_profile_summary_v1.md.
 type UserSummaryResult struct {
-	Roast       string                `json:"roast" bson:"roast"`
-	Profile     UserSummaryProfile    `json:"profile" bson:"profile"`
-	Evidence    []UserSummaryEvidence `json:"evidence" bson:"evidence"`
-	Limitations []string              `json:"limitations" bson:"limitations"`
+	Roast               string                `json:"roast" bson:"roast"`
+	Profile             UserSummaryProfile    `json:"profile" bson:"profile"`
+	Evidence            []UserSummaryEvidence `json:"evidence" bson:"evidence"`
+	Limitations         []string              `json:"limitations" bson:"limitations"`
+	CommentQualityStars *int                  `json:"commentQualityStars,omitempty" bson:"commentQualityStars,omitempty"`
 }
 
 type UserSummaryProfile struct {
@@ -116,7 +117,23 @@ func ParseAndSanitizeUserSummaryResult(raw string, allowedEvidenceIDs map[string
 
 	result.Limitations = sanitizeLimitations(result.Limitations)
 
+	result.CommentQualityStars = sanitizeCommentQualityStars(result.CommentQualityStars)
+
 	return &result, nil
+}
+
+// sanitizeCommentQualityStars keeps only integer scores in [1, 5]. Missing or
+// out-of-range values become nil so older cached summaries (and bad model
+// output) stay compatible with clients that treat absence as "no rating".
+func sanitizeCommentQualityStars(stars *int) *int {
+	if stars == nil {
+		return nil
+	}
+	if *stars < 1 || *stars > 5 {
+		return nil
+	}
+	v := *stars
+	return &v
 }
 
 func stripCodeFence(raw string) string {

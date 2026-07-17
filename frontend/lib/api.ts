@@ -404,6 +404,8 @@ export interface AIUserSummaryResult {
   profile: AIUserSummaryProfile;
   evidence: AIUserSummaryEvidence[];
   limitations: string[];
+  /** 1-5 comment quality stars; absent/null on older summaries */
+  commentQualityStars?: number | null;
 }
 
 export type AIUserSummaryStatus = 'none' | 'ready' | 'failed';
