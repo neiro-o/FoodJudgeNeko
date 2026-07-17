@@ -1,11 +1,31 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { mediaAPI } from '@/lib/api';
 import type { ProblemComment } from '@/lib/api';
+import ImageModal from './ImageModal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+
+// Check if URL is from an external (proxy-required) domain
+function isExternalMediaUrl(url: string): boolean {
+  if (!url || url.startsWith('/') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return false;
+  }
+  try {
+    const urlObj = new URL(url);
+    const host = urlObj.hostname.toLowerCase();
+    return (
+      host.includes('meituan.com') ||
+      host.includes('meituan.net') ||
+      host.includes('sankuai.com')
+    );
+  } catch {
+    return false;
+  }
+}
 
 interface CommentListProps {
   comments: ProblemComment[];
@@ -29,12 +49,44 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
   const [currentPage, setCurrentPage] = useState(1);
   const [inputValue, setInputValue] = useState('1');
   const inputRef = useRef<HTMLInputElement>(null);
+  const [modalImage, setModalImage] = useState<string | null>(null);
+  const [mediaUrlMap, setMediaUrlMap] = useState<Map<string, string>>(new Map());
 
   // Pagination
   const totalPages = Math.ceil(comments.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const currentComments = comments.slice(startIndex, endIndex);
+
+  // Resolve a media URL through the proxy for external domains, caching the result
+  const getProxiedMediaUrl = (url: string): string => mediaUrlMap.get(url) || url;
+
+  // Preload proxied URLs for all images/audios on the current page
+  useEffect(() => {
+    const preload = async () => {
+      const urls: { url: string; isAudio: boolean }[] = [];
+      currentComments.forEach((comment) => {
+        (comment.images || []).forEach((url) => urls.push({ url, isAudio: false }));
+        (comment.audios || []).forEach((url) => urls.push({ url, isAudio: true }));
+      });
+
+      const uniqueUrls = Array.from(new Map(urls.map((u) => [u.url, u])).values());
+      for (const { url, isAudio } of uniqueUrls) {
+        if (!isExternalMediaUrl(url) || mediaUrlMap.has(url)) continue;
+        try {
+          const proxiedUrl = isAudio
+            ? await mediaAPI.getAudioUrl(url)
+            : await mediaAPI.getImageUrl(url);
+          setMediaUrlMap((prev) => new Map(prev).set(url, proxiedUrl));
+        } catch (error) {
+          console.error('Failed to preload comment media:', url, error);
+        }
+      }
+    };
+
+    preload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentComments]);
 
   // Format timestamp to YYYY/MM/DD H:MM:SS (GMT+8)
   const formatTimestamp = (ts: number): string => {
@@ -116,7 +168,37 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
               {/* Comment Content */}
               <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">{comment.content}</p>
 
-              {/* Footer: Time + Likes */}
+              {/* Audio player bar(s) */}
+              {comment.audios && comment.audios.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {comment.audios.map((audioUrl, idx) => (
+                    <audio
+                      key={idx}
+                      controls
+                      preload="none"
+                      src={getProxiedMediaUrl(audioUrl)}
+                      className="w-full h-8 max-w-md"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Image thumbnails */}
+              {comment.images && comment.images.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {comment.images.map((imageUrl, idx) => (
+                    <img
+                      key={idx}
+                      src={getProxiedMediaUrl(imageUrl)}
+                      alt={`${comment.name} image ${idx + 1}`}
+                      className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition"
+                      onClick={() => setModalImage(imageUrl)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Footer: Time + Likes + Location */}
               <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <span>{formatTimestamp(comment.timestamp)}</span>
                 <span className="flex items-center gap-1">
@@ -125,6 +207,15 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
                   </svg>
                   {comment.likes}
                 </span>
+                {comment.locationInfo && (
+                  <span className="flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    {comment.locationInfo}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -193,6 +284,13 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
           </button>
         </div>
       )}
+
+      {/* Image Modal */}
+      <ImageModal
+        imageUrl={modalImage ? getProxiedMediaUrl(modalImage) : ''}
+        isOpen={!!modalImage}
+        onClose={() => setModalImage(null)}
+      />
     </div>
   );
 }

@@ -257,6 +257,7 @@ export interface ProblemComment {
   images: string[];
   audios: string[];
   replies: ProblemReply[];
+  locationInfo: string | null;
 }
 
 export interface ProblemCommentsResponse {
@@ -297,6 +298,17 @@ export const mediaAPI = {
       hash: hash,
     });
     return `${API_BASE_URL}/media/video?${params.toString()}`;
+  },
+
+  getAudioUrl: async (audioUrl: string): Promise<string> => {
+    // First get the hash
+    const { hash } = await mediaAPI.generateHash(audioUrl);
+    // Return the proxied URL
+    const params = new URLSearchParams({
+      url: audioUrl,
+      hash: hash,
+    });
+    return `${API_BASE_URL}/media/audio?${params.toString()}`;
   },
 };
 

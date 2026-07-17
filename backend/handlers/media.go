@@ -67,30 +67,29 @@ func isAllowedDomain(urlStr string) bool {
 	return false
 }
 
-// getFileExtension extracts file extension from URL
-func getFileExtension(urlStr string) string {
+// getFileExtension extracts file extension from URL, falling back to defaultExt if none is present
+func getFileExtension(urlStr, defaultExt string) string {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-		return ""
+		return defaultExt
 	}
 
 	path := parsedURL.Path
 	ext := filepath.Ext(path)
 	if ext == "" {
-		// Try to determine from query parameters or default to jpg for images
-		return ".jpg"
+		return defaultExt
 	}
 	return ext
 }
 
-// getCachePath returns the cache file path for an image URL
-func getCachePath(imageURL string) (string, error) {
+// getCachePath returns the cache file path for a media URL, namespaced by subdir (e.g. "img", "video", "audio")
+func getCachePath(mediaURL, subdir, defaultExt string) (string, error) {
 	// Create hash of URL for filename
-	hash := sha256.Sum256([]byte(imageURL))
-	filename := hex.EncodeToString(hash[:]) + getFileExtension(imageURL)
+	hash := sha256.Sum256([]byte(mediaURL))
+	filename := hex.EncodeToString(hash[:]) + getFileExtension(mediaURL, defaultExt)
 
 	// Cache directory relative to backend directory
-	cacheDir := filepath.Join("cache", "img")
+	cacheDir := filepath.Join("cache", subdir)
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create cache directory: %w", err)
 	}
@@ -98,9 +97,9 @@ func getCachePath(imageURL string) (string, error) {
 	return filepath.Join(cacheDir, filename), nil
 }
 
-// downloadAndCacheImage downloads an image and saves it to cache
-func downloadAndCacheImage(imageURL, cachePath string) error {
-	req, err := http.NewRequest("GET", imageURL, nil)
+// downloadAndCacheMedia downloads a media file and saves it to cache
+func downloadAndCacheMedia(mediaURL, cachePath string) error {
+	req, err := http.NewRequest("GET", mediaURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -111,12 +110,12 @@ func downloadAndCacheImage(imageURL, cachePath string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to download image: %w", err)
+		return fmt.Errorf("failed to download media: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download image: status code %d", resp.StatusCode)
+		return fmt.Errorf("failed to download media: status code %d", resp.StatusCode)
 	}
 
 	// Create cache file
@@ -158,7 +157,7 @@ func LoadImage(c *gin.Context) {
 	}
 
 	// Get cache path
-	cachePath, err := getCachePath(imageURL)
+	cachePath, err := getCachePath(imageURL, "img", ".jpg")
 	if err != nil {
 		utils.InternalServerErrorResponse(c, "Failed to get cache path: "+err.Error())
 		return
@@ -167,7 +166,7 @@ func LoadImage(c *gin.Context) {
 	// Check if cached file exists
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		// Download and cache the image
-		if err := downloadAndCacheImage(imageURL, cachePath); err != nil {
+		if err := downloadAndCacheMedia(imageURL, cachePath); err != nil {
 			utils.InternalServerErrorResponse(c, "Failed to download image: "+err.Error())
 			return
 		}
@@ -204,7 +203,7 @@ func GenerateMediaHash(c *gin.Context) {
 	})
 }
 
-// LoadVideo handles video loading without caching
+// LoadVideo handles video loading with download-then-serve caching
 func LoadVideo(c *gin.Context) {
 	videoURL := c.Query("url")
 	hash := c.Query("hash")
@@ -226,44 +225,64 @@ func LoadVideo(c *gin.Context) {
 		return
 	}
 
-	// Fetch video from URL and stream it
-	req, err := http.NewRequest("GET", videoURL, nil)
+	// Get cache path
+	cachePath, err := getCachePath(videoURL, "video", ".mp4")
 	if err != nil {
-		utils.InternalServerErrorResponse(c, "Failed to create request: "+err.Error())
+		utils.InternalServerErrorResponse(c, "Failed to get cache path: "+err.Error())
 		return
 	}
 
-	// Set Referer header
-	req.Header.Set("Referer", "https://zqt.meituan.com")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		utils.InternalServerErrorResponse(c, "Failed to fetch video: "+err.Error())
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		utils.InternalServerErrorResponse(c, fmt.Sprintf("Failed to fetch video: status code %d", resp.StatusCode))
-		return
+	// Check if cached file exists
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		// Download and cache the video first, then serve from disk
+		if err := downloadAndCacheMedia(videoURL, cachePath); err != nil {
+			utils.InternalServerErrorResponse(c, "Failed to download video: "+err.Error())
+			return
+		}
 	}
 
-	// Set appropriate headers
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "video/mp4" // Default content type
-	}
-	c.Header("Content-Type", contentType)
-	if resp.ContentLength > 0 {
-		c.Header("Content-Length", fmt.Sprintf("%d", resp.ContentLength))
-	}
 	c.Header("Accept-Ranges", "bytes")
+	c.File(cachePath)
+}
 
-	// Stream the video
-	contentLength := resp.ContentLength
-	if contentLength < 0 {
-		contentLength = 0 // Unknown length
+// LoadAudio handles audio loading with download-then-serve caching
+func LoadAudio(c *gin.Context) {
+	audioURL := c.Query("url")
+	hash := c.Query("hash")
+
+	if audioURL == "" || hash == "" {
+		utils.BadRequestResponse(c, "Missing url or hash parameter")
+		return
 	}
-	c.DataFromReader(http.StatusOK, contentLength, contentType, resp.Body, nil)
+
+	// Validate hash
+	if !validateHash(audioURL, hash) {
+		utils.BadRequestResponse(c, "Invalid hash validation")
+		return
+	}
+
+	// Check if URL is from allowed domain
+	if !isAllowedDomain(audioURL) {
+		utils.BadRequestResponse(c, "URL is not from an allowed domain")
+		return
+	}
+
+	// Get cache path
+	cachePath, err := getCachePath(audioURL, "audio", ".mp3")
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to get cache path: "+err.Error())
+		return
+	}
+
+	// Check if cached file exists
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		// Download and cache the audio first, then serve from disk
+		if err := downloadAndCacheMedia(audioURL, cachePath); err != nil {
+			utils.InternalServerErrorResponse(c, "Failed to download audio: "+err.Error())
+			return
+		}
+	}
+
+	c.Header("Accept-Ranges", "bytes")
+	c.File(cachePath)
 }

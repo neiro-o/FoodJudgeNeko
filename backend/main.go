@@ -90,6 +90,7 @@ func main() {
 		// Media endpoints are public but validate hash (hash generation is protected)
 		api.GET("/media/image", handlers.LoadImage)
 		api.GET("/media/video", handlers.LoadVideo)
+		api.GET("/media/audio", handlers.LoadAudio)
 		// Avatar endpoint accepts token via query parameter (for use in <img src="">)
 		api.GET("/user_detail/avatar", handlers.GetUserAvatar)
 	}

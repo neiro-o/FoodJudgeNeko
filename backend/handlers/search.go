@@ -2030,6 +2030,14 @@ func GetProblemComments(c *gin.Context) {
 			return []string{}
 		}
 		switch val := v.(type) {
+		case bson.A:
+			result := make([]string, 0, len(val))
+			for _, item := range val {
+				if s, ok := item.(string); ok {
+					result = append(result, s)
+				}
+			}
+			return result
 		case []interface{}:
 			result := make([]string, 0, len(val))
 			for _, item := range val {
@@ -2038,6 +2046,8 @@ func GetProblemComments(c *gin.Context) {
 				}
 			}
 			return result
+		case []string:
+			return val
 		case string:
 			if val == "" {
 				return []string{}
@@ -2055,16 +2065,17 @@ func GetProblemComments(c *gin.Context) {
 		}
 
 		comment := gin.H{
-			"id":        "",
-			"choice":    0,
-			"content":   "",
-			"likes":     int64(0),
-			"name":      "",
-			"timestamp": int64(0),
-			"userid":    int64(0),
-			"images":    []string{},
-			"audios":    []string{},
-			"replies":   []gin.H{},
+			"id":           "",
+			"choice":       0,
+			"content":      "",
+			"likes":        int64(0),
+			"name":         "",
+			"timestamp":    int64(0),
+			"userid":       int64(0),
+			"images":       []string{},
+			"audios":       []string{},
+			"replies":      []gin.H{},
+			"locationInfo": nil,
 		}
 
 		if id, ok := doc["_id"].(interface{ Hex() string }); ok {
@@ -2092,6 +2103,9 @@ func GetProblemComments(c *gin.Context) {
 		}
 		comment["images"] = toStringSlicePC(doc["images"])
 		comment["audios"] = toStringSlicePC(doc["audios"])
+		if v, ok := doc["locationInfo"].(string); ok && v != "" {
+			comment["locationInfo"] = v
+		}
 
 		var replies []gin.H
 		if replys, ok := doc["replys"].([]interface{}); ok {
