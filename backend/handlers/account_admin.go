@@ -39,25 +39,44 @@ func CreateAccount(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Ensure the username and email are not already in use
+	// Ensure the username is not already in use
 	var existingAccount models.Account
-	err := database.Accounts.FindOne(ctx, bson.M{
-		"$or": []bson.M{
-			{"username": req.Username},
-			{"email": req.Email},
-		},
-	}).Decode(&existingAccount)
+	err := database.Accounts.FindOne(ctx, bson.M{"username": req.Username}).Decode(&existingAccount)
 	if err == nil {
-		utils.ConflictResponse(c, "Account with the same username or email already exists")
+		utils.ConflictResponse(c, "Username already exists")
 		return
 	} else if err != mongo.ErrNoDocuments {
 		utils.InternalServerErrorResponse(c, "Database error")
 		return
 	}
 
+	// Ensure the email is not already in use
+	err = database.Accounts.FindOne(ctx, bson.M{"email": req.Email}).Decode(&existingAccount)
+	if err == nil {
+		utils.ConflictResponse(c, "Email already exists")
+		return
+	} else if err != mongo.ErrNoDocuments {
+		utils.InternalServerErrorResponse(c, "Database error")
+		return
+	}
+
+	// Generate a random initial password, since the admin doesn't supply one.
+	initialPassword, err := utils.GenerateRandomPassword(16)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to generate initial password")
+		return
+	}
+
+	hashedPassword, err := utils.HashPassword(initialPassword)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to hash password")
+		return
+	}
+
 	account := models.Account{
 		ID:        primitive.NewObjectID(),
 		Username:  req.Username,
+		Password:  hashedPassword,
 		Email:     req.Email,
 		Points:    0,
 		IsAdmin:   false,
@@ -79,6 +98,10 @@ func CreateAccount(c *gin.Context) {
 			"points":   account.Points,
 			"is_admin": account.IsAdmin,
 		},
+		// Returned once, in plaintext, at creation time only. It is never
+		// stored or retrievable again after this response — only its bcrypt
+		// hash is persisted. Make sure to relay it to the account owner.
+		"initial_password": initialPassword,
 	})
 }
 
