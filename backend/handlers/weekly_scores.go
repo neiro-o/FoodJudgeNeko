@@ -75,7 +75,10 @@ func GetWeeklyScoreRanking(c *gin.Context) {
 // parseYearWeekParams reads the optional "year" and "weekId" query params,
 // defaulting to the current ISO year/week when not provided or invalid.
 func parseYearWeekParams(c *gin.Context) (int, int) {
-	nowYear, nowWeek := time.Now().ISOWeek()
+	// Default to the current ISO year/week in Singapore Time (SGT) so the
+	// "current week" is consistent regardless of the server's local
+	// timezone.
+	nowYear, nowWeek := utils.ISOYearWeekSGT()
 
 	year := nowYear
 	if yearStr := c.Query("year"); yearStr != "" {

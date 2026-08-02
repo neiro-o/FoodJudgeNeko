@@ -71,7 +71,9 @@ func awardUploadCredit(ctx context.Context, accountIDHex string) {
 		return
 	}
 
-	isoYear, isoWeek := time.Now().ISOWeek()
+	// weekId is computed in Singapore Time (SGT) so week boundaries are
+	// consistent regardless of the server's local timezone.
+	isoYear, isoWeek := utils.ISOYearWeekSGT()
 	now := time.Now()
 	_, _ = database.WeeklyScores.UpdateOne(
 		ctx,
