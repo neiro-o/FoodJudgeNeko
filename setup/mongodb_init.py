@@ -18,6 +18,65 @@ def hash_password(password: str) -> str:
     return hashed.decode('utf-8')
 
 
+def create_weekly_scores_collection(db, config):
+    """Create the weekly_scores collection with its JSON schema validator (if missing)"""
+    collection_name = config['mongodb']['collections'].get('weekly_scores', 'weekly_scores')
+
+    if collection_name in db.list_collection_names():
+        print(f"⚠ Collection '{collection_name}' already exists, skipping schema creation...")
+        return
+
+    validator = {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": [
+                "userId",
+                "year",
+                "weekId",
+                "score",
+                "createdAt",
+                "updatedAt",
+            ],
+            "properties": {
+                "userId": {
+                    "bsonType": "objectId",
+                    "description": "必须对应 accounts._id",
+                },
+                "year": {
+                    "bsonType": "int",
+                    "minimum": 2000,
+                },
+                "weekId": {
+                    "bsonType": "int",
+                    "minimum": 1,
+                    "maximum": 53,
+                },
+                "score": {
+                    "bsonType": ["int", "long", "double", "decimal"],
+                    "minimum": 0,
+                },
+                "createdAt": {
+                    "bsonType": "date",
+                },
+                "updatedAt": {
+                    "bsonType": "date",
+                },
+            },
+        }
+    }
+
+    try:
+        db.create_collection(
+            collection_name,
+            validator=validator,
+            validationLevel="strict",
+            validationAction="error",
+        )
+        print(f"✓ Collection '{collection_name}' created with schema validation")
+    except OperationFailure as e:
+        print(f"⚠ Warning creating '{collection_name}' collection: {e}")
+
+
 def create_indexes(db, config):
     """Create indexes for all collections defined in config.yml"""
     collections = config['mongodb']['collections']
@@ -41,9 +100,16 @@ def create_indexes(db, config):
             ([("user_id", ASCENDING)], {}),
         ],
         'problems': [
+            # Matches the exact filter used by UploadProblem/UploadMultipleProblems
+            # (backend/handlers/problem.go) to check for existing userId+taskId
+            # combos before queueing an upload. Without this compound index, that
+            # duplicate check falls back to scanning via the single-field taskId
+            # index (or a full collection scan), and the lack of a unique
+            # constraint means concurrent uploads can still race past the
+            # app-level check and insert duplicate problems.
+            ([("userId", ASCENDING), ("taskId", ASCENDING)], {"unique": True}),
             ([("uploader", ASCENDING)], {}),
             ([("taskId", ASCENDING)], {}),
-            ([("userId", ASCENDING)], {}),
             ([("created_at", DESCENDING)], {}),
             ([("timestamp", DESCENDING)], {}),
         ],
@@ -53,6 +119,10 @@ def create_indexes(db, config):
         'ai_user_summaries': [
             ([("userId", ASCENDING)], {"unique": True}),
             ([("generatedAt", DESCENDING)], {}),
+        ],
+        'weekly_scores': [
+            ([("userId", ASCENDING), ("year", ASCENDING), ("weekId", ASCENDING)], {"unique": True}),
+            ([("year", ASCENDING), ("weekId", ASCENDING), ("score", DESCENDING)], {}),
         ],
     }
     
@@ -134,6 +204,10 @@ def init_mongodb(config):
     print(f"Collections to initialize: {', '.join([f'{k} ({v})' for k, v in collections.items()])}")
     print()
     
+    # Create the weekly_scores collection with its schema validator, if missing
+    create_weekly_scores_collection(db, config)
+    print()
+
     # Create indexes for all collections
     create_indexes(db, config)
     print()

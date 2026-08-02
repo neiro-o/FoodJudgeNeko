@@ -6,6 +6,22 @@ interface ApiResponse<T> {
   data?: T;
 }
 
+// Unique error code returned by the backend when a non-group account's
+// points balance is too low to use the search endpoints.
+export const CODE_INSUFFICIENT_POINTS = 4290;
+
+// ApiError carries the backend's numeric error code alongside the message so
+// callers can branch on specific error conditions (e.g. CODE_INSUFFICIENT_POINTS).
+export class ApiError extends Error {
+  code: number;
+
+  constructor(code: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+  }
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -48,7 +64,7 @@ async function apiRequest<T>(
   }
 
   if (data.code !== 0) {
-    throw new Error(data.message || 'Request failed');
+    throw new ApiError(data.code, data.message || 'Request failed');
   }
 
   return data.data as T;

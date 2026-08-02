@@ -20,6 +20,10 @@ type Response struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
+// CodeInsufficientPoints is the unique error code returned when a non-group
+// account's points balance is too low to use the search endpoints.
+const CodeInsufficientPoints = 4290
+
 // SuccessResponse sends a successful response
 func SuccessResponse(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{
@@ -60,6 +64,12 @@ func ConflictResponse(c *gin.Context, message string) {
 // NotFoundResponse sends a not found error response
 func NotFoundResponse(c *gin.Context, message string) {
 	ErrorResponse(c, 404, message)
+}
+
+// InsufficientPointsResponse sends the unique error response used when a
+// non-group account does not have enough points to search.
+func InsufficientPointsResponse(c *gin.Context) {
+	ErrorResponse(c, CodeInsufficientPoints, "积分不足，请上传题目后获得积分。")
 }
 
 // GetUserID returns the authenticated user's MongoDB ObjectID as a hex string
@@ -111,4 +121,31 @@ func IsAdmin(c *gin.Context) bool {
 	}
 
 	return account.IsAdmin
+}
+
+// IsInGroup checks if the authenticated user belongs to the group
+// Returns false if user is not authenticated or not in the group
+func IsInGroup(c *gin.Context) bool {
+	userID, exists := GetUserID(c)
+	if !exists {
+		return false
+	}
+
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var account struct {
+		IsInGroup bool `bson:"is_in_group"`
+	}
+	err = database.Accounts.FindOne(ctx, bson.M{"_id": objID}).Decode(&account)
+	if err != nil {
+		return false
+	}
+
+	return account.IsInGroup
 }

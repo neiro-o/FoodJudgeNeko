@@ -10,6 +10,7 @@ mongodb:
     malicious: "malicious"
     user_rankings: "user_rankings"
     ai_user_summaries: "ai_user_summaries"
+    weekly_scores: "weekly_scores"
 
 redis:
   host: "localhost"

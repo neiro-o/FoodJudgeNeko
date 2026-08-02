@@ -106,9 +106,9 @@ func main() {
 		protected.POST("/problem/upload", handlers.UploadProblem)
 		protected.POST("/problem/upload-multiple", handlers.UploadMultipleProblems)
 		protected.POST("/problem/upload_daily", handlers.UploadDaily)
-		protected.GET("/problem/search", handlers.Search)
-		protected.GET("/problem/quicksearch", handlers.QuickSearch)
-		protected.GET("/bot/search", handlers.BotSearch)
+		protected.GET("/problem/search", middleware.RequireSearchQuota(), handlers.Search)
+		protected.GET("/problem/quicksearch", middleware.RequireSearchQuota(), handlers.QuickSearch)
+		protected.GET("/bot/search", middleware.RequireSearchQuota(), handlers.BotSearch)
 		protected.GET("/problem/recent", handlers.GetRecentProblems)
 		protected.GET("/problem/count", handlers.CountItems)
 		protected.GET("/problem/by-esid/:id", handlers.SearchByESID)
@@ -127,6 +127,13 @@ func main() {
 		protected.POST("/user_detail/toggle_malicious", handlers.ToggleMaliciousUser)
 		protected.GET("/user_detail/ai_summary", handlers.GetAIUserSummary)
 		protected.POST("/user_detail/ai_summary", handlers.PostAIUserSummary)
+
+		// Admin account management routes
+		protected.POST("/admin/accounts/create", handlers.CreateAccount)
+		protected.POST("/admin/accounts/query", handlers.QueryAccount)
+
+		// Weekly score ranking (any authenticated account)
+		protected.GET("/weekly_scores/ranking", handlers.GetWeeklyScoreRanking)
 	}
 
 	// Start server

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { problemAPI, searchAPI, SearchResult, NotesSearchItem } from '@/lib/api';
+import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, CODE_INSUFFICIENT_POINTS } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/components/ColumnCustomizer';
@@ -48,6 +48,7 @@ export default function ProblemsPage() {
   const [searchTotal, setSearchTotal] = useState(0);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [searchErrorIsInsufficientPoints, setSearchErrorIsInsufficientPoints] = useState(false);
 
   // Notes search states
   const [notesSearchResults, setNotesSearchResults] = useState<NotesSearchItem[]>([]);
@@ -68,6 +69,14 @@ export default function ProblemsPage() {
       router.push('/login');
     }
   }, [isAuthenticated, loading, router]);
+
+  // Sets the search error message and flags whether it was caused by an
+  // insufficient-points restriction so the UI can render a special hint.
+  const applySearchError = (error: any) => {
+    const isInsufficientPoints = error instanceof ApiError && error.code === CODE_INSUFFICIENT_POINTS;
+    setSearchErrorIsInsufficientPoints(isInsufficientPoints);
+    setSearchError(error.message || t('problems.search.errorFailed'));
+  };
 
   // Load recent problems on page load or search from URL params
   useEffect(() => {
@@ -103,6 +112,7 @@ export default function ProblemsPage() {
         const performSearch = async () => {
           setSearchLoading(true);
           setSearchError('');
+          setSearchErrorIsInsufficientPoints(false);
           setNotesSearchResults([]);
           try {
             const response = await searchAPI.search(trimmedKeyword, limit);
@@ -117,7 +127,7 @@ export default function ProblemsPage() {
               setNotesSearchResults([]);
             }
           } catch (error: any) {
-            setSearchError(error.message || t('problems.search.errorFailed'));
+            applySearchError(error);
             setSearchResults([]);
             setSearchTotal(0);
             setCurrentSearchKeyword('');
@@ -136,13 +146,14 @@ export default function ProblemsPage() {
         const loadRecentProblems = async () => {
           setSearchLoading(true);
           setSearchError('');
+          setSearchErrorIsInsufficientPoints(false);
           try {
             const response = await searchAPI.recent(limit);
             setSearchResults(response.results);
             setSearchTotal(response.total);
             setCurrentSearchKeyword('');
           } catch (error: any) {
-            setSearchError(error.message || t('problems.search.errorFailed'));
+            applySearchError(error);
             setSearchResults([]);
             setSearchTotal(0);
           } finally {
@@ -260,6 +271,7 @@ export default function ProblemsPage() {
     // Re-fetch results with new limit
     setSearchLoading(true);
     setSearchError('');
+    setSearchErrorIsInsufficientPoints(false);
     try {
       if (currentSearchKeyword) {
         const response = await searchAPI.search(currentSearchKeyword, limit);
@@ -271,7 +283,7 @@ export default function ProblemsPage() {
         setSearchTotal(response.total);
       }
     } catch (error: any) {
-      setSearchError(error.message || t('problems.search.errorFailed'));
+      applySearchError(error);
     } finally {
       setSearchLoading(false);
     }
@@ -524,11 +536,13 @@ export default function ProblemsPage() {
     e.preventDefault();
     if (!searchKeyword.trim()) {
       setSearchError(t('problems.search.error'));
+      setSearchErrorIsInsufficientPoints(false);
       return;
     }
 
     const keyword = searchKeyword.trim();
     setSearchError('');
+    setSearchErrorIsInsufficientPoints(false);
     setSearchLoading(true);
     setNotesSearchLoading(true);
     setNotesSearchResults([]);
@@ -558,7 +572,7 @@ export default function ProblemsPage() {
         setNotesSearchResults([]);
       }
     } catch (error: any) {
-      setSearchError(error.message || t('problems.search.errorFailed'));
+      applySearchError(error);
       setSearchResults([]);
       setSearchTotal(0);
       setCurrentSearchKeyword('');
@@ -845,8 +859,24 @@ export default function ProblemsPage() {
             </form>
 
             {searchError && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg">
-                <p className="text-sm text-red-600 dark:text-red-400">{searchError}</p>
+              <div
+                className={`mb-4 p-3 rounded-lg border ${
+                  searchErrorIsInsufficientPoints
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700'
+                    : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700'
+                }`}
+              >
+                <p
+                  className={`text-sm ${
+                    searchErrorIsInsufficientPoints
+                      ? 'text-amber-800 dark:text-amber-300 font-medium'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}
+                >
+                  {searchErrorIsInsufficientPoints
+                    ? `⚠️ ${t('problems.search.errorInsufficientPoints')}`
+                    : searchError}
+                </p>
               </div>
             )}
 

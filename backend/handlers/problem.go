@@ -14,12 +14,75 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UploadProblemRequest struct {
 	UserID string `json:"userId" binding:"required"`
 	TaskID string `json:"taskId" binding:"required"`
+	// AccountID optionally overrides which account (MongoDB ObjectId hex
+	// string, i.e. accounts._id) the upload is attributed to, instead of
+	// the currently authenticated caller. Admin-only: only an account
+	// with is_admin = true may set this field.
+	AccountID string `json:"accountId"`
+}
+
+// resolveUploadAccountID validates an optional admin-only accountId override
+// and returns the account id that the upload should be credited to (either
+// the override, or the caller's own account id when no override is given).
+func resolveUploadAccountID(c *gin.Context, callerAccountID string, overrideAccountID string) (string, bool) {
+	if overrideAccountID == "" {
+		return callerAccountID, true
+	}
+
+	if !utils.IsAdmin(c) {
+		utils.UnauthorizedResponse(c, "Admin access required to set accountId")
+		return "", false
+	}
+
+	if _, err := primitive.ObjectIDFromHex(overrideAccountID); err != nil {
+		utils.BadRequestResponse(c, "Invalid accountId: must be a valid MongoDB ObjectId")
+		return "", false
+	}
+
+	return overrideAccountID, true
+}
+
+// awardUploadCredit gives the account +1 points and +1 to its current
+// ISO year/week entry in weekly_scores after a successful upload. If the
+// account does not exist in the accounts collection, this is a no-op
+// (including skipping the weekly_scores update), per product decision.
+// Errors are intentionally swallowed: the upload itself already succeeded,
+// and this bookkeeping should not fail the request.
+func awardUploadCredit(ctx context.Context, accountIDHex string) {
+	objID, err := primitive.ObjectIDFromHex(accountIDHex)
+	if err != nil {
+		return
+	}
+
+	updateResult, err := database.Accounts.UpdateOne(
+		ctx,
+		bson.M{"_id": objID},
+		bson.M{"$inc": bson.M{"points": 1}},
+	)
+	if err != nil || updateResult.MatchedCount == 0 {
+		return
+	}
+
+	isoYear, isoWeek := time.Now().ISOWeek()
+	now := time.Now()
+	_, _ = database.WeeklyScores.UpdateOne(
+		ctx,
+		bson.M{"userId": objID, "year": int32(isoYear), "weekId": int32(isoWeek)},
+		bson.M{
+			"$inc":         bson.M{"score": 1},
+			"$set":         bson.M{"updatedAt": now},
+			"$setOnInsert": bson.M{"createdAt": now},
+		},
+		options.Update().SetUpsert(true),
+	)
 }
 
 type UploadMultipleProblemsRequest struct {
@@ -57,6 +120,13 @@ func UploadProblem(c *gin.Context) {
 	var req UploadProblemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequestResponse(c, err.Error())
+		return
+	}
+
+	// Resolve which account this upload should be attributed to (supports
+	// an admin-only accountId override).
+	effectiveAccountID, ok := resolveUploadAccountID(c, accountID, req.AccountID)
+	if !ok {
 		return
 	}
 
@@ -115,7 +185,7 @@ func UploadProblem(c *gin.Context) {
 	queueItem := QueueItem{
 		UserID:    req.UserID,
 		TaskID:    req.TaskID,
-		AccountID: accountID, // MongoDB ObjectID hex string from accounts collection
+		AccountID: effectiveAccountID, // MongoDB ObjectID hex string from accounts collection
 		UploadIP:  uploadIP,
 	}
 
@@ -141,6 +211,10 @@ func UploadProblem(c *gin.Context) {
 		// Log error but don't fail the request
 		// The item is already in the queue
 	}
+
+	// Award points + weekly score to the effective account for this
+	// successful upload.
+	awardUploadCredit(ctx, effectiveAccountID)
 
 	utils.SuccessResponse(c, gin.H{
 		"message": "Problem uploaded successfully",
@@ -180,11 +254,24 @@ func UploadMultipleProblems(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// Resolve the effective (admin-only override or caller's own) account id
+	// for every problem up front, before doing any work, so the whole
+	// request is rejected consistently if the override is misused.
+	effectiveAccountIDs := make([]string, len(req.Problems))
+	for i, problem := range req.Problems {
+		effectiveAccountID, ok := resolveUploadAccountID(c, accountID, problem.AccountID)
+		if !ok {
+			return
+		}
+		effectiveAccountIDs[i] = effectiveAccountID
+	}
+
 	var results []ProblemUploadResult
 	queueName := config.AppConfig.Redis.Fields.ProblemsQueue
 
 	// Process each problem
-	for _, problem := range req.Problems {
+	for i, problem := range req.Problems {
+		effectiveAccountID := effectiveAccountIDs[i]
 		result := ProblemUploadResult{
 			UserID:  problem.UserID,
 			TaskID:  problem.TaskID,
@@ -246,7 +333,7 @@ func UploadMultipleProblems(c *gin.Context) {
 		queueItem := QueueItem{
 			UserID:    problem.UserID,
 			TaskID:    problem.TaskID,
-			AccountID: accountID, // MongoDB ObjectID hex string from accounts collection
+			AccountID: effectiveAccountID, // MongoDB ObjectID hex string from accounts collection
 			UploadIP:  uploadIP,
 		}
 
@@ -273,6 +360,10 @@ func UploadMultipleProblems(c *gin.Context) {
 			// Log error but don't fail the request
 			// The item is already in the queue
 		}
+
+		// Award points + weekly score to the effective account for this
+		// successful upload.
+		awardUploadCredit(ctx, effectiveAccountID)
 
 		// Success
 		result.Success = true

@@ -13,6 +13,7 @@ type Account struct {
 	Email             string             `bson:"email" json:"email"`
 	Points            int                `bson:"points" json:"points"`
 	IsAdmin           bool               `bson:"is_admin" json:"is_admin"`
+	IsInGroup         bool               `bson:"is_in_group" json:"is_in_group"`
 	TokenVersion      int                `bson:"token_version" json:"-"`                 // Token version for invalidating old tokens
 	PasswordChangedAt time.Time          `bson:"password_changed_at,omitempty" json:"-"` // Track password changes
 	CreatedAt         time.Time          `bson:"created_at" json:"created_at"`

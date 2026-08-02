@@ -24,6 +24,7 @@ var (
 	Notes           *mongo.Collection
 	UserRankings    *mongo.Collection
 	AIUserSummaries *mongo.Collection
+	WeeklyScores    *mongo.Collection
 )
 
 func Connect() error {
@@ -61,6 +62,12 @@ func Connect() error {
 		aiUserSummariesCollectionName = "ai_user_summaries"
 	}
 	AIUserSummaries = DB.Collection(aiUserSummariesCollectionName)
+
+	weeklyScoresCollectionName := config.AppConfig.MongoDB.Collections.WeeklyScores
+	if weeklyScoresCollectionName == "" {
+		weeklyScoresCollectionName = "weekly_scores"
+	}
+	WeeklyScores = DB.Collection(weeklyScoresCollectionName)
 
 	// Ensure the AI summary cache has a unique index on userId so a
 	// concurrent generation can never leave two cache rows for the same
