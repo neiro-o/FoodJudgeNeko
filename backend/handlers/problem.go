@@ -136,10 +136,10 @@ func UploadProblem(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Check if userId and taskId combination already exists in MongoDB processed_list
+	// Check if taskId already exists in MongoDB processed_list
 	var existingItem models.ProcessedListItem
 	err := database.ProcessedList.FindOne(ctx, bson.M{
-		"user_id": req.UserID,
+		// "user_id": req.UserID,
 		"task_id": req.TaskID,
 	}).Decode(&existingItem)
 	if err == nil {
@@ -152,10 +152,10 @@ func UploadProblem(c *gin.Context) {
 		return
 	}
 
-	// Check if userId and taskId combination already exists in MongoDB problems collection
+	// Check if taskId already exists in MongoDB problems collection
 	var existingProblem bson.M
 	err = database.Problems.FindOne(ctx, bson.M{
-		"userId": req.UserID,
+		// "userId": req.UserID,
 		"taskId": req.TaskID,
 	}).Decode(&existingProblem)
 	if err == nil {
@@ -168,7 +168,7 @@ func UploadProblem(c *gin.Context) {
 		return
 	}
 
-	// Check if userId and taskId combination already exists in Redis queue
+	// Check if taskId already exists in Redis queue
 	queueKey := fmt.Sprintf("%s:%s", req.UserID, req.TaskID)
 	existsCount, err := database.RedisClient.Exists(ctx, queueKey).Result()
 	if err != nil {
@@ -278,10 +278,10 @@ func UploadMultipleProblems(c *gin.Context) {
 			Success: false,
 		}
 
-		// Check if userId and taskId combination already exists in MongoDB processed_list
+		// Check if taskId already exists in MongoDB processed_list
 		var existingItem models.ProcessedListItem
 		err := database.ProcessedList.FindOne(ctx, bson.M{
-			"user_id": problem.UserID,
+			// "user_id": problem.UserID,
 			"task_id": problem.TaskID,
 		}).Decode(&existingItem)
 		if err == nil {
@@ -296,10 +296,10 @@ func UploadMultipleProblems(c *gin.Context) {
 			continue
 		}
 
-		// Check if userId and taskId combination already exists in MongoDB problems collection
+		// Check if taskId already exists in MongoDB problems collection
 		var existingProblem bson.M
 		err = database.Problems.FindOne(ctx, bson.M{
-			"userId": problem.UserID,
+			// "userId": problem.UserID,
 			"taskId": problem.TaskID,
 		}).Decode(&existingProblem)
 		if err == nil {
@@ -314,7 +314,7 @@ func UploadMultipleProblems(c *gin.Context) {
 			continue
 		}
 
-		// Check if userId and taskId combination already exists in Redis queue
+		// Check if taskId already exists in Redis queue
 		queueKey := fmt.Sprintf("%s:%s", problem.UserID, problem.TaskID)
 		existsCount, err := database.RedisClient.Exists(ctx, queueKey).Result()
 		if err != nil {
