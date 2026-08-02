@@ -24,6 +24,13 @@ import (
 type SearchRequest struct {
 	Keyword string `form:"keyword" json:"keyword" binding:"required"`
 	Limit   int    `form:"limit" json:"limit" binding:"required,min=5,max=30"`
+	// AccountID optionally overrides which account (MongoDB ObjectId hex
+	// string, i.e. accounts._id) the search's quota/points checks and
+	// point deduction are evaluated against, instead of the currently
+	// authenticated caller. Admin-only: only an account with
+	// is_admin = true may set this field (enforced by
+	// middleware.RequireSearchQuota).
+	AccountID string `form:"accountId" json:"accountId"`
 }
 
 type SearchNotesRequest struct {
@@ -782,6 +789,7 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
+		utils.DeductSearchPointIfApplicable(c, total)
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -794,6 +802,7 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
+		utils.DeductSearchPointIfApplicable(c, total)
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -812,6 +821,7 @@ func Search(c *gin.Context) {
 				utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 				return
 			}
+			utils.DeductSearchPointIfApplicable(c, total)
 			utils.SuccessResponse(c, SearchResponse{
 				Total:   total,
 				Results: results,
@@ -827,6 +837,7 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
+		utils.DeductSearchPointIfApplicable(c, total)
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -841,6 +852,7 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
+		utils.DeductSearchPointIfApplicable(c, total)
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -855,6 +867,7 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
+		utils.DeductSearchPointIfApplicable(c, total)
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -1148,6 +1161,7 @@ func Search(c *gin.Context) {
 		})
 	}
 
+	utils.DeductSearchPointIfApplicable(c, int64(totalValue))
 	utils.SuccessResponse(c, SearchResponse{
 		Total:   int64(totalValue),
 		Results: results,
@@ -2121,6 +2135,10 @@ func GetProblemComments(c *gin.Context) {
 // QuickSearchRequest is the request for the quick keyword search endpoint.
 type QuickSearchRequest struct {
 	Keyword string `form:"keyword" binding:"required"`
+	// AccountID optionally overrides which account the search's
+	// quota/points checks and point deduction are evaluated against. See
+	// SearchRequest.AccountID for details.
+	AccountID string `form:"accountId"`
 }
 
 // QuickSearch returns only the answer fields for a keyword without computing
@@ -2142,6 +2160,7 @@ func QuickSearch(c *gin.Context) {
 		return
 	}
 
+	utils.DeductSearchPointIfApplicable(c, total)
 	utils.SuccessResponse(c, BotSearchResponse{
 		Total:   total,
 		Results: results,

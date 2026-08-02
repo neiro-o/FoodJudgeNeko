@@ -20,6 +20,10 @@ import (
 type BotSearchRequest struct {
 	Keyword string `form:"keyword" binding:"required"`
 	Date    string `form:"date"`
+	// AccountID optionally overrides which account the search's
+	// quota/points checks and point deduction are evaluated against. See
+	// SearchRequest.AccountID for details.
+	AccountID string `form:"accountId"`
 }
 
 type botDateRange struct {
@@ -392,6 +396,7 @@ func BotSearch(c *gin.Context) {
 		}
 	}
 
+	utils.DeductSearchPointIfApplicable(c, total)
 	utils.SuccessResponse(c, BotSearchResponse{
 		Total:   total,
 		Results: results,
