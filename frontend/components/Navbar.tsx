@@ -148,6 +148,12 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
                   >
                     {t('nav.userStats')}
                   </button>
+                  <button
+                    onClick={() => handleNavigate('/points')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                  >
+                    {t('nav.points')}
+                  </button>
                 </div>
               )}
             </div>

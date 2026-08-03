@@ -483,3 +483,31 @@ export const userDetailAPI = {
     });
   },
 };
+
+// Points leaderboard API
+export interface LeaderboardEntry {
+  id: string;
+  username: string;
+  points: number;
+  score: number | null;
+}
+
+export interface LeaderboardResponse {
+  year: number;
+  weekId: number;
+  rankings: LeaderboardEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export const pointsAPI = {
+  getLeaderboard: async (page: number = 1, limit: number = 50): Promise<LeaderboardResponse> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    return apiRequest<LeaderboardResponse>(`/points/leaderboard?${params.toString()}`);
+  },
+};

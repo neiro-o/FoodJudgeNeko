@@ -25,6 +25,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.home': 'Home',
     'nav.problems': 'Problems',
     'nav.userStats': 'User Details',
+    'nav.points': 'Leaderboards',
 
     // Page titles
     'pageTitle.home': 'You lose a heart.',
@@ -231,6 +232,18 @@ const translations: Record<Language, Record<string, string>> = {
     'rankings.searchNoResults': 'No matching users',
     'rankings.searchLoading': 'Searching...',
 
+    'pageTitle.points': 'Leaderboards',
+    'points.title': 'Leaderboards',
+    'points.rank': 'Rank',
+    'points.user': 'User',
+    'points.points': 'Points',
+    'points.weeklyScore': 'Weekly Score',
+    'points.loading': 'Loading...',
+    'points.empty': 'No accounts available',
+    'points.totalUsers': '{count} users total',
+    'points.noScore': 'No score yet',
+    'points.weekLabel': 'Week {weekId}, {year}',
+
     // Problem Operations
     'problemOps.title': 'Problem Operations',
     'problemOps.copyLink': 'Copy Link',
@@ -250,6 +263,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.home': '首页',
     'nav.problems': '题库',
     'nav.userStats': '查成分',
+    'nav.points': '分榜',
     
     // Page titles
     'pageTitle.home': '乐一欧应援网站',
@@ -455,6 +469,18 @@ const translations: Record<Language, Record<string, string>> = {
     'rankings.searchPlaceholder': '按昵称搜索用户...',
     'rankings.searchNoResults': '没有找到匹配的用户',
     'rankings.searchLoading': '搜索中...',
+
+    'pageTitle.points': '积分榜',
+    'points.title': '分榜',
+    'points.rank': '排名',
+    'points.user': '用户',
+    'points.points': '积分',
+    'points.weeklyScore': '本周积分',
+    'points.loading': '加载中...',
+    'points.empty': '暂无用户数据',
+    'points.totalUsers': '共 {count} 位用户',
+    'points.noScore': '暂无本周积分',
+    'points.weekLabel': '{year} 年第 {weekId} 周',
 
     // Problem Operations
     'problemOps.title': '题目操作',

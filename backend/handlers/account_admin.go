@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"mtv2/backend/database"
@@ -171,5 +172,140 @@ func QueryAccount(c *gin.Context) {
 		"username": account.Username,
 		"email":    account.Email,
 		"points":   account.Points,
+	})
+}
+
+// leaderboardEntry is a single row of the points leaderboard response.
+type leaderboardEntry struct {
+	ID       string   `json:"id"`
+	Username string   `json:"username"`
+	Points   int      `json:"points"`
+	Score    *float64 `json:"score"`
+}
+
+type leaderboardFacetResult struct {
+	Data       []leaderboardEntry `bson:"data"`
+	TotalCount []struct {
+		Count int64 `bson:"count"`
+	} `bson:"totalCount"`
+}
+
+// GetPointsLeaderboard returns a paginated points leaderboard built from
+// mtv2.accounts left-joined with this week's mtv2.weekly_scores entry
+// (matched on weekly_scores.userId == accounts._id and the current ISO
+// week/year in Singapore Time). Accounts without a weekly score entry for
+// the current week are included with score = null.
+// Sorted by score descending (accounts with no score sort last), then by
+// points descending.
+// Requires authentication only (no admin check).
+// GET /api/points/leaderboard?page=1&limit=50
+func GetPointsLeaderboard(c *gin.Context) {
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "50")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100 // Max limit
+	}
+
+	skip := (page - 1) * limit
+
+	year, weekID := utils.ISOYearWeekSGT()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$lookup", Value: bson.M{
+			"from": "weekly_scores",
+			"let":  bson.M{"uid": "$_id"},
+			"pipeline": mongo.Pipeline{
+				bson.D{{Key: "$match", Value: bson.M{
+					"$expr": bson.M{"$and": bson.A{
+						bson.M{"$eq": bson.A{"$userId", "$$uid"}},
+						bson.M{"$eq": bson.A{"$year", year}},
+						bson.M{"$eq": bson.A{"$weekId", weekID}},
+					}},
+				}}},
+			},
+			"as": "weeklyScore",
+		}}},
+		bson.D{{Key: "$unwind", Value: bson.M{
+			"path":                       "$weeklyScore",
+			"preserveNullAndEmptyArrays": true,
+		}}},
+		bson.D{{Key: "$project", Value: bson.M{
+			"_id":      bson.M{"$toString": "$_id"},
+			"username": 1,
+			"points":   1,
+			"score":    bson.M{"$ifNull": bson.A{"$weeklyScore.score", nil}},
+		}}},
+		bson.D{{Key: "$sort", Value: bson.D{
+			{Key: "score", Value: -1},
+			{Key: "points", Value: -1},
+		}}},
+		bson.D{{Key: "$facet", Value: bson.M{
+			"data": mongo.Pipeline{
+				bson.D{{Key: "$skip", Value: skip}},
+				bson.D{{Key: "$limit", Value: limit}},
+				bson.D{{Key: "$project", Value: bson.M{
+					"id":       "$_id",
+					"username": 1,
+					"points":   1,
+					"score":    1,
+				}}},
+			},
+			"totalCount": mongo.Pipeline{
+				bson.D{{Key: "$count", Value: "count"}},
+			},
+		}}},
+	}
+
+	cursor, err := database.Accounts.Aggregate(ctx, pipeline)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to fetch leaderboard")
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var results []leaderboardFacetResult
+	if err := cursor.All(ctx, &results); err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to decode leaderboard")
+		return
+	}
+
+	entries := make([]leaderboardEntry, 0)
+	var total int64
+	if len(results) > 0 {
+		entries = results[0].Data
+		if entries == nil {
+			entries = make([]leaderboardEntry, 0)
+		}
+		if len(results[0].TotalCount) > 0 {
+			total = results[0].TotalCount[0].Count
+		}
+	}
+
+	totalPages := int64(0)
+	if limit > 0 {
+		totalPages = (total + int64(limit) - 1) / int64(limit)
+	}
+
+	utils.SuccessResponse(c, gin.H{
+		"year":       year,
+		"weekId":     weekID,
+		"rankings":   entries,
+		"total":      total,
+		"page":       page,
+		"limit":      limit,
+		"totalPages": totalPages,
 	})
 }

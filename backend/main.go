@@ -91,6 +91,7 @@ func main() {
 		api.GET("/media/image", handlers.LoadImage)
 		api.GET("/media/video", handlers.LoadVideo)
 		api.GET("/media/audio", handlers.LoadAudio)
+		api.GET("/media/random_image", handlers.LoadRandomImage)
 		// Avatar endpoint accepts token via query parameter (for use in <img src="">)
 		api.GET("/user_detail/avatar", handlers.GetUserAvatar)
 	}
@@ -134,6 +135,9 @@ func main() {
 
 		// Weekly score ranking (any authenticated account)
 		protected.GET("/weekly_scores/ranking", handlers.GetWeeklyScoreRanking)
+
+		// Points leaderboard (any authenticated account)
+		protected.GET("/points/leaderboard", handlers.GetPointsLeaderboard)
 	}
 
 	// Start server

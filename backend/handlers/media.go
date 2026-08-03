@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,11 +12,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"mtv2/backend/config"
+	"mtv2/backend/database"
 	"mtv2/backend/utils"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Allowed domains for media loading
@@ -173,6 +178,68 @@ func LoadImage(c *gin.Context) {
 	}
 
 	// Serve the cached file
+	c.File(cachePath)
+}
+
+// LoadRandomImage picks a random comment from mtv2.comments whose "images"
+// field is a non-empty array, takes its first image (images[0]), and
+// downloads/serves it using the same cache-then-serve flow as LoadImage.
+// GET /api/media/random_image
+func LoadRandomImage(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: bson.M{
+			"images": bson.M{"$exists": true, "$type": "array", "$ne": bson.A{}},
+		}}},
+		bson.D{{Key: "$sample", Value: bson.M{"size": 1}}},
+	}
+
+	cursor, err := database.Comments.Aggregate(ctx, pipeline)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to query comments: "+err.Error())
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var docs []bson.M
+	if err := cursor.All(ctx, &docs); err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to decode comment: "+err.Error())
+		return
+	}
+
+	if len(docs) == 0 {
+		utils.NotFoundResponse(c, "No comment with images found")
+		return
+	}
+
+	images := toStringSlice(docs[0]["images"])
+	if len(images) == 0 || images[0] == "" {
+		utils.NotFoundResponse(c, "No comment with images found")
+		return
+	}
+
+	imageURL := images[0]
+
+	if !isAllowedDomain(imageURL) {
+		utils.InternalServerErrorResponse(c, "Image URL is not from an allowed domain")
+		return
+	}
+
+	cachePath, err := getCachePath(imageURL, "img", ".jpg")
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to get cache path: "+err.Error())
+		return
+	}
+
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		if err := downloadAndCacheMedia(imageURL, cachePath); err != nil {
+			utils.InternalServerErrorResponse(c, "Failed to download image: "+err.Error())
+			return
+		}
+	}
+
 	c.File(cachePath)
 }
 
