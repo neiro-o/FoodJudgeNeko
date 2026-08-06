@@ -53,21 +53,22 @@ type Comment struct {
 // ProblemDocument represents the main Elasticsearch document model for problems
 // Represents a review evaluation record
 type ProblemDocument struct {
-	ID          interface{} `json:"id"`           // unique identifier for the review record (string or number)
-	MongoID     string      `json:"mongo_id"`     // MongoDB unique identifier
-	Stars       int         `json:"stars"`        // user rating, 1-5, 1 is worst, 5 is best
-	UserReview  string      `json:"user_review"`  // user's text review, may be empty for refund problems
-	ReviewPics  []string    `json:"review_pics"`  // array of review image URLs
-	Timestamp   int64       `json:"timestamp"`    // user review timestamp in seconds
-	Others      string      `json:"others"`       // additional notes, e.g., "消费后评价"
-	ProblemType int         `json:"problem_type"` // 1-delivery, 2-dine-in, 3-delivery refund, 4-dine-in refund, 5-other
-	Answer      int         `json:"answer"`       // review result: 1-support user, 2-support merchant
-	Ratio1      float64     `json:"ratio_1"`      // ratio of choice 1 (0~100)
-	Ratio2      float64     `json:"ratio_2"`      // ratio of choice 2 (0~100)
-	Uploader    string      `json:"uploader"`     // ID of user who uploaded this problem
-	TaskID      string      `json:"taskId"`       // associated task ID
-	UserID      string      `json:"userId"`       // original link's userID parameter
-	CreatedAt   int64       `json:"created_at"`   // creation timestamp in seconds
+	ID           interface{} `json:"id"`            // unique identifier for the review record (string or number)
+	MongoID      string      `json:"mongo_id"`      // MongoDB unique identifier
+	Stars        int         `json:"stars"`         // user rating, 1-5, 1 is worst, 5 is best
+	UserReview   string      `json:"user_review"`   // user's text review, may be empty for refund problems
+	ReviewPics   []string    `json:"review_pics"`   // array of review image URLs
+	Timestamp    int64       `json:"timestamp"`     // user review timestamp in seconds
+	Others       string      `json:"others"`        // additional notes, e.g., "消费后评价"
+	ProblemType  int         `json:"problem_type"`  // 1-delivery, 2-dine-in, 3-delivery refund, 4-dine-in refund, 5-other
+	Answer       int         `json:"answer"`        // review result: 1-support user, 2-support merchant
+	Ratio1       float64     `json:"ratio_1"`       // ratio of choice 1 (0~100)
+	Ratio2       float64     `json:"ratio_2"`       // ratio of choice 2 (0~100)
+	Uploader     string      `json:"uploader"`      // ID of user who uploaded this problem
+	UploaderName string      `json:"uploader_name"` // username of the account that uploaded this problem
+	TaskID       string      `json:"taskId"`        // associated task ID
+	UserID       string      `json:"userId"`        // original link's userID parameter
+	CreatedAt    int64       `json:"created_at"`    // creation timestamp in seconds
 
 	// Nested structures
 	Replies     []Reply      `json:"replies,omitempty"`      // timeline of merchant/user replies

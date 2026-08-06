@@ -195,6 +195,12 @@ export const problemAPI = {
   },
 };
 
+export const accountAPI = {
+  getAvatarUrl: (accountId: string): string => {
+    return `${API_BASE_URL}/account/avatar?id=${encodeURIComponent(accountId)}`;
+  },
+};
+
 // Search API
 export interface SearchResult {
   id: any; // ESID

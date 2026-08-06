@@ -92,6 +92,7 @@ func main() {
 		api.GET("/media/video", handlers.LoadVideo)
 		api.GET("/media/audio", handlers.LoadAudio)
 		api.GET("/media/random_image", handlers.LoadRandomImage)
+		api.GET("/account/avatar", handlers.GetAccountAvatar)
 		// Avatar endpoint accepts token via query parameter (for use in <img src="">)
 		api.GET("/user_detail/avatar", handlers.GetUserAvatar)
 	}

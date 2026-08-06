@@ -7,6 +7,7 @@ import PageTitle from '@/components/PageTitle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { pointsAPI, LeaderboardEntry } from '@/lib/api';
+import AccountAvatar from '@/components/AccountAvatar';
 
 const PAGE_LIMIT = 50;
 
@@ -285,6 +286,7 @@ export default function PointsPage() {
                       <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${getRankBadgeClass(rank)}`}>
                         {rank}
                       </span>
+                      <AccountAvatar accountId={item.id} username={item.username} />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{item.username}</p>
                         <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400">
@@ -304,7 +306,10 @@ export default function PointsPage() {
                         </span>
                       </div>
                       <div className="col-span-6">
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{item.username}</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <AccountAvatar accountId={item.id} username={item.username} />
+                          <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{item.username}</span>
+                        </div>
                       </div>
                       <div className="col-span-2 text-right text-gray-700 dark:text-gray-300">
                         {item.score !== null ? item.score.toLocaleString() : (

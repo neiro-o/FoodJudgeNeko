@@ -90,6 +90,8 @@ interface Appeal {
 interface ProblemData {
   mongo_id: string;
   problem_type: number;
+  uploader?: string;
+  uploader_name?: string;
   user_review: string;
   review_pics?: string[];
   timestamp: number;
@@ -246,6 +248,8 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
+                      uploaderId={problem.uploader}
+                      uploaderName={problem.uploader_name}
                     />
                   )}
                   {problem.problem_type === 2 && (
@@ -259,6 +263,8 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
+                      uploaderId={problem.uploader}
+                      uploaderName={problem.uploader_name}
                     />
                   )}
                   {problem.problem_type === 3 && (
@@ -270,6 +276,8 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
+                      uploaderId={problem.uploader}
+                      uploaderName={problem.uploader_name}
                     />
                   )}
                   {problem.problem_type === 4 && (
@@ -280,6 +288,8 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
+                      uploaderId={problem.uploader}
+                      uploaderName={problem.uploader_name}
                     />
                   )}
                   {problem.problem_type === 5 && (
@@ -290,6 +300,8 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
+                      uploaderId={problem.uploader}
+                      uploaderName={problem.uploader_name}
                     />
                   )}
                 </div>

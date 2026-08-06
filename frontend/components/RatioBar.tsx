@@ -2,14 +2,17 @@
 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import AccountAvatar from './AccountAvatar';
 
 interface RatioBarProps {
   ratio1: number;
   ratio2: number;
   answer: number; // 1 = support user, 2 = support merchant
+  uploaderId?: string;
+  uploaderName?: string;
 }
 
-export default function RatioBar({ ratio1, ratio2, answer }: RatioBarProps) {
+export default function RatioBar({ ratio1, ratio2, answer, uploaderId, uploaderName }: RatioBarProps) {
   const { language } = useLanguage();
   const { isDark } = useTheme();
 
@@ -69,6 +72,20 @@ export default function RatioBar({ ratio1, ratio2, answer }: RatioBarProps) {
           {rightLabel}
         </span>
       </div>
+
+      {uploaderId && (
+        <div className="mt-3 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          <span>{language === 'zh' ? '最后上传人：' : 'Last uploader:'}</span>
+          <AccountAvatar
+            accountId={uploaderId}
+            username={uploaderName}
+            sizeClassName="w-6 h-6"
+          />
+          <span className="font-medium text-gray-800 dark:text-gray-200">
+            {uploaderName || (language === 'zh' ? '未知用户' : 'Unknown user')}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -34,6 +34,8 @@ interface ProblemType4Props {
   ratio1?: number;
   ratio2?: number;
   answer?: number;
+  uploaderId?: string;
+  uploaderName?: string;
 }
 
 export default function ProblemType4({
@@ -43,6 +45,8 @@ export default function ProblemType4({
   ratio1 = 50,
   ratio2 = 50,
   answer = 1,
+  uploaderId,
+  uploaderName,
 }: ProblemType4Props) {
   const { language } = useLanguage();
   const [modalImage, setModalImage] = useState<string | null>(null);
@@ -171,7 +175,7 @@ export default function ProblemType4({
     <div>
       {/* Problem Section */}
       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemTitle}</h2>
-      <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} />
+      <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} uploaderId={uploaderId} uploaderName={uploaderName} />
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemDescription}</h3>
 
       {/* Order Info Section */}

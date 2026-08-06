@@ -389,11 +389,36 @@ Get a specific problem by its MongoDB ID.
     "stars": 5,
     "user_review": "review text",
     "problem_type": 1,
+    "uploader": "account_object_id",
+    "uploader_name": "account_username",
     "_score": 1.0,
     ...
   }
 }
 ```
+
+`uploader_name` is resolved from `accounts.username` by matching
+`accounts._id` against `uploader`. It is an empty string for legacy uploader
+values that are invalid or no longer reference an existing account.
+
+---
+
+## Account Avatar
+
+### Get Website Account Avatar
+
+**GET** `/api/account/avatar?id=<accounts._id>`
+
+Returns the website account avatar as an image file. The account is looked up
+in MongoDB by `accounts._id`. For an email matching `{digits}@qq.com`, the QQ
+avatar is tried first; if that fails, or for any other email, Gravatar is used.
+Successful images are cached under `cache/img` for 7 days.
+
+**Response:**
+- Returns the image file directly when an avatar is available
+- Returns an empty `204 No Content` response when neither source has an avatar
+- Returns the standard API error response for an invalid ID, a missing account,
+  or a database/cache error
 
 ---
 
