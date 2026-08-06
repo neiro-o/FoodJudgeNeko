@@ -251,6 +251,10 @@ const translations: Record<Language, Record<string, string>> = {
     'problemOps.copyYaml': 'Copy YAML',
     'problemOps.copySuccess': 'Copied to clipboard!',
     'problemOps.copyFailed': 'Failed to copy',
+    'problemOps.refreshComments': 'Update Comments',
+    'problemOps.refreshingComments': 'Submitting...',
+    'problemOps.refreshCommentsSuccess': 'Comment update has been queued.',
+    'problemOps.refreshCommentsFailed': 'Failed to update comments',
   },
   zh: {
     // Common
@@ -489,6 +493,10 @@ const translations: Record<Language, Record<string, string>> = {
     'problemOps.copyYaml': '复制YAML',
     'problemOps.copySuccess': '已复制到剪贴板！',
     'problemOps.copyFailed': '复制失败',
+    'problemOps.refreshComments': '更新评论区',
+    'problemOps.refreshingComments': '正在提交...',
+    'problemOps.refreshCommentsSuccess': '评论区更新任务已加入队列。',
+    'problemOps.refreshCommentsFailed': '更新评论区失败',
   },
 };
 

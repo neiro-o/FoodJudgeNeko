@@ -187,6 +187,12 @@ export const problemAPI = {
       body: JSON.stringify(data),
     });
   },
+
+  refreshComments: async (mongoId: string): Promise<ProblemUploadResponse> => {
+    return apiRequest<ProblemUploadResponse>(`/problem/refresh-comments/${encodeURIComponent(mongoId)}`, {
+      method: 'POST',
+    });
+  },
 };
 
 // Search API

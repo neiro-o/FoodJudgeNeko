@@ -107,6 +107,7 @@ func main() {
 		protected.POST("/problem/upload", handlers.UploadProblem)
 		protected.POST("/problem/upload-multiple", handlers.UploadMultipleProblems)
 		protected.POST("/problem/upload_daily", handlers.UploadDaily)
+		protected.POST("/problem/refresh-comments/:mongo_id", handlers.RefreshProblemComments)
 		protected.GET("/problem/search", middleware.RequireSearchQuota(), handlers.Search)
 		protected.GET("/problem/quicksearch", middleware.RequireSearchQuota(), handlers.QuickSearch)
 		protected.GET("/bot/search", middleware.RequireSearchQuota(), handlers.BotSearch)

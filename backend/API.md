@@ -271,6 +271,31 @@ Upload multiple problems to Redis queue in one request.
 }
 ```
 
+### Refresh Problem Comments
+
+**POST** `/api/problem/refresh-comments/:mongo_id`
+
+Queues an existing MongoDB problem for another crawl, preserving its original
+`userId`, `taskId`, uploader account, and upload IP. The problem must be at
+least two hours old and must not already be waiting in the Redis problem queue.
+
+**Response:**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "message": "Problem comments refresh queued successfully",
+    "data": {
+      "mongo_id": "6880ee6fbaa7705148850e5f",
+      "userId": "718316652",
+      "taskId": "task456",
+      "uploadIP": "127.0.0.1"
+    }
+  }
+}
+```
+
 ### Search Problems
 
 **GET** `/api/problem/search?keyword=search_term&limit=10`

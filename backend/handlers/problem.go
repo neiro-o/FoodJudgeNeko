@@ -98,6 +98,16 @@ type QueueItem struct {
 	UploadIP  string `json:"uploadIP"`
 }
 
+type refreshProblemSource struct {
+	UserID          string      `bson:"userId"`
+	TaskID          string      `bson:"taskId"`
+	AccountID       string      `bson:"uploader"`
+	UploadIP        string      `bson:"upload_ip"`
+	UploadTimestamp interface{} `bson:"upload_timestamp"`
+}
+
+const problemRefreshInterval = 2 * time.Hour
+
 type DailyQueueItem struct {
 	UserID    string `json:"userId"`
 	DateID    string `json:"dateId"`
@@ -226,6 +236,136 @@ func UploadProblem(c *gin.Context) {
 			"uploadIP": uploadIP,
 		},
 	})
+}
+
+// RefreshProblemComments queues an existing MongoDB problem for another crawl.
+// POST /api/problem/refresh-comments/:mongo_id
+func RefreshProblemComments(c *gin.Context) {
+	mongoID := c.Param("mongo_id")
+	objectID, err := primitive.ObjectIDFromHex(mongoID)
+	if err != nil {
+		utils.BadRequestResponse(c, "Invalid mongo_id: must be a valid MongoDB ObjectId")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var problem refreshProblemSource
+	err = database.Problems.FindOne(ctx, bson.M{"_id": objectID}).Decode(&problem)
+	if err == mongo.ErrNoDocuments {
+		utils.NotFoundResponse(c, "Problem not found")
+		return
+	}
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Database error")
+		return
+	}
+
+	uploadTimestamp, ok := unixTimestampSeconds(problem.UploadTimestamp)
+	if !ok || uploadTimestamp <= 0 {
+		utils.InternalServerErrorResponse(c, "Problem has invalid upload_timestamp")
+		return
+	}
+	if problemRefreshTooSoon(uploadTimestamp, time.Now()) {
+		utils.ConflictResponse(c, "刷新时间未超过2h，不予刷新")
+		return
+	}
+
+	if problem.UserID == "" || problem.TaskID == "" || problem.AccountID == "" || problem.UploadIP == "" {
+		utils.InternalServerErrorResponse(c, "Problem is missing queue fields")
+		return
+	}
+
+	queueName := config.AppConfig.Redis.Fields.ProblemsQueue
+	queued, err := isProblemInQueue(ctx, queueName, problem.UserID, problem.TaskID)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Redis error")
+		return
+	}
+	if queued {
+		utils.ConflictResponse(c, "Problem is already in queue")
+		return
+	}
+
+	queueItem := QueueItem{
+		UserID:    problem.UserID,
+		TaskID:    problem.TaskID,
+		AccountID: problem.AccountID,
+		UploadIP:  problem.UploadIP,
+	}
+	itemJSON, err := json.Marshal(queueItem)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to serialize queue item")
+		return
+	}
+
+	if _, err = database.RedisClient.LPush(ctx, queueName, itemJSON).Result(); err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to push to queue")
+		return
+	}
+
+	// Keep the same duplicate marker convention as the normal upload path.
+	queueKey := fmt.Sprintf("%s:%s", problem.UserID, problem.TaskID)
+	_ = database.RedisClient.Set(ctx, queueKey, "1", 24*time.Hour).Err()
+
+	utils.SuccessResponse(c, gin.H{
+		"message": "Problem comments refresh queued successfully",
+		"data": gin.H{
+			"mongo_id": mongoID,
+			"userId":   problem.UserID,
+			"taskId":   problem.TaskID,
+			"uploadIP": problem.UploadIP,
+		},
+	})
+}
+
+func problemRefreshTooSoon(uploadTimestamp int64, now time.Time) bool {
+	return now.Sub(time.Unix(uploadTimestamp, 0)) < problemRefreshInterval
+}
+
+func unixTimestampSeconds(value interface{}) (int64, bool) {
+	switch timestamp := value.(type) {
+	case int32:
+		return int64(timestamp), true
+	case int64:
+		return timestamp, true
+	case float64:
+		seconds := int64(timestamp)
+		if float64(seconds) != timestamp {
+			return 0, false
+		}
+		return seconds, true
+	case primitive.DateTime:
+		return timestamp.Time().Unix(), true
+	case time.Time:
+		return timestamp.Unix(), true
+	default:
+		return 0, false
+	}
+}
+
+// isProblemInQueue checks the list itself instead of only checking the
+// userId:taskId marker. The normal upload marker lives for 24 hours and is not
+// removed by the worker after dequeue, so it cannot accurately represent
+// whether a refresh is currently waiting in the queue.
+func isProblemInQueue(ctx context.Context, queueName, userID, taskID string) (bool, error) {
+	items, err := database.RedisClient.LRange(ctx, queueName, 0, -1).Result()
+	if err != nil {
+		return false, err
+	}
+
+	for _, rawItem := range items {
+		var item QueueItem
+		if err := json.Unmarshal([]byte(rawItem), &item); err != nil {
+			continue
+		}
+		if item.UserID == userID && item.TaskID == taskID {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 type ProblemUploadResult struct {

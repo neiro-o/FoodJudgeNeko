@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useParams } from 'next/navigation';
-import { searchAPI, ProblemComment } from '@/lib/api';
+import { problemAPI, searchAPI, ProblemComment } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ProblemType1 from '@/components/ProblemType1';
@@ -111,6 +111,7 @@ export default function ProblemDetailPage() {
   const [loadingProblem, setLoadingProblem] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<{ type: string; success: boolean } | null>(null);
+  const [refreshingComments, setRefreshingComments] = useState(false);
 
   // Copy to clipboard helper
   const copyToClipboard = useCallback(async (text: string, type: string) => {
@@ -143,6 +144,20 @@ export default function ProblemDetailPage() {
     const yamlStr = jsonToYaml(problem);
     copyToClipboard(yamlStr, 'yaml');
   }, [problem, copyToClipboard]);
+
+  const handleRefreshComments = useCallback(async () => {
+    if (!mongoId || refreshingComments) return;
+
+    setRefreshingComments(true);
+    try {
+      await problemAPI.refreshComments(mongoId);
+      window.alert(t('problemOps.refreshCommentsSuccess'));
+    } catch (err: any) {
+      window.alert(err?.message || t('problemOps.refreshCommentsFailed'));
+    } finally {
+      setRefreshingComments(false);
+    }
+  }, [mongoId, refreshingComments, t]);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -340,6 +355,15 @@ export default function ProblemDetailPage() {
                           ? t('problemOps.copySuccess')
                           : t('problemOps.copyFailed')
                         : t('problemOps.copyYaml')}
+                    </button>
+                    <button
+                      onClick={handleRefreshComments}
+                      disabled={refreshingComments}
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {refreshingComments
+                        ? t('problemOps.refreshingComments')
+                        : t('problemOps.refreshComments')}
                     </button>
                   </div>
                 </div>
