@@ -5,6 +5,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import ChatTimeline from './ChatTimeline';
 import { ChatMessageData } from './ChatMessage';
 import { mediaAPI } from '@/lib/api';
+import RatioBar, { type UploaderAccount } from './RatioBar';
 
 interface Reply {
   role: string;
@@ -29,8 +30,7 @@ interface ProblemType2Props {
   ratio1?: number;
   ratio2?: number;
   answer?: number;
-  uploaderId?: string;
-  uploaderName?: string;
+  uploaders?: UploaderAccount[];
 }
 
 export default function ProblemType2({
@@ -43,8 +43,7 @@ export default function ProblemType2({
   ratio1 = 50,
   ratio2 = 50,
   answer = 1,
-  uploaderId,
-  uploaderName,
+  uploaders,
 }: ProblemType2Props) {
   const { language } = useLanguage();
   const [imageUrlMap, setImageUrlMap] = useState<Map<string, string>>(new Map());
@@ -194,14 +193,11 @@ export default function ProblemType2({
   const appealsTitle = language === 'zh' ? '商户申诉' : 'Appeals';
   const othersTitle = language === 'zh' ? '其他信息' : 'Other Info';
 
-  // Import RatioBar dynamically to avoid issues
-  const RatioBar = require('./RatioBar').default;
-
   return (
     <div>
       {/* Problem Section */}
       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemTitle}</h2>
-      <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} uploaderId={uploaderId} uploaderName={uploaderName} />
+      <RatioBar ratio1={ratio1} ratio2={ratio2} answer={answer} uploaders={uploaders} />
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{problemDescription}</h3>
       <div className="mb-6">
         <ChatTimeline messages={problemMessages} />

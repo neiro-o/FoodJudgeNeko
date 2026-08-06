@@ -18,8 +18,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -156,30 +154,29 @@ type ESDocument struct {
 
 // FullESDocument is the full document structure (kept for other functions)
 type FullESDocument struct {
-	ID           interface{}         `json:"id"`                     // unique identifier for the review record (string or number)
-	MongoID      string              `json:"mongo_id"`               // MongoDB unique identifier
-	Stars        int                 `json:"stars"`                  // user rating, 1-5, 1 is worst, 5 is best
-	UserReview   string              `json:"user_review"`            // user's text review, may be empty for refund problems
-	ReviewPics   []string            `json:"review_pics"`            // array of review image URLs
-	Timestamp    int64               `json:"timestamp"`              // user review timestamp in seconds
-	Others       string              `json:"others"`                 // additional notes, e.g., "消费后评价"
-	ProblemType  int                 `json:"problem_type"`           // 1-delivery, 2-dine-in, 3-delivery refund, 4-dine-in refund, 5-other
-	Answer       int                 `json:"answer"`                 // review result: 1-support user, 2-support merchant
-	Ratio1       float64             `json:"ratio_1"`                // ratio of choice 1 (0~100)
-	Ratio2       float64             `json:"ratio_2"`                // ratio of choice 2 (0~100)
-	Uploader     string              `json:"uploader"`               // ID of user who uploaded this problem
-	UploaderName string              `json:"uploader_name"`          // username of the account that uploaded this problem
-	TaskID       string              `json:"taskId"`                 // associated task ID
-	UserID       string              `json:"userId"`                 // original link's userID parameter
-	CreatedAt    int64               `json:"created_at"`             // creation timestamp in seconds
-	Replies      []Reply             `json:"replies,omitempty"`      // timeline of merchant/user replies
-	Appeals      []Appeal            `json:"appeals,omitempty"`      // appeals from user/merchant
-	OrderInfo    interface{}         `json:"order_info,omitempty"`   // order info for non-delivery problems (variable dict)
-	Orders       []Order             `json:"orders,omitempty"`       // order items
-	OrderDetail  *OrderDetail        `json:"order_detail,omitempty"` // order detail for delivery scenarios
-	Comments     []Comment           `json:"comments,omitempty"`     // evaluation comments
-	Score        float64             `json:"_score"`                 // Elasticsearch relevance score
-	Highlight    map[string][]string `json:"_highlight,omitempty"`   // search highlights
+	ID          interface{}         `json:"id"`                     // unique identifier for the review record (string or number)
+	MongoID     string              `json:"mongo_id"`               // MongoDB unique identifier
+	Stars       int                 `json:"stars"`                  // user rating, 1-5, 1 is worst, 5 is best
+	UserReview  string              `json:"user_review"`            // user's text review, may be empty for refund problems
+	ReviewPics  []string            `json:"review_pics"`            // array of review image URLs
+	Timestamp   int64               `json:"timestamp"`              // user review timestamp in seconds
+	Others      string              `json:"others"`                 // additional notes, e.g., "消费后评价"
+	ProblemType int                 `json:"problem_type"`           // 1-delivery, 2-dine-in, 3-delivery refund, 4-dine-in refund, 5-other
+	Answer      int                 `json:"answer"`                 // review result: 1-support user, 2-support merchant
+	Ratio1      float64             `json:"ratio_1"`                // ratio of choice 1 (0~100)
+	Ratio2      float64             `json:"ratio_2"`                // ratio of choice 2 (0~100)
+	Uploader    string              `json:"uploader"`               // ID of user who uploaded this problem
+	TaskID      string              `json:"taskId"`                 // associated task ID
+	UserID      string              `json:"userId"`                 // original link's userID parameter
+	CreatedAt   int64               `json:"created_at"`             // creation timestamp in seconds
+	Replies     []Reply             `json:"replies,omitempty"`      // timeline of merchant/user replies
+	Appeals     []Appeal            `json:"appeals,omitempty"`      // appeals from user/merchant
+	OrderInfo   interface{}         `json:"order_info,omitempty"`   // order info for non-delivery problems (variable dict)
+	Orders      []Order             `json:"orders,omitempty"`       // order items
+	OrderDetail *OrderDetail        `json:"order_detail,omitempty"` // order detail for delivery scenarios
+	Comments    []Comment           `json:"comments,omitempty"`     // evaluation comments
+	Score       float64             `json:"_score"`                 // Elasticsearch relevance score
+	Highlight   map[string][]string `json:"_highlight,omitempty"`   // search highlights
 }
 
 type Reply struct {
@@ -1700,30 +1697,6 @@ func filterMaliciousComments(comments []Comment) []Comment {
 	return filtered
 }
 
-func findUploaderName(ctx context.Context, uploaderID string) (string, error) {
-	objectID, err := primitive.ObjectIDFromHex(uploaderID)
-	if err != nil {
-		return "", nil
-	}
-
-	var account struct {
-		Username string `bson:"username"`
-	}
-	err = database.Accounts.FindOne(
-		ctx,
-		bson.M{"_id": objectID},
-		options.FindOne().SetProjection(bson.M{"username": 1}),
-	).Decode(&account)
-	if err == mongo.ErrNoDocuments {
-		return "", nil
-	}
-	if err != nil {
-		return "", err
-	}
-
-	return account.Username, nil
-}
-
 // SearchByMongoID searches for a document by MongoDB ID
 func SearchByMongoID(c *gin.Context) {
 	mongoID := c.Param("id")
@@ -1831,13 +1804,6 @@ func SearchByMongoID(c *gin.Context) {
 	if shouldBlock && len(doc.Comments) > 0 {
 		doc.Comments = filterMaliciousComments(doc.Comments)
 	}
-
-	uploaderName, err := findUploaderName(ctx, doc.Uploader)
-	if err != nil {
-		utils.InternalServerErrorResponse(c, "Failed to look up uploader")
-		return
-	}
-	doc.UploaderName = uploaderName
 
 	// Encrypt userId before returning
 	if doc.UserID != "" {

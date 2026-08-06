@@ -8,11 +8,15 @@ interface RatioBarProps {
   ratio1: number;
   ratio2: number;
   answer: number; // 1 = support user, 2 = support merchant
-  uploaderId?: string;
-  uploaderName?: string;
+  uploaders?: UploaderAccount[];
 }
 
-export default function RatioBar({ ratio1, ratio2, answer, uploaderId, uploaderName }: RatioBarProps) {
+export interface UploaderAccount {
+  id: string;
+  name: string;
+}
+
+export default function RatioBar({ ratio1, ratio2, answer, uploaders = [] }: RatioBarProps) {
   const { language } = useLanguage();
   const { isDark } = useTheme();
 
@@ -73,17 +77,21 @@ export default function RatioBar({ ratio1, ratio2, answer, uploaderId, uploaderN
         </span>
       </div>
 
-      {uploaderId && (
-        <div className="mt-3 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-          <span>{language === 'zh' ? '最后上传人：' : 'Last uploader:'}</span>
-          <AccountAvatar
-            accountId={uploaderId}
-            username={uploaderName}
-            sizeClassName="w-6 h-6"
-          />
-          <span className="font-medium text-gray-800 dark:text-gray-200">
-            {uploaderName || (language === 'zh' ? '未知用户' : 'Unknown user')}
-          </span>
+      {uploaders.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
+          <span>{language === 'zh' ? '上传者：' : 'Uploaders:'}</span>
+          {uploaders.map((uploader) => (
+            <span key={uploader.id} className="inline-flex items-center gap-1.5">
+              <AccountAvatar
+                accountId={uploader.id}
+                username={uploader.name}
+                sizeClassName="w-6 h-6"
+              />
+              <span className="font-medium text-gray-800 dark:text-gray-200">
+                {uploader.name || (language === 'zh' ? '未知用户' : 'Unknown user')}
+              </span>
+            </span>
+          ))}
         </div>
       )}
     </div>

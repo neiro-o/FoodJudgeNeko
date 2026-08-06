@@ -229,6 +229,13 @@ export interface NotesSearchItem {
   reply: string;
 }
 
+export interface ProblemUploadersResponse {
+  uploader: string;
+  uploader_name: string;
+  previous_uploaders: string[];
+  previous_uploaders_name: string[];
+}
+
 export const searchAPI = {
   search: async (keyword: string, limit: number = 15): Promise<SearchResponse> => {
     const params = new URLSearchParams({
@@ -258,6 +265,10 @@ export const searchAPI = {
       blockMaliciousComment: blockMaliciousComment.toString(),
     });
     return apiRequest<any>(`/problem/by-mongoid/${mongoId}?${params.toString()}`);
+  },
+
+  getProblemUploaders: async (mongoId: string): Promise<ProblemUploadersResponse> => {
+    return apiRequest<ProblemUploadersResponse>(`/problem/uploaders/${mongoId}`);
   },
 
   getProblemComments: async (problemId: string, ignore: number = 1): Promise<ProblemCommentsResponse> => {

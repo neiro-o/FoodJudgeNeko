@@ -390,16 +390,33 @@ Get a specific problem by its MongoDB ID.
     "user_review": "review text",
     "problem_type": 1,
     "uploader": "account_object_id",
-    "uploader_name": "account_username",
     "_score": 1.0,
     ...
   }
 }
 ```
 
-`uploader_name` is resolved from `accounts.username` by matching
-`accounts._id` against `uploader`. It is an empty string for legacy uploader
-values that are invalid or no longer reference an existing account.
+### Get Problem Uploaders
+
+**GET** `/api/problem/uploaders/:mongo-id`
+
+Get the current and previous uploaders directly from the MongoDB problem, with
+usernames resolved from `accounts._id`. Missing or invalid accounts keep an
+empty string in the corresponding username position.
+
+**Response:**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "uploader": "current_account_object_id",
+    "uploader_name": "current_username",
+    "previous_uploaders": ["previous_account_object_id"],
+    "previous_uploaders_name": ["previous_username"]
+  }
+}
+```
 
 ---
 

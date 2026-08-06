@@ -13,6 +13,7 @@ import ProblemType3 from '@/components/ProblemType3';
 import ProblemType4 from '@/components/ProblemType4';
 import ProblemType5 from '@/components/ProblemType5';
 import CommentList from '@/components/CommentList';
+import { type UploaderAccount } from '@/components/RatioBar';
 
 // Simple JSON to YAML converter
 function jsonToYaml(obj: any, indent: number = 0): string {
@@ -91,7 +92,6 @@ interface ProblemData {
   mongo_id: string;
   problem_type: number;
   uploader?: string;
-  uploader_name?: string;
   user_review: string;
   review_pics?: string[];
   timestamp: number;
@@ -99,6 +99,35 @@ interface ProblemData {
   appeals?: Appeal[];
   // Add other fields as needed
   [key: string]: any;
+}
+
+function mergeUploaders(
+  uploader: string,
+  uploaderName: string,
+  previousUploaders: string[],
+  previousUploaderNames: string[]
+): UploaderAccount[] {
+  const uploaders: UploaderAccount[] = [];
+  const indexById = new Map<string, number>();
+  const ids = [uploader, ...previousUploaders];
+  const names = [uploaderName, ...previousUploaderNames];
+
+  ids.forEach((id, index) => {
+    if (!id) return;
+
+    const existingIndex = indexById.get(id);
+    if (existingIndex !== undefined) {
+      if (!uploaders[existingIndex].name && names[index]) {
+        uploaders[existingIndex].name = names[index];
+      }
+      return;
+    }
+
+    indexById.set(id, uploaders.length);
+    uploaders.push({ id, name: names[index] || '' });
+  });
+
+  return uploaders;
 }
 
 export default function ProblemDetailPage() {
@@ -109,6 +138,7 @@ export default function ProblemDetailPage() {
   const mongoId = params.mongo_id as string;
 
   const [problem, setProblem] = useState<ProblemData | null>(null);
+  const [uploaders, setUploaders] = useState<UploaderAccount[]>([]);
   const [comments, setComments] = useState<ProblemComment[]>([]);
   const [loadingProblem, setLoadingProblem] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -178,11 +208,18 @@ export default function ProblemDetailPage() {
           const blockMaliciousComment = typeof window !== 'undefined' 
             ? (localStorage.getItem('blockMaliciousComment') !== 'false' ? 1 : 0)
             : 1;
-          const [data, commentsRes] = await Promise.all([
+          const [data, uploaderData, commentsRes] = await Promise.all([
             searchAPI.getByMongoId(mongoId, blockMaliciousComment),
+            searchAPI.getProblemUploaders(mongoId),
             searchAPI.getProblemComments(mongoId, blockMaliciousComment),
           ]);
           setProblem(data);
+          setUploaders(mergeUploaders(
+            uploaderData.uploader,
+            uploaderData.uploader_name,
+            uploaderData.previous_uploaders,
+            uploaderData.previous_uploaders_name
+          ));
           setComments(commentsRes.data ?? []);
         } catch (err: any) {
           console.error('Failed to fetch problem:', err);
@@ -248,8 +285,7 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
-                      uploaderId={problem.uploader}
-                      uploaderName={problem.uploader_name}
+                      uploaders={uploaders}
                     />
                   )}
                   {problem.problem_type === 2 && (
@@ -263,8 +299,7 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
-                      uploaderId={problem.uploader}
-                      uploaderName={problem.uploader_name}
+                      uploaders={uploaders}
                     />
                   )}
                   {problem.problem_type === 3 && (
@@ -276,8 +311,7 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
-                      uploaderId={problem.uploader}
-                      uploaderName={problem.uploader_name}
+                      uploaders={uploaders}
                     />
                   )}
                   {problem.problem_type === 4 && (
@@ -288,8 +322,7 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
-                      uploaderId={problem.uploader}
-                      uploaderName={problem.uploader_name}
+                      uploaders={uploaders}
                     />
                   )}
                   {problem.problem_type === 5 && (
@@ -300,8 +333,7 @@ export default function ProblemDetailPage() {
                       ratio1={problem.ratio_1}
                       ratio2={problem.ratio_2}
                       answer={problem.answer}
-                      uploaderId={problem.uploader}
-                      uploaderName={problem.uploader_name}
+                      uploaders={uploaders}
                     />
                   )}
                 </div>
