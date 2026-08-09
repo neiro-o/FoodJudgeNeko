@@ -81,7 +81,8 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		var account struct {
-			TokenVersion int `bson:"token_version"`
+			TokenVersion int  `bson:"token_version"`
+			IsAdmin      bool `bson:"is_admin"`
 		}
 		err = database.Accounts.FindOne(ctx, bson.M{"_id": objID}).Decode(&account)
 		if err != nil {
@@ -98,6 +99,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
+		c.Set(utils.CtxKeyIsAdmin, account.IsAdmin)
 		c.Next()
 	}
 }

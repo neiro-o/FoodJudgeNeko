@@ -13,6 +13,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+const CtxKeyIsAdmin = "is_admin"
+
 // Response represents the standard API response format
 type Response struct {
 	Code    int         `json:"code"`
@@ -99,6 +101,11 @@ func GetUserObjectID(c *gin.Context) (primitive.ObjectID, error) {
 // IsAdmin checks if the authenticated user is an admin
 // Returns false if user is not authenticated or not an admin
 func IsAdmin(c *gin.Context) bool {
+	if isAdmin, exists := c.Get(CtxKeyIsAdmin); exists {
+		value, ok := isAdmin.(bool)
+		return ok && value
+	}
+
 	userID, exists := GetUserID(c)
 	if !exists {
 		return false
