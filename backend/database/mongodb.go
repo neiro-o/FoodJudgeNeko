@@ -19,6 +19,7 @@ var (
 	Invitations     *mongo.Collection
 	ProcessedList   *mongo.Collection
 	Problems        *mongo.Collection
+	UploadHistory   *mongo.Collection
 	Comments        *mongo.Collection
 	Malicious       *mongo.Collection
 	Notes           *mongo.Collection
@@ -48,6 +49,7 @@ func Connect() error {
 	Invitations = DB.Collection(config.AppConfig.MongoDB.Collections.Invitations)
 	ProcessedList = DB.Collection(config.AppConfig.MongoDB.Collections.ProcessedList)
 	Problems = DB.Collection(config.AppConfig.MongoDB.Collections.Problems)
+	UploadHistory = DB.Collection("upload_history")
 	Comments = DB.Collection(config.AppConfig.MongoDB.Collections.Comments)
 	Malicious = DB.Collection("malicious")
 	Notes = DB.Collection(config.AppConfig.MongoDB.Collections.Notes)

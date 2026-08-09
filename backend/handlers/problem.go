@@ -180,6 +180,21 @@ func UploadProblem(c *gin.Context) {
 		return
 	}
 
+	// Check if taskId has appeared in MongoDB upload_history collection
+	var existingUploadHistory bson.M
+	err = database.UploadHistory.FindOne(ctx, bson.M{
+		"taskId": req.TaskID,
+	}).Decode(&existingUploadHistory)
+	if err == nil {
+		// Problem has already been uploaded before
+		utils.ConflictResponse(c, "Problem has already exists")
+		return
+	} else if err != mongo.ErrNoDocuments {
+		// Database error
+		utils.InternalServerErrorResponse(c, "Database error")
+		return
+	}
+
 	// Check if taskId already exists in Redis queue
 	queueKey := fmt.Sprintf("%s:%s", req.UserID, req.TaskID)
 	existsCount, err := database.RedisClient.Exists(ctx, queueKey).Result()
@@ -210,7 +225,7 @@ func UploadProblem(c *gin.Context) {
 
 	// Push to Redis queue
 	queueName := config.AppConfig.Redis.Fields.ProblemsQueue
-	_, err = database.RedisClient.LPush(ctx, queueName, itemJSON).Result()
+	_, err = database.RedisClient.RPush(ctx, queueName, itemJSON).Result()
 	if err != nil {
 		utils.InternalServerErrorResponse(c, "Failed to push to queue")
 		return
@@ -224,9 +239,8 @@ func UploadProblem(c *gin.Context) {
 		// The item is already in the queue
 	}
 
-	// Award points + weekly score to the effective account for this
-	// successful upload.
-	awardUploadCredit(ctx, effectiveAccountID)
+	// Temporarily disable awarding points + weekly score for uploads.
+	// awardUploadCredit(ctx, effectiveAccountID)
 
 	utils.SuccessResponse(c, gin.H{
 		"message": "Problem uploaded successfully",
@@ -300,7 +314,7 @@ func RefreshProblemComments(c *gin.Context) {
 		return
 	}
 
-	if _, err = database.RedisClient.LPush(ctx, queueName, itemJSON).Result(); err != nil {
+	if _, err = database.RedisClient.RPush(ctx, queueName, itemJSON).Result(); err != nil {
 		utils.InternalServerErrorResponse(c, "Failed to push to queue")
 		return
 	}
@@ -456,6 +470,21 @@ func UploadMultipleProblems(c *gin.Context) {
 			continue
 		}
 
+		// Check if taskId has appeared in MongoDB upload_history collection
+		var existingUploadHistory bson.M
+		err = database.UploadHistory.FindOne(ctx, bson.M{
+			"taskId": problem.TaskID,
+		}).Decode(&existingUploadHistory)
+		if err == nil {
+			result.Message = "Problem already exists"
+			results = append(results, result)
+			continue
+		} else if err != mongo.ErrNoDocuments {
+			result.Message = "Database error while checking upload history"
+			results = append(results, result)
+			continue
+		}
+
 		// Check if taskId already exists in Redis queue
 		queueKey := fmt.Sprintf("%s:%s", problem.UserID, problem.TaskID)
 		existsCount, err := database.RedisClient.Exists(ctx, queueKey).Result()
@@ -488,7 +517,7 @@ func UploadMultipleProblems(c *gin.Context) {
 		}
 
 		// Push to Redis queue
-		_, err = database.RedisClient.LPush(ctx, queueName, itemJSON).Result()
+		_, err = database.RedisClient.RPush(ctx, queueName, itemJSON).Result()
 		if err != nil {
 			result.Message = "Failed to push to queue"
 			results = append(results, result)
@@ -503,9 +532,8 @@ func UploadMultipleProblems(c *gin.Context) {
 			// The item is already in the queue
 		}
 
-		// Award points + weekly score to the effective account for this
-		// successful upload.
-		awardUploadCredit(ctx, effectiveAccountID)
+		// Temporarily disable awarding points + weekly score for uploads.
+		// awardUploadCredit(ctx, effectiveAccountID)
 
 		// Success
 		result.Success = true

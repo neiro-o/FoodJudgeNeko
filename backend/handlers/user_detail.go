@@ -225,6 +225,83 @@ type UserInfoResponse struct {
 	Malicious bool   `json:"malicious"`
 }
 
+// AccountPointsResponse represents an account's total points and current-week
+// points. WeeklyPoints is zero when the account has no weekly_scores document
+// for the current ISO week.
+type AccountPointsResponse struct {
+	AccountID    string  `json:"accountId"`
+	Username     string  `json:"username"`
+	TotalPoints  int     `json:"totalPoints"`
+	WeeklyPoints float64 `json:"weeklyPoints"`
+	Year         int     `json:"year"`
+	WeekID       int     `json:"weekId"`
+}
+
+// GetAccountPoints returns any account's total points and current-week points.
+// The current ISO year/week is computed in Singapore Time, consistently with
+// point awarding and the weekly leaderboard.
+// GET /api/user_detail/account_points?accountId=xxx
+func GetAccountPoints(c *gin.Context) {
+	accountID := strings.TrimSpace(c.Query("accountId"))
+	if accountID == "" {
+		utils.BadRequestResponse(c, "Missing accountId parameter")
+		return
+	}
+
+	objID, err := primitive.ObjectIDFromHex(accountID)
+	if err != nil {
+		utils.BadRequestResponse(c, "Invalid accountId: must be a valid 24-character hex ObjectID")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var account struct {
+		Username string `bson:"username"`
+		Points   int    `bson:"points"`
+	}
+	err = database.Accounts.FindOne(
+		ctx,
+		bson.M{"_id": objID},
+		options.FindOne().SetProjection(bson.M{"username": 1, "points": 1}),
+	).Decode(&account)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			utils.NotFoundResponse(c, "Account not found")
+			return
+		}
+		utils.InternalServerErrorResponse(c, "Database error")
+		return
+	}
+
+	year, weekID := utils.ISOYearWeekSGT()
+	weeklyPoints := float64(0)
+	var weeklyScore struct {
+		Score float64 `bson:"score"`
+	}
+	err = database.WeeklyScores.FindOne(
+		ctx,
+		bson.M{"userId": objID, "year": year, "weekId": weekID},
+		options.FindOne().SetProjection(bson.M{"score": 1}),
+	).Decode(&weeklyScore)
+	if err == nil {
+		weeklyPoints = weeklyScore.Score
+	} else if err != mongo.ErrNoDocuments {
+		utils.InternalServerErrorResponse(c, "Failed to fetch weekly points")
+		return
+	}
+
+	utils.SuccessResponse(c, AccountPointsResponse{
+		AccountID:    objID.Hex(),
+		Username:     account.Username,
+		TotalPoints:  account.Points,
+		WeeklyPoints: weeklyPoints,
+		Year:         year,
+		WeekID:       weekID,
+	})
+}
+
 // GetUserInfo returns user information including name, total likes, and total replies
 // GET /api/user_detail/user_info?userId=xxx
 func GetUserInfo(c *gin.Context) {

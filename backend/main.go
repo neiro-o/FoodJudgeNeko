@@ -124,6 +124,7 @@ func main() {
 		protected.GET("/notes/search", handlers.SearchNotes)
 
 		// User detail routes
+		protected.GET("/user_detail/account_points", handlers.GetAccountPoints)
 		protected.GET("/user_detail/user_info", handlers.GetUserInfo)
 		protected.GET("/user_detail/comments", handlers.GetUserComments)
 		protected.GET("/user_detail/rankings", handlers.GetRankings)
