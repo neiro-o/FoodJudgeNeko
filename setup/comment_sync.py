@@ -5,6 +5,7 @@ Syncs comments from problems collection to comments collection.
 """
 
 import sys
+import time
 from pathlib import Path
 from pymongo import MongoClient, ASCENDING
 from pymongo.errors import OperationFailure
@@ -198,10 +199,12 @@ def sync_comments(config):
         # Step 7: Upsert comments into comments collection (check by commentId)
         if comments_to_insert:
             upserted_count = 0
+            synced_at = int(time.time())
             for comment in comments_to_insert:
                 comment_id = comment.get('commentId')
                 if not comment_id:
                     continue
+                comment['updatedAt'] = synced_at
                 try:
                     result = comments_collection.update_one(
                         {"commentId": comment_id},
