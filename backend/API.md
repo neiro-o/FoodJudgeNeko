@@ -542,6 +542,53 @@ Get paginated comments for a user, sorted by approveCount (desc) and createTime 
 - `1`: Support User (适合展示) - User voted DOWN (or UP if reversed for DAOZONG_JIAOYI/IPR)
 - `2`: Support Merchant (不适合展示) - User voted UP (or DOWN if reversed for DAOZONG_JIAOYI/IPR)
 
+### Get Vanished Comments
+
+**GET** `/api/user_detail/vanished/{userId}`
+
+Returns the user's comments with `approveCount > 35` that no longer exist in
+the corresponding MongoDB problem's `comment[].pageContent[]`. Candidates whose
+entire problem no longer exists are excluded. The endpoint also looks up the
+problem in Elasticsearch by `mongo_id`; an empty `user_review` falls back to
+`appeals[0].content`. Both timestamps are formatted in SGT (UTC+08:00).
+
+**Success Response:**
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": [
+    {
+      "problemId": "68984a6f0c852a04a7ef1234",
+      "user_review": "评价或首条申诉内容",
+      "timestamp": "2026-08-16 10:30:00+08:00",
+      "commentId": "1754799712775200769",
+      "content": "已经消失的评论内容",
+      "likes": 1489,
+      "createTime": "2026-08-16 11:20:00+08:00",
+      "url": "https://zqt.meituan.com/xiaomei/vote/jury/api/r/rediectByScene?jumpScene=mockTaskShare&userId=3417484203&channel=mockTaskShare&encryptMockTaskNo=exampleTaskId"
+    }
+  ]
+}
+```
+
+When no vanished comments are found, `data` is an empty list:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": []
+}
+```
+
+**Error Response (invalid user ID):**
+```json
+{
+  "code": 400,
+  "message": "Invalid userId: must be an integer"
+}
+```
+
 ### Get Rankings
 
 **GET** `/api/user_detail/rankings?page=1`

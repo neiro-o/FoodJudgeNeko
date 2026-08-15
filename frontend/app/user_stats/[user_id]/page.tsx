@@ -51,6 +51,7 @@ export default function UserStatsPage() {
   const [toggling, setToggling] = useState(false);
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [mediaUrlMap, setMediaUrlMap] = useState<Map<string, string>>(new Map());
+  const [exportingVanished, setExportingVanished] = useState(false);
 
   const [aiSummary, setAiSummary] = useState<AIUserSummaryResponse | null>(null);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(true);
@@ -225,6 +226,44 @@ export default function UserStatsPage() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const escapeCSVCell = (value: string | number): string => {
+    const text = String(value ?? '');
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+
+  const handleExportVanished = async () => {
+    setExportingVanished(true);
+    try {
+      const rows = await userDetailAPI.getVanishedComments(userId);
+      if (rows.length === 0) {
+        window.alert('你暂时没有被举报的评价。');
+        return;
+      }
+
+      const columns = [
+        'problemId', 'user_review', 'timestamp', 'commentId',
+        'content', 'likes', 'createTime', 'url',
+      ] as const;
+      const csv = [
+        columns.join(','),
+        ...rows.map((row) => columns.map((column) => escapeCSVCell(row[column])).join(',')),
+      ].join('\r\n');
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${userId}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err: any) {
+      window.alert(err?.message || '导出被举报评价失败');
+    } finally {
+      setExportingVanished(false);
+    }
   };
 
   // Handle page change
@@ -440,10 +479,18 @@ export default function UserStatsPage() {
 
             {/* User Info */}
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   {userInfo?.userName || 'Unknown User'}
                 </h2>
+                <button
+                  type="button"
+                  onClick={handleExportVanished}
+                  disabled={exportingVanished}
+                  className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {exportingVanished ? '导出中...' : '导出被举报评价'}
+                </button>
                 {userInfo?.malicious && (
                   <div className="relative">
                     <span 

@@ -391,6 +391,17 @@ export interface UserCommentsResponse {
   totalPages: number;
 }
 
+export interface VanishedComment {
+  problemId: string;
+  user_review: string;
+  timestamp: string;
+  commentId: string;
+  content: string;
+  likes: number;
+  createTime: string;
+  url: string;
+}
+
 export interface RankingItem {
   userId: string;
   userName: string;
@@ -479,6 +490,10 @@ export const userDetailAPI = {
       limit: limit.toString(),
     });
     return apiRequest<UserCommentsResponse>(`/user_detail/comments?${params.toString()}`);
+  },
+
+  getVanishedComments: async (userId: string): Promise<VanishedComment[]> => {
+    return apiRequest<VanishedComment[]>(`/user_detail/vanished/${encodeURIComponent(userId)}`);
   },
 
   getRankings: async (page: number = 1): Promise<RankingsResponse> => {

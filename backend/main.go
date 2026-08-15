@@ -127,6 +127,7 @@ func main() {
 		protected.GET("/user_detail/account_points", handlers.GetAccountPoints)
 		protected.GET("/user_detail/user_info", handlers.GetUserInfo)
 		protected.GET("/user_detail/comments", handlers.GetUserComments)
+		protected.GET("/user_detail/vanished/:userId", handlers.GetVanishedComments)
 		protected.GET("/user_detail/rankings", handlers.GetRankings)
 		protected.GET("/user_detail/search_users", handlers.SearchUsers)
 		protected.POST("/user_detail/toggle_malicious", handlers.ToggleMaliciousUser)

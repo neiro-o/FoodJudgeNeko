@@ -8,22 +8,27 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+from urllib.parse import urlencode
 
 import yaml
 from bson import ObjectId
+from elasticsearch import Elasticsearch
 from pymongo import MongoClient
 
 
 SGT = timezone(timedelta(hours=8), name="SGT")
 CSV_FIELDS = [
-    "_id",
-    "userId",
-    "taskId",
+    "problemId",
+    "user_review",
+    "timestamp",
     "commentId",
     "content",
-    "approveCount",
+    "likes",
     "createTime",
+    "url",
 ]
+PROBLEM_URL = "https://zqt.meituan.com/xiaomei/vote/jury/api/r/rediectByScene"
+MIN_APPROVE_COUNT = 35
 
 
 def load_config() -> Dict[str, Any]:
@@ -96,9 +101,106 @@ def nested_comment_ids(problem: Mapping[str, Any]) -> Set[str]:
     return result
 
 
-def batched(values: Sequence[ObjectId], batch_size: int) -> Iterable[Sequence[ObjectId]]:
+def batched(values: Sequence[Any], batch_size: int) -> Iterable[Sequence[Any]]:
     for start in range(0, len(values), batch_size):
         yield values[start:start + batch_size]
+
+
+def build_problem_url(user_id: Any, task_id: Any) -> str:
+    """Build the original Xiaomei shared-task URL from a problem document."""
+    query = urlencode([
+        ("jumpScene", "mockTaskShare"),
+        ("userId", str(user_id or "")),
+        ("channel", "mockTaskShare"),
+        ("encryptMockTaskNo", str(task_id or "")),
+    ])
+    return f"{PROBLEM_URL}?{query}"
+
+
+def connect_elasticsearch(config: Mapping[str, Any]) -> Elasticsearch:
+    """Create and verify an Elasticsearch client from config.yml."""
+    es_config = config.get("elasticsearch") or {}
+    hosts = es_config.get("hosts", ["http://localhost:9200"])
+    client_config: Dict[str, Any] = {
+        "hosts": hosts,
+        "request_timeout": 30,
+    }
+    username = es_config.get("username", "")
+    password = es_config.get("password", "")
+    if username and password:
+        client_config["basic_auth"] = (username, password)
+    if any(str(host).lower().startswith("https://") for host in hosts):
+        client_config["verify_certs"] = False
+        client_config["ssl_show_warn"] = False
+
+    client = Elasticsearch(**client_config)
+    if not client.ping():
+        client.close()
+        raise ConnectionError("Elasticsearch ping returned False")
+    return client
+
+
+def fetch_es_documents(
+    es_client: Any,
+    index_name: str,
+    problem_ids: Sequence[str],
+    batch_size: int = 500,
+) -> Dict[str, Mapping[str, Any]]:
+    """Fetch the ES fields needed by the CSV, keyed by MongoDB problem ID."""
+    result: Dict[str, Mapping[str, Any]] = {}
+    unique_problem_ids = list(dict.fromkeys(problem_ids))
+    for problem_id_batch in batched(unique_problem_ids, batch_size):
+        response = es_client.search(
+            index=index_name,
+            body={
+                "query": {"terms": {"mongo_id": list(problem_id_batch)}},
+                "_source": ["mongo_id", "user_review", "timestamp", "appeals.content"],
+                "size": len(problem_id_batch),
+            },
+        )
+        response_body = getattr(response, "body", response)
+        for hit in response_body.get("hits", {}).get("hits", []):
+            source = hit.get("_source") or {}
+            mongo_id = source.get("mongo_id")
+            if mongo_id is not None:
+                result[str(mongo_id)] = source
+    return result
+
+
+def es_user_review(source: Mapping[str, Any]) -> str:
+    """Use user_review, falling back only to appeals[0].content when empty."""
+    user_review = source.get("user_review")
+    if isinstance(user_review, str) and user_review.strip():
+        return user_review
+
+    appeals = source.get("appeals")
+    if isinstance(appeals, list) and appeals and isinstance(appeals[0], Mapping):
+        content = appeals[0].get("content")
+        if content is not None:
+            return str(content)
+    return ""
+
+
+def enrich_rows_with_es(
+    rows: Iterable[Mapping[str, Any]],
+    es_documents: Mapping[str, Mapping[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Add ES review/timestamp fields and return final CSV-shaped rows."""
+    enriched: List[Dict[str, Any]] = []
+    for row in rows:
+        problem_id = str(row["problemId"])
+        source = es_documents.get(problem_id, {})
+        enriched.append({
+            "problemId": problem_id,
+            "user_review": es_user_review(source),
+            "timestamp": format_create_time_sgt(source.get("timestamp")),
+            "commentId": row.get("commentId", ""),
+            "content": row.get("content", ""),
+            "likes": row.get("likes", ""),
+            "createTime": row.get("createTime", ""),
+            "url": row.get("url", ""),
+        })
+    return enriched
 
 
 def find_vanished_comments(
@@ -108,7 +210,7 @@ def find_vanished_comments(
     batch_size: int = 500,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """Return vanished-comment CSV rows and the number of candidates checked."""
-    comment_filter = {"userId": user_id, "approveCount": {"$gt": 100}}
+    comment_filter = {"userId": user_id, "approveCount": {"$gt": MIN_APPROVE_COUNT}}
     comment_projection = {
         "_id": 0,
         "problemId": 1,
@@ -154,19 +256,18 @@ def find_vanished_comments(
             if comment_id in existing_comment_ids:
                 continue
             vanished.append({
-                "_id": problem_id,
-                "userId": problem.get("userId", "") if problem else "",
-                "taskId": problem.get("taskId", "") if problem else "",
+                "problemId": problem_id,
                 "commentId": comment_id,
                 "content": comment.get("content", ""),
-                "approveCount": comment.get("approveCount", ""),
+                "likes": comment.get("approveCount", ""),
                 "createTime": format_create_time_sgt(comment.get("createTime")),
+                "url": build_problem_url(problem.get("userId"), problem.get("taskId")),
             })
 
     vanished.sort(
         key=lambda row: (
-            -(float(row["approveCount"]) if isinstance(row["approveCount"], (int, float)) else 0),
-            row["_id"],
+            -(float(row["likes"]) if isinstance(row["likes"], (int, float)) else 0),
+            row["problemId"],
             row["commentId"],
         )
     )
@@ -183,14 +284,14 @@ def write_csv(rows: Iterable[Mapping[str, Any]], output_path: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Export approveCount > 100 comments missing from problems.",
+        description=f"Export approveCount > {MIN_APPROVE_COUNT} comments missing from problems.",
     )
     parser.add_argument("user_id", type=parse_user_id, help="numeric comments.userId")
     parser.add_argument(
         "-o",
         "--output",
         type=Path,
-        help="CSV output path (default: vanished_comments_<user_id>.csv)",
+        help="CSV output path (default: <user_id>.csv)",
     )
     parser.add_argument(
         "--batch-size",
@@ -207,8 +308,9 @@ def main() -> int:
         print("error: --batch-size must be at least 1", file=sys.stderr)
         return 2
 
-    output_path = args.output or Path(f"vanished_comments_{args.user_id}.csv")
+    output_path = args.output or Path(f"{args.user_id}.csv")
     client: Optional[MongoClient] = None
+    es_client: Optional[Elasticsearch] = None
     try:
         config = load_config()
         mongo_config = config["mongodb"]
@@ -225,6 +327,16 @@ def main() -> int:
             args.user_id,
             args.batch_size,
         )
+        if rows:
+            es_client = connect_elasticsearch(config)
+            es_config = config.get("elasticsearch") or {}
+            es_documents = fetch_es_documents(
+                es_client,
+                es_config.get("index_name", "problems"),
+                [row["problemId"] for row in rows],
+                args.batch_size,
+            )
+            rows = enrich_rows_with_es(rows, es_documents)
         write_csv(rows, output_path)
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -232,8 +344,10 @@ def main() -> int:
     finally:
         if client is not None:
             client.close()
+        if es_client is not None:
+            es_client.close()
 
-    print(f"Checked {candidate_count} comments with approveCount > 100.")
+    print(f"Checked {candidate_count} comments with approveCount > {MIN_APPROVE_COUNT}.")
     print(f"Found {len(rows)} vanished comments.")
     print(f"CSV written to: {output_path.resolve()}")
     return 0
