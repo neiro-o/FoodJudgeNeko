@@ -31,9 +31,24 @@ The script will:
    - Admin password (twice for confirmation)
 5. Create the initial admin user with `is_admin: true`
 
+## Export vanished high-liked comments
+
+`fetch_vanished_comments.py` finds a user's comments with `approveCount > 100`
+whose `commentId` no longer appears under the corresponding problem's
+`comment[].pageContent[]`, then exports them as CSV. `createTime` is written in
+Singapore Time (SGT, UTC+08:00).
+
+```bash
+python fetch_vanished_comments.py 123456789
+python fetch_vanished_comments.py 123456789 -o /path/to/result.csv
+```
+
+The default output is `vanished_comments_<user_id>.csv` in the current
+directory. Comments with an invalid `problemId`, or whose entire problem no
+longer exists, are skipped rather than counted as vanished comments.
+
 ## Notes
 
 - The script checks if a user with the same username or email already exists
 - Passwords are hashed using bcrypt before storage
 - The admin user will have `is_admin` set to `true`
-
