@@ -299,13 +299,23 @@
   .result-metrics[data-count="3"] { grid-template-columns: repeat(3, max-content); }
   .result-heading-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 12px; }
   .display-settings-overlay { position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 20px; }
-  .display-settings { width: min(420px, 100%); padding: 26px; }
+  .display-settings { width: min(460px, 100%); max-height: min(720px, calc(100svh - 40px)); padding: 26px; overflow-y: auto; }
   .display-settings h2 { font-size: 23px; font-weight: 700; }
   .display-settings p { color: var(--brand-muted); margin: 10px 0 20px; }
-  .display-settings label { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-top: 1px solid var(--brand-line); }
+  .display-settings label { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 16px 0; border-top: 1px solid var(--brand-line); }
   .display-settings input { width: 20px; height: 20px; accent-color: #9b6b00; }
+  .display-settings-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--brand-line); }
+  .display-settings-section h3 { margin-bottom: 5px; color: var(--brand-muted); font-size: 12px; font-weight: 800; letter-spacing: .14em; }
+  .display-settings-section label:first-of-type { border-top: 0; }
+  .display-settings-section label > span:first-child { display: grid; gap: 4px; }
+  .display-settings-section label b { font-size: 14px; }
+  .display-settings-section label small { color: var(--brand-muted); font-size: 11px; }
+  .display-limit-control { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .display-limit-control input { width: 92px; }
+  .display-limit-control output { min-width: 24px; text-align: center; font-weight: 800; }
+  .display-toggle-text { display: flex; align-items: center; gap: 8px; flex-shrink: 0; color: var(--brand-muted); font-size: 13px; }
   .display-settings footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
-  .display-settings footer button { padding: 10px 24px; }
+  .display-settings footer button { min-width: 96px; padding: 10px 24px; border-radius: 999px; }
   .result-metrics em { color: #ff4d5e; font-style: normal; }
   .ratio-colored { display: inline-flex; align-items: baseline; gap: 2px; font-variant-numeric: tabular-nums; }
   .ratio-colored b { color: #f04452; font-weight: 750; }

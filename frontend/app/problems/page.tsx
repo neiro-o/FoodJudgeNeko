@@ -80,6 +80,8 @@ export default function ProblemsPage() {
   const returnToSearch = () => window.location.assign('/problems');
   const [resultLimit, setResultLimit] = useState(15);
   const [blockMaliciousComment, setBlockMaliciousComment] = useState(true);
+  const [draftResultLimit, setDraftResultLimit] = useState(15);
+  const [draftBlockMaliciousComment, setDraftBlockMaliciousComment] = useState(true);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   useEffect(() => {
@@ -1272,7 +1274,7 @@ export default function ProblemsPage() {
                         <h2>共找到 <b>{searchTotal}</b> 道题，显示前 <b>{searchResults.length}</b> 个</h2>
                       </div>
                       <div className="result-heading-actions">
-                      <button onClick={() => { setDraftDisplayItems(displayItems); setIsCustomizerOpen(true); }} className="result-settings" aria-label="选择显示项">
+                      <button onClick={() => { setDraftDisplayItems(displayItems); setDraftResultLimit(resultLimit); setDraftBlockMaliciousComment(blockMaliciousComment); setIsCustomizerOpen(true); }} className="result-settings" aria-label="选择显示项">
                         <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2m4 0h10M14 4v6M6 14v6" /></svg>
                       </button>
                       <button type="button" className="result-settings" onClick={returnToSearch} aria-label="关闭结果，返回搜题" title="关闭结果，返回搜题">
@@ -1365,9 +1367,32 @@ export default function ProblemsPage() {
               {([['ratio', '比例'], ['comments', '评论区比例'], ['ai', 'AI 判断']] as const).map(([key, label]) => (
                 <label key={key}><span>{label}</span><input type="checkbox" checked={draftDisplayItems[key]} onChange={(event) => setDraftDisplayItems({ ...draftDisplayItems, [key]: event.target.checked })} /></label>
               ))}
+              <div className="display-settings-section">
+                <h3>搜索设置</h3>
+                <label>
+                  <span><b>每页显示条数</b><small>设置搜索结果一次显示的数量</small></span>
+                  <span className="display-limit-control">
+                    <input type="range" min="5" max="20" value={draftResultLimit} onChange={(event) => setDraftResultLimit(Number(event.target.value))} />
+                    <output>{draftResultLimit}</output>
+                  </span>
+                </label>
+                <label>
+                  <span><b>屏蔽恶意用户</b><small>隐藏疑似恶意用户产生的内容</small></span>
+                  <span className="display-toggle-text">
+                    <input type="checkbox" checked={draftBlockMaliciousComment} onChange={(event) => setDraftBlockMaliciousComment(event.target.checked)} />
+                    {draftBlockMaliciousComment ? '开启' : '关闭'}
+                  </span>
+                </label>
+              </div>
               <footer>
                 <button className="quick-pill" autoFocus onClick={() => setIsCustomizerOpen(false)}>取消</button>
-                <button className="brand-primary-button" onClick={() => { localStorage.setItem('problemDisplayItemsV1', JSON.stringify(draftDisplayItems)); setDisplayItems(draftDisplayItems); setIsCustomizerOpen(false); }}>保存</button>
+                <button className="brand-primary-button" onClick={() => {
+                  localStorage.setItem('problemDisplayItemsV1', JSON.stringify(draftDisplayItems));
+                  setDisplayItems(draftDisplayItems);
+                  handleBlockMaliciousCommentChange(draftBlockMaliciousComment);
+                  if (draftResultLimit !== resultLimit) void handleResultLimitChange(draftResultLimit);
+                  setIsCustomizerOpen(false);
+                }}>保存</button>
               </footer>
             </section>
           </div>
