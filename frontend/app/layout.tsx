@@ -4,6 +4,21 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ProblemsStateProvider } from '@/contexts/ProblemsStateContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { Noto_Sans_SC, Noto_Serif_SC } from 'next/font/google'
+
+const notoSansSC = Noto_Sans_SC({
+  variable: '--font-noto-sans-sc',
+  weight: 'variable',
+  display: 'swap',
+  preload: false,
+})
+
+const notoSerifSC = Noto_Serif_SC({
+  variable: '--font-noto-serif-sc',
+  weight: ['700', '900'],
+  display: 'swap',
+  preload: false,
+})
 
 export const metadata: Metadata = {
   title: '掉心心',
@@ -16,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="zh-CN" className={`${notoSansSC.variable} ${notoSerifSC.variable}`} suppressHydrationWarning>
       <body>
         <ThemeProvider>
           <LanguageProvider>

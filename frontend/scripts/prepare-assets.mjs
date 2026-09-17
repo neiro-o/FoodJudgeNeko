@@ -8,7 +8,10 @@ async function walk(directory, prefix) {
     const file = path.join(directory, entry.name);
     const url = `${prefix}/${entry.name}`;
     if (entry.isDirectory()) await walk(file, url);
-    else if (!['/asset-manifest.json', '/asset-worker.js', '/indexpage/le0ou.jpg'].includes(url) && !entry.name.endsWith('.map') && !entry.name.startsWith('.')) {
+    // next/font emits many unicode-range font shards. Browsers should request
+    // only the shards needed by the rendered text instead of the landing-page
+    // preloader downloading the entire CJK family on mobile.
+    else if (!['/asset-manifest.json', '/asset-worker.js', '/indexpage/le0ou.jpg'].includes(url) && !entry.name.endsWith('.map') && !entry.name.startsWith('.') && !/\.(woff2?|ttf|otf|eot)$/i.test(entry.name)) {
       const buffer = await readFile(file);
       assets.push({ url, bytes: buffer.length, hash: createHash('sha256').update(buffer).digest('hex') });
     }

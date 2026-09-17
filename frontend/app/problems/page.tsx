@@ -9,6 +9,7 @@ import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/components/ColumnCustomizer';
 import Image from 'next/image';
+import { analyzeUnifiedUploads, extractUploadUrls, parseDailyUrl, parseProblemUrl } from '@/lib/uploadParsing';
 
 const PREVIEW_RESULTS: SearchResult[] = [
   { id: 'preview-1', mongo_id: 'preview-1', user_review: '商家拒绝履行活动承诺，消费者申请退款是否应该支持？', timestamp: 1758090191, answer: 1, hot1_answer: 1, comment_ratio: 76, ratio_1: 57, ratio_2: 43, _score: 1 },
@@ -336,63 +337,6 @@ export default function ProblemsPage() {
     }
   };
 
-  // Parse URL to extract userId and taskId
-  const parseUrl = (url: string): { userId: string | null; taskId: string | null } => {
-    try {
-      const urlObj = new URL(url);
-      const userId = urlObj.searchParams.get('userId');
-      const taskId = urlObj.searchParams.get('encryptMockTaskNo');
-      return { userId, taskId };
-    } catch (error) {
-      return { userId: null, taskId: null };
-    }
-  };
-
-  // Parse daily report URL to extract shareUserId and dailyReportTime
-  const parseDailyUrl = (url: string): { userId: string | null; dateId: string | null } => {
-    try {
-      const urlObj = new URL(url);
-      const jumpScene = urlObj.searchParams.get('jumpScene');
-      
-      // Only parse if it's a daily report URL
-      if (jumpScene !== 'dailyReport') {
-        return { userId: null, dateId: null };
-      }
-      
-      const userId = urlObj.searchParams.get('shareUserId');
-      const dateId = urlObj.searchParams.get('dailyReportTime');
-      return { userId, dateId };
-    } catch (error) {
-      return { userId: null, dateId: null };
-    }
-  };
-
-  const analyzeUnifiedUploads = (text: string) => {
-    const urls = text.match(/https?:\/\/[^\s\n\t,;]+/gi) || [];
-    const regular = urls.flatMap((url) => {
-      const parsed = parseUrl(url);
-      return parsed.userId && parsed.taskId ? [{ userId: parsed.userId, taskId: parsed.taskId }] : [];
-    });
-    const daily = urls.flatMap((url) => {
-      const parsed = parseDailyUrl(url);
-      return parsed.userId && parsed.dateId ? [{ userId: parsed.userId, dateId: parsed.dateId }] : [];
-    });
-
-    const uniqueRegular = regular.filter((item, index, items) =>
-      index === items.findIndex((candidate) => candidate.userId === item.userId && candidate.taskId === item.taskId)
-    );
-    const uniqueDaily = daily.filter((item, index, items) =>
-      index === items.findIndex((candidate) => candidate.userId === item.userId && candidate.dateId === item.dateId)
-    );
-
-    return {
-      regular: uniqueRegular,
-      daily: uniqueDaily,
-      total: uniqueRegular.length + uniqueDaily.length,
-      invalid: Math.max(0, urls.length - uniqueRegular.length - uniqueDaily.length),
-    };
-  };
-
   // Parse single URL in real-time
   useEffect(() => {
     if (uploadMode === 'single' && singleUrl.trim()) {
@@ -403,7 +347,7 @@ export default function ProblemsPage() {
         setSingleParsed(null);
       } else {
         // Try regular URL parsing
-        const parsed = parseUrl(singleUrl.trim());
+        const parsed = parseProblemUrl(singleUrl.trim());
         if (parsed.userId && parsed.taskId) {
           setSingleParsed({ userId: parsed.userId, taskId: parsed.taskId });
           setSingleDailyParsed(null);
@@ -421,50 +365,14 @@ export default function ProblemsPage() {
   // Parse multiple URLs in real-time
   useEffect(() => {
     if (uploadMode === 'multiple' && multipleUrls.trim()) {
-      let urls: string[] = [];
-      
-      // Find all positions where URLs start (http:// or https://)
-      // This handles both separated and concatenated URLs (no separators)
-      const protocolPattern = /https?:\/\//gi;
-      const matches: Array<{ index: number; protocol: string }> = [];
-      let match;
-      
-      // Reset regex lastIndex to ensure we search from the beginning
-      protocolPattern.lastIndex = 0;
-      while ((match = protocolPattern.exec(multipleUrls)) !== null) {
-        matches.push({ index: match.index, protocol: match[0] });
-      }
-      
-      if (matches.length > 0) {
-        // Extract URLs from each protocol start position
-        for (let i = 0; i < matches.length; i++) {
-          const start = matches[i].index;
-          const nextStart = i < matches.length - 1 ? matches[i + 1].index : multipleUrls.length;
-          
-          // Extract the substring from current protocol to next protocol (or end)
-          const urlSegment = multipleUrls.substring(start, nextStart);
-          
-          // Extract URL until whitespace/delimiter or next protocol
-          // Match from protocol until whitespace, delimiter, or end
-          const urlMatch = urlSegment.match(/^(https?:\/\/[^\s\n\t,;]+)/);
-          if (urlMatch) {
-            urls.push(urlMatch[1]);
-          }
-        }
-      } else {
-        // Fall back to delimiter-based splitting
-        urls = multipleUrls
-          .split(/[\n\t,;\s]+/)
-          .map(url => url.trim())
-          .filter(url => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')));
-      }
+      const urls = extractUploadUrls(multipleUrls);
 
       const userIds: string[] = [];
       const taskIds: string[] = [];
       const pairs: Array<{ userId: string; taskId: string }> = [];
 
       urls.forEach(url => {
-        const parsed = parseUrl(url);
+        const parsed = parseProblemUrl(url);
         if (parsed.userId) userIds.push(parsed.userId);
         if (parsed.taskId) taskIds.push(parsed.taskId);
         if (parsed.userId && parsed.taskId) {
@@ -1396,7 +1304,7 @@ export default function ProblemsPage() {
               {uploadSuccess && <div className="search-alert success">{uploadSuccess}</div>}
               <form onSubmit={handleUnifiedUpload} className="upload-form">
                 <label htmlFor="unifiedUrls">粘贴题目链接</label>
-                <textarea id="unifiedUrls" value={multipleUrls} onChange={(event) => setMultipleUrls(event.target.value)} placeholder="支持普通题目链接和 daily 链接；多条链接可换行粘贴" rows={5} autoFocus />
+                <textarea id="unifiedUrls" value={multipleUrls} onChange={(event) => setMultipleUrls(event.target.value)} placeholder="支持普通题目链接和 daily 链接；多条链接可用逗号、空格、换行分隔，也可直接连续粘贴" rows={5} autoFocus />
                 <div className="upload-detection-row">
                   <span>普通题目 <b>{unifiedUploadAnalysis.regular.length}</b></span>
                   <span>Daily <b>{unifiedUploadAnalysis.daily.length}</b></span>
