@@ -42,14 +42,17 @@ async function apiRequest<T>(
     headers,
   });
 
-  // Handle 401 Unauthorized - redirect to login
-  if (response.status === 401) {
+  // Handle an expired login by preserving the current in-app location so the
+  // user can return to it after authenticating again. A rejected login request
+  // itself should stay on the login page and display the backend error.
+  if (response.status === 401 && endpoint !== '/login') {
     // Clear auth data
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // Redirect to login with expired parameter
-      window.location.href = '/login?expired=true';
+      const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const params = new URLSearchParams({ expired: 'true', redirect });
+      window.location.href = `/login?${params.toString()}`;
     }
     throw new Error('Unauthorized');
   }
@@ -209,7 +212,7 @@ export interface SearchResult {
   timestamp: number;
   answer: number;
   hot1_answer?: number | null;
-  comment_answer?: number | null;
+  comment_ratio?: number | null;
   ratio_1: number;
   ratio_2: number;
   _score: number;

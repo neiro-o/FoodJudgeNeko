@@ -12,8 +12,8 @@ export default function BrandLogo({ compact = false }: { compact?: boolean }) {
         </svg>
       </span>
       <span className="brand-logo-copy">
-        <strong>搜题</strong>
-        {!compact && <small>美团评审团 · 题目答案搜索</small>}
+        <strong>掉心心</strong>
+        {!compact && <small>打爆歪题，少掉歪心！</small>}
       </span>
     </Link>
   );

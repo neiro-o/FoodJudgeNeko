@@ -9,6 +9,19 @@ import Image from 'next/image';
 import BrandLogo from '@/components/BrandLogo';
 import PageTitle from '@/components/PageTitle';
 
+const getSafeRedirectPath = (value: string | null): string => {
+  if (!value) return '/problems';
+
+  try {
+    const baseUrl = new URL('https://local.invalid');
+    const targetUrl = new URL(value, baseUrl);
+    if (targetUrl.origin !== baseUrl.origin) return '/problems';
+    return `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
+  } catch {
+    return '/problems';
+  }
+};
+
 function LoginForm() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -19,6 +32,7 @@ function LoginForm() {
   const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const redirectPath = getSafeRedirectPath(searchParams.get('redirect'));
 
   useEffect(() => {
     if (searchParams.get('registered') === 'true') setSuccess(t('login.success'));
@@ -26,8 +40,8 @@ function LoginForm() {
   }, [searchParams, t]);
 
   useEffect(() => {
-    if (isAuthenticated) router.push('/problems');
-  }, [isAuthenticated, router]);
+    if (isAuthenticated) router.replace(redirectPath);
+  }, [isAuthenticated, redirectPath, router]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -35,6 +49,7 @@ function LoginForm() {
     setLoading(true);
     try {
       await login(username, password);
+      router.replace(redirectPath);
     } catch (loginError: any) {
       setError(loginError.message || t('login.error'));
     } finally {

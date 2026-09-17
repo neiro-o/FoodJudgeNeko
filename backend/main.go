@@ -114,6 +114,8 @@ func main() {
 		protected.GET("/bot/search", middleware.RequireSearchQuota(), handlers.BotSearch)
 		protected.GET("/problem/recent", middleware.ProblemRateLimit("/api/problem/recent", 3), handlers.GetRecentProblems)
 		protected.GET("/problem/count", handlers.CountItems)
+		// Short alias used by the search landing-page count switcher.
+		protected.GET("/count", handlers.CountItems)
 		protected.GET("/problem/by-esid/:id", middleware.ProblemRateLimit("/api/problem/by-esid/:id", 1), handlers.SearchByESID)
 		protected.GET("/problem/by-mongoid/:id", middleware.ProblemRateLimit("/api/problem/by-mongoid/:id", 1), handlers.SearchByMongoID)
 		protected.GET("/problem/uploaders/:id", handlers.GetProblemUploaders)

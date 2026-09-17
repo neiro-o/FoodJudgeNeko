@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/prepare-assets.mjs --dev && next dev",
+    "build": "next build && node scripts/prepare-assets.mjs",
     "start": "next start",
     "start:prod": "NODE_ENV=production next start",
     "lint": "next lint"
@@ -25,4 +25,3 @@
     "typescript": "^5"
   }
 }
-

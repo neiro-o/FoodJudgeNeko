@@ -4,7 +4,6 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ProblemsStateProvider } from '@/contexts/ProblemsStateContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
-import AssetPreloader from '@/components/AssetPreloader'
 
 export const metadata: Metadata = {
   title: '掉心心',
@@ -17,14 +16,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preload" as="image" href="/brand/kangaroo-reader.png?v=2" />
-        <link rel="preload" as="image" href="/brand/book-stack.png" />
-        <link rel="preload" as="image" href="/brand/kangaroo-milk-tea.png" />
-      </head>
+    <html lang="zh-CN" suppressHydrationWarning>
       <body>
-        <AssetPreloader />
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>

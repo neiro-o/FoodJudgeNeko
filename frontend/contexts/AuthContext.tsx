@@ -61,8 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.user));
       }
-      
-      router.push('/problems');
     } catch (error: any) {
       throw new Error(error.message || 'Login failed');
     }

@@ -11,11 +11,17 @@ import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/com
 import Image from 'next/image';
 
 const PREVIEW_RESULTS: SearchResult[] = [
-  { id: 'preview-1', mongo_id: 'preview-1', user_review: '商家拒绝履行活动承诺，消费者申请退款是否应该支持？', timestamp: 1758090191, answer: 1, hot1_answer: 1, comment_answer: 1, ratio_1: 57, ratio_2: 43, _score: 1 },
-  { id: 'preview-2', mongo_id: 'preview-2', user_review: '外卖食品中吃出异物，无法提供完整证据时，平台应如何处理？', timestamp: 1758085527, answer: 2, hot1_answer: 2, comment_answer: 2, ratio_1: 53, ratio_2: 47, _score: 1 },
-  { id: 'preview-3', mongo_id: 'preview-3', user_review: '骑手未按备注要求送达，导致餐品变质，责任应由谁承担？', timestamp: 1758022928, answer: 1, hot1_answer: 1, comment_answer: 1, ratio_1: 71, ratio_2: 29, _score: 1 },
-  { id: 'preview-4', mongo_id: 'preview-4', user_review: '用户使用优惠券下单后，商家单方面取消订单，是否应赔付？', timestamp: 1757992653, answer: 2, hot1_answer: 2, comment_answer: 2, ratio_1: 48, ratio_2: 52, _score: 1 },
+  { id: 'preview-1', mongo_id: 'preview-1', user_review: '商家拒绝履行活动承诺，消费者申请退款是否应该支持？', timestamp: 1758090191, answer: 1, hot1_answer: 1, comment_ratio: 76, ratio_1: 57, ratio_2: 43, _score: 1 },
+  { id: 'preview-2', mongo_id: 'preview-2', user_review: '外卖食品中吃出异物，无法提供完整证据时，平台应如何处理？', timestamp: 1758085527, answer: 2, hot1_answer: 2, comment_ratio: 61, ratio_1: 53, ratio_2: 47, _score: 1 },
+  { id: 'preview-3', mongo_id: 'preview-3', user_review: '骑手未按备注要求送达，导致餐品变质，责任应由谁承担？', timestamp: 1758022928, answer: 1, hot1_answer: 1, comment_ratio: 50, ratio_1: 71, ratio_2: 29, _score: 1 },
+  { id: 'preview-4', mongo_id: 'preview-4', user_review: '用户使用优惠券下单后，商家单方面取消订单，是否应赔付？', timestamp: 1757992653, answer: 2, hot1_answer: 2, comment_ratio: 24, ratio_1: 48, ratio_2: 52, _score: 1 },
 ];
+
+const COUNT_METRICS = [
+  { key: 'elasticsearch', icon: '📋', label: '题目总数' },
+  { key: 'redis', icon: '📤', label: '上传队列' },
+  { key: 'mongodb', icon: '📖', label: '原始数据' },
+] as const;
 
 export default function ProblemsPage() {
   const { isAuthenticated, loading, user } = useAuth();
@@ -65,6 +71,7 @@ export default function ProblemsPage() {
   // Count states
   const [counts, setCounts] = useState<{ elasticsearch: number; mongodb: number; redis: number } | null>(null);
   const [countsLoading, setCountsLoading] = useState(false);
+  const [countMetricIndex, setCountMetricIndex] = useState(0);
 
   // Column customization states
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
@@ -737,6 +744,24 @@ export default function ProblemsPage() {
     );
   };
 
+  const renderCommentRatio = (ratio: number | null | undefined): JSX.Element => {
+    if (ratio === null || ratio === undefined || !Number.isFinite(ratio)) {
+      return <span className="text-gray-500 dark:text-gray-400">N/A</span>;
+    }
+
+    const value = Math.min(100, Math.max(0, ratio));
+    const distanceFromMiddle = Math.abs(value - 50) / 50;
+    const endpoint = value >= 50 ? [34, 197, 94] : [239, 68, 68];
+    const channel = (target: number) => Math.round(255 + (target - 255) * distanceFromMiddle);
+    const color = `rgb(${channel(endpoint[0])}, ${channel(endpoint[1])}, ${channel(endpoint[2])})`;
+
+    return (
+      <span className="comment-ratio" style={{ color }}>
+        {Math.round(value)}%
+      </span>
+    );
+  };
+
   const truncateTaskId = (taskId: string, maxLength: number = 80): string => {
     if (taskId.length <= maxLength) {
       return taskId;
@@ -1095,7 +1120,7 @@ export default function ProblemsPage() {
                             if (col.id === 'comment') {
                               return (
                                 <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm">
-                                  {renderAnswerCell(result.comment_answer)}
+                                  {renderCommentRatio(result.comment_ratio)}
                                 </td>
                               );
                             }
@@ -1185,6 +1210,8 @@ export default function ProblemsPage() {
 
   void legacyPage;
   const hasSearchState = searchLoading || Boolean(currentSearchKeyword) || searchResults.length > 0 || Boolean(searchError);
+  const activeCountMetric = COUNT_METRICS[countMetricIndex];
+  const activeCount = counts?.[activeCountMetric.key];
 
   return (
     <>
@@ -1208,6 +1235,7 @@ export default function ProblemsPage() {
               />
               <Image
                 src="/brand/book-stack.png"
+                unoptimized
                 alt="真实题目、高分答案、少走弯路书堆"
                 width={1698}
                 height={926}
@@ -1217,6 +1245,7 @@ export default function ProblemsPage() {
             </div>
             <Image
               src="/brand/kangaroo-milk-tea.png"
+              unoptimized
               alt="袋鼠造型奶茶"
               width={1024}
               height={1536}
@@ -1240,6 +1269,17 @@ export default function ProblemsPage() {
                 aria-label="搜索题目"
               />
               {!hasSearchState && <span className="search-hint">加空格带上日期可以精确搜索对应日期评价</span>}
+              {searchKeyword && (
+                <button
+                  type="button"
+                  className="search-clear"
+                  onClick={() => setSearchKeyword('')}
+                  aria-label="清空搜索内容"
+                  title="清空"
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
+              )}
               <button type="submit" disabled={searchLoading} aria-label="提交搜索">
                 {searchLoading ? (
                   <span className="search-spinner search-spinner-small" />
@@ -1251,6 +1291,16 @@ export default function ProblemsPage() {
 
             {!hasSearchState && (
               <div className="search-quick-actions">
+                <button
+                  type="button"
+                  className="quick-pill count-switcher"
+                  onClick={() => setCountMetricIndex((index) => (index + 1) % COUNT_METRICS.length)}
+                  data-tooltip={activeCountMetric.label}
+                  aria-label={`${activeCountMetric.label}：${activeCount ?? '加载中'}，点击查看下一项`}
+                >
+                  <span aria-hidden="true">{activeCountMetric.icon}</span>
+                  <b>{countsLoading || activeCount === undefined ? '—' : activeCount}</b>
+                </button>
                 <button className="quick-pill" onClick={() => router.push('/points')}><span className="coin-icon">●</span>{user?.points ?? 0}</button>
                 <button className="quick-pill" onClick={() => router.push('/points')}><span>▥</span> 查询分榜</button>
                 <button className="quick-pill" onClick={() => router.push('/user_stats')}><span>♙</span> 查询用户</button>
@@ -1309,7 +1359,7 @@ export default function ProblemsPage() {
                           <div className="result-metrics" data-count={1 + Object.values(displayItems).filter(Boolean).length}>
                             <span>答案 {renderAnswerCell(result.answer)}</span>
                             {displayItems.ratio && <span>比例 <em>{formatRatio(result.ratio_1, result.ratio_2)}</em></span>}
-                            {displayItems.comments && <span>评论区比例 <em>{renderAnswerCell(result.comment_answer)}</em></span>}
+                            {displayItems.comments && <span>评论区比例 {renderCommentRatio(result.comment_ratio)}</span>}
                             {displayItems.ai && <span>AI 判断 {renderAnswerCell(result.hot1_answer)}</span>}
                           </div>
                         </a>
