@@ -1223,8 +1223,8 @@ export default function ProblemsPage() {
             />
             <div className="search-hero-copy">
               <p className="search-eyebrow">ANSWER FINDER · 题目答案搜索</p>
-              <h1>搜题</h1>
-              <p>美团评审团 · 找到更好的答案</p>
+              <h1>小美搜题</h1>
+              <p>打爆歪题，少掉歪心！</p>
             </div>
           </section>
 
@@ -1258,7 +1258,6 @@ export default function ProblemsPage() {
 
             {hasSearchState && (
               <div className="search-results-shell brand-card">
-                <button type="button" className="quick-pill close-search-results" onClick={returnToSearch}>× 关闭结果，返回搜题</button>
                 {searchLoading ? (
                   <div className="search-loading-state">
                     <span className="search-spinner" />
@@ -1272,9 +1271,14 @@ export default function ProblemsPage() {
                         <span>SEARCH RESULTS</span>
                         <h2>共找到 <b>{searchTotal}</b> 道题，显示前 <b>{searchResults.length}</b> 个</h2>
                       </div>
+                      <div className="result-heading-actions">
                       <button onClick={() => { setDraftDisplayItems(displayItems); setIsCustomizerOpen(true); }} className="result-settings" aria-label="选择显示项">
                         <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2m4 0h10M14 4v6M6 14v6" /></svg>
                       </button>
+                      <button type="button" className="result-settings" onClick={returnToSearch} aria-label="关闭结果，返回搜题" title="关闭结果，返回搜题">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                      </button>
+                      </div>
                     </div>
 
                     {searchError && (

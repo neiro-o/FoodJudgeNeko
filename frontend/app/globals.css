@@ -297,7 +297,7 @@
   .result-metrics[data-count="1"] { grid-template-columns: max-content; }
   .result-metrics[data-count="2"] { grid-template-columns: repeat(2, max-content); }
   .result-metrics[data-count="3"] { grid-template-columns: repeat(3, max-content); }
-  .close-search-results { margin-bottom: 18px; }
+  .result-heading-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 12px; }
   .display-settings-overlay { position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 20px; }
   .display-settings { width: min(420px, 100%); padding: 26px; }
   .display-settings h2 { font-size: 23px; font-weight: 700; }
