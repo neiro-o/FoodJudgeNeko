@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import LanguageSelector from '@/components/LanguageSelector';
+import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import PageTitle from '@/components/PageTitle';
 
 function LoginForm() {
@@ -19,136 +20,56 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Check for registration success message
   useEffect(() => {
-    if (searchParams.get('registered') === 'true') {
-      setSuccess(t('login.success'));
-    }
+    if (searchParams.get('registered') === 'true') setSuccess(t('login.success'));
+    if (searchParams.get('expired') === 'true') setError(t('login.expired'));
   }, [searchParams, t]);
 
-  // Check for expired session message
   useEffect(() => {
-    if (searchParams.get('expired') === 'true') {
-      setError(t('login.expired'));
-    }
-  }, [searchParams, t]);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/problems');
-    }
+    if (isAuthenticated) router.push('/problems');
   }, [isAuthenticated, router]);
 
-  if (isAuthenticated) {
-    return null;
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       await login(username, password);
-    } catch (err: any) {
-      setError(err.message || t('login.error'));
+    } catch (loginError: any) {
+      setError(loginError.message || t('login.error'));
     } finally {
       setLoading(false);
     }
   };
 
+  if (isAuthenticated) return null;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
-      <div className="absolute top-4 right-4">
-        <LanguageSelector />
-      </div>
-      <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">{t('login.title')}</h1>
-            <p className="text-gray-600 dark:text-gray-400">{t('login.subtitle')}</p>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
-              <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('login.username')}
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                placeholder={t('login.usernamePlaceholder')}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('login.password')}
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                placeholder={t('login.passwordPlaceholder')}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {loading ? t('login.submitting') : t('login.submit')}
-            </button>
+    <div className="brand-page auth-page">
+      <section className="auth-visual">
+        <BrandLogo />
+        <div className="auth-kicker">认真搜题，<br /><span>少走一点弯路。</span></div>
+        <Image className="auth-mascot" src="/brand/kangaroo-reader.png?v=2" alt="读题袋鼠" width={1254} height={1254} priority unoptimized />
+      </section>
+      <section className="auth-panel">
+        <div className="brand-card auth-card">
+          <p className="search-eyebrow">WELCOME BACK</p>
+          <h1>{t('login.title')}</h1>
+          <p className="mt-2 mb-8 text-gray-500">{t('login.subtitle')}</p>
+          {error && <div className="search-alert error">{error}</div>}
+          {success && <div className="search-alert success">{success}</div>}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div><label htmlFor="username">{t('login.username')}</label><input className="brand-form-input" id="username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t('login.usernamePlaceholder')} required /></div>
+            <div><label htmlFor="password">{t('login.password')}</label><input className="brand-form-input" id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t('login.passwordPlaceholder')} required /></div>
+            <button className="brand-primary-button w-full py-3.5" type="submit" disabled={loading}>{loading ? t('login.submitting') : t('login.submit')}</button>
           </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {t('login.noAccount')}{' '}
-              <Link href="/register" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 font-medium">
-                {t('login.signUp')}
-              </Link>
-            </p>
-          </div>
+          <p className="mt-6 text-center text-sm text-gray-500">{t('login.noAccount')} <Link className="font-bold text-amber-600" href="/register">{t('login.signUp')}</Link></p>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
 
 export default function LoginPage() {
-  const { t } = useLanguage();
-  return (
-    <>
-      <PageTitle titleKey="pageTitle.login" />
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
-          <div className="text-gray-600 dark:text-gray-300">{t('loading')}</div>
-      </div>
-    }>
-      <LoginForm />
-    </Suspense>
-    </>
-  );
+  return <><PageTitle titleKey="pageTitle.login" /><Suspense fallback={<div className="brand-page min-h-screen" />}><LoginForm /></Suspense></>;
 }
-

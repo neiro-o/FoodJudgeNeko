@@ -24,12 +24,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const previewMode = process.env.NEXT_PUBLIC_UI_PREVIEW === '1';
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
+    if (previewMode) {
+      setToken('ui-preview');
+      setUser({ id: 'preview', username: '设计预览', email: 'preview@local', points: 360, is_admin: false });
+      setLoading(false);
+      return;
+    }
     // Check for stored token and user on mount
     if (typeof window !== 'undefined') {
       const storedToken = localStorage.getItem('token');
@@ -41,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     setLoading(false);
-  }, []);
+  }, [previewMode]);
 
   const login = async (username: string, password: string) => {
     try {
@@ -103,4 +110,3 @@ export function useAuth() {
   }
   return context;
 }
-

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
 import Link from 'next/link';
-import LanguageSelector from '@/components/LanguageSelector';
+import Image from 'next/image';
+import BrandLogo from '@/components/BrandLogo';
 import PageTitle from '@/components/PageTitle';
 
 export default function RegisterPage() {
@@ -21,41 +22,21 @@ export default function RegisterPage() {
   const { t } = useLanguage();
   const router = useRouter();
 
-  // Redirect if already authenticated
-  if (isAuthenticated) {
-    router.push('/problems');
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated) router.push('/problems');
+  }, [isAuthenticated, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
     setError('');
-
-    // Validation
-    if (password !== confirmPassword) {
-      setError(t('register.passwordMismatch'));
-      return;
-    }
-
-    if (password.length < 6) {
-      setError(t('register.passwordTooShort'));
-      return;
-    }
-
+    if (password !== confirmPassword) return setError(t('register.passwordMismatch'));
+    if (password.length < 6) return setError(t('register.passwordTooShort'));
     setLoading(true);
-
     try {
-      await authAPI.register({
-        username,
-        email,
-        password,
-        invite_code: inviteCode,
-      });
-      
-      // Registration successful, redirect to login
+      await authAPI.register({ username, email, password, invite_code: inviteCode });
       router.push('/login?registered=true');
-    } catch (err: any) {
-      setError(err.message || t('register.error'));
+    } catch (registerError: any) {
+      setError(registerError.message || t('register.error'));
     } finally {
       setLoading(false);
     }
@@ -64,126 +45,31 @@ export default function RegisterPage() {
   return (
     <>
       <PageTitle titleKey="pageTitle.register" />
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
-        <div className="absolute top-4 right-4">
-          <LanguageSelector />
-        </div>
-      <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">{t('register.title')}</h1>
-            <p className="text-gray-600 dark:text-gray-400">{t('register.subtitle')}</p>
+      <div className="brand-page auth-page">
+        <section className="auth-visual">
+          <BrandLogo />
+          <div className="auth-kicker">一起把题库，<br /><span>变得更可靠。</span></div>
+          <Image className="auth-mascot" src="/brand/kangaroo-reader.png?v=2" alt="读题袋鼠" width={1254} height={1254} priority unoptimized />
+        </section>
+        <section className="auth-panel">
+          <div className="brand-card auth-card my-8">
+            <p className="search-eyebrow">CREATE ACCOUNT</p>
+            <h1>{t('register.title')}</h1>
+            <p className="mt-2 mb-5 text-gray-500">{t('register.subtitle')}</p>
+            <div className="search-alert warning">{t('register.notice')}</div>
+            {error && <div className="search-alert error">{error}</div>}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div><label htmlFor="inviteCode">{t('register.inviteCode')}</label><input className="brand-form-input" id="inviteCode" value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder={t('register.inviteCodePlaceholder')} required /></div>
+              <div><label htmlFor="username">{t('register.username')}</label><input className="brand-form-input" id="username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t('register.usernamePlaceholder')} required /></div>
+              <div><label htmlFor="email">{t('register.email')}</label><input className="brand-form-input" id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t('register.emailPlaceholder')} required /></div>
+              <div><label htmlFor="password">{t('register.password')}</label><input className="brand-form-input" id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t('register.passwordPlaceholder')} required minLength={6} /></div>
+              <div><label htmlFor="confirmPassword">{t('register.confirmPassword')}</label><input className="brand-form-input" id="confirmPassword" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder={t('register.confirmPasswordPlaceholder')} required minLength={6} /></div>
+              <button className="brand-primary-button w-full py-3.5" type="submit" disabled={loading}>{loading ? t('register.submitting') : t('register.submit')}</button>
+            </form>
+            <p className="mt-5 text-center text-sm text-gray-500">{t('register.hasAccount')} <Link className="font-bold text-amber-600" href="/login">{t('register.signIn')}</Link></p>
           </div>
-
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
-            <p className="text-sm text-blue-800 dark:text-blue-300">{t('register.notice')}</p>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="inviteCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('register.inviteCode')} *
-              </label>
-              <input
-                id="inviteCode"
-                type="text"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                placeholder={t('register.inviteCodePlaceholder')}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('register.username')} *
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                placeholder={t('register.usernamePlaceholder')}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('register.email')} *
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                placeholder={t('register.emailPlaceholder')}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('register.password')} *
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                placeholder={t('register.passwordPlaceholder')}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('register.confirmPassword')} *
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                placeholder={t('register.confirmPasswordPlaceholder')}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {loading ? t('register.submitting') : t('register.submit')}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {t('register.hasAccount')}{' '}
-              <Link href="/login" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 font-medium">
-                {t('register.signIn')}
-              </Link>
-            </p>
-          </div>
-        </div>
+        </section>
       </div>
-    </div>
     </>
   );
 }
-
