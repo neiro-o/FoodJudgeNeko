@@ -69,6 +69,15 @@ export default function ProblemsPage() {
   // Column customization states
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+  const [displayItems, setDisplayItems] = useState({ ratio: false, comments: false, ai: false });
+  const [draftDisplayItems, setDraftDisplayItems] = useState(displayItems);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('problemDisplayItemsV1') || '{}');
+      setDisplayItems({ ratio: saved.ratio === true, comments: saved.comments === true, ai: saved.ai === true });
+    } catch { /* Keep defaults if stored preferences are invalid. */ }
+  }, []);
+  const returnToSearch = () => window.location.assign('/problems');
   const [resultLimit, setResultLimit] = useState(15);
   const [blockMaliciousComment, setBlockMaliciousComment] = useState(true);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -1249,11 +1258,12 @@ export default function ProblemsPage() {
 
             {hasSearchState && (
               <div className="search-results-shell brand-card">
+                <button type="button" className="quick-pill close-search-results" onClick={returnToSearch}>× 关闭结果，返回搜题</button>
                 {searchLoading ? (
                   <div className="search-loading-state">
                     <span className="search-spinner" />
-                    <strong>正在穿过题库寻找答案</strong>
-                    <p>会同时匹配题干、评论与历史记录</p>
+                    <strong>袋鼠增肥中……</strong>
+                    <p>哦呦，掉小心心了！</p>
                   </div>
                 ) : (
                   <>
@@ -1262,7 +1272,7 @@ export default function ProblemsPage() {
                         <span>SEARCH RESULTS</span>
                         <h2>共找到 <b>{searchTotal}</b> 道题，显示前 <b>{searchResults.length}</b> 个</h2>
                       </div>
-                      <button onClick={() => setIsCustomizerOpen(true)} className="result-settings" aria-label="结果设置">
+                      <button onClick={() => { setDraftDisplayItems(displayItems); setIsCustomizerOpen(true); }} className="result-settings" aria-label="选择显示项">
                         <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2m4 0h10M14 4v6M6 14v6" /></svg>
                       </button>
                     </div>
@@ -1290,11 +1300,11 @@ export default function ProblemsPage() {
                             <h3>{getProblemTitle(result)}</h3>
                             <p>上传时间：{formatTimestamp(result.timestamp)}</p>
                           </div>
-                          <div className="result-metrics">
+                          <div className="result-metrics" data-count={1 + Object.values(displayItems).filter(Boolean).length}>
                             <span>答案 {renderAnswerCell(result.answer)}</span>
-                            <span>比例 <em>{formatRatio(result.ratio_1, result.ratio_2)}</em></span>
-                            <span>评论区比例 <em>{renderAnswerCell(result.comment_answer)}</em></span>
-                            <span>AI 判断 {renderAnswerCell(result.hot1_answer)}</span>
+                            {displayItems.ratio && <span>比例 <em>{formatRatio(result.ratio_1, result.ratio_2)}</em></span>}
+                            {displayItems.comments && <span>评论区比例 <em>{renderAnswerCell(result.comment_answer)}</em></span>}
+                            {displayItems.ai && <span>AI 判断 {renderAnswerCell(result.hot1_answer)}</span>}
                           </div>
                         </a>
                       ))}
@@ -1337,22 +1347,27 @@ export default function ProblemsPage() {
                   {unifiedUploadAnalysis.invalid > 0 && <span className="invalid">未识别 {unifiedUploadAnalysis.invalid}</span>}
                 </div>
                 <button className="brand-primary-button" type="submit" disabled={uploadLoading || unifiedUploadAnalysis.total === 0}>
-                  {uploadLoading ? t('problems.upload.submitting') : `上传 ${unifiedUploadAnalysis.total || ''} 道题`}
+                  {uploadLoading ? t('problems.upload.submitting') : unifiedUploadAnalysis.total > 0 ? `上传 ${unifiedUploadAnalysis.total} 道题` : '上传题目'}
                 </button>
               </form>
           </section>
         )}
 
-        <ColumnCustomizer
-          isOpen={isCustomizerOpen}
-          onClose={() => setIsCustomizerOpen(false)}
-          columns={columns}
-          onChange={handleColumnsChange}
-          resultLimit={resultLimit}
-          onResultLimitChange={handleResultLimitChange}
-          blockMaliciousComment={blockMaliciousComment}
-          onBlockMaliciousCommentChange={handleBlockMaliciousCommentChange}
-        />
+        {isCustomizerOpen && (
+          <div className="display-settings-overlay" onClick={() => setIsCustomizerOpen(false)}>
+            <section className="display-settings brand-card" role="dialog" aria-modal="true" aria-labelledby="display-settings-title" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === 'Escape') setIsCustomizerOpen(false); }}>
+              <h2 id="display-settings-title">选择显示项</h2>
+              <p>答案始终显示，以下信息可按需开启。</p>
+              {([['ratio', '比例'], ['comments', '评论区比例'], ['ai', 'AI 判断']] as const).map(([key, label]) => (
+                <label key={key}><span>{label}</span><input type="checkbox" checked={draftDisplayItems[key]} onChange={(event) => setDraftDisplayItems({ ...draftDisplayItems, [key]: event.target.checked })} /></label>
+              ))}
+              <footer>
+                <button className="quick-pill" autoFocus onClick={() => setIsCustomizerOpen(false)}>取消</button>
+                <button className="brand-primary-button" onClick={() => { localStorage.setItem('problemDisplayItemsV1', JSON.stringify(draftDisplayItems)); setDisplayItems(draftDisplayItems); setIsCustomizerOpen(false); }}>保存</button>
+              </footer>
+            </section>
+          </div>
+        )}
       </div>
     </>
   );

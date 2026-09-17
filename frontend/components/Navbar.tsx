@@ -31,6 +31,10 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
 
   const navigate = (path: string) => {
     setOpenMenu(null);
+    if (path === '/problems') {
+      window.location.assign('/problems');
+      return;
+    }
     router.push(path);
   };
 

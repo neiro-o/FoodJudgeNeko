@@ -1,4 +1,4 @@
-@import url("https://fontsapi.zeoseven.com/185/main/result.css");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&family=Noto+Serif+SC:wght@700;900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -24,7 +24,7 @@
   }
 
   body {
-    font-family: 'LXGW 975 Gothic SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     color: var(--brand-ink);
@@ -213,7 +213,7 @@
   .search-page-results .search-landing-visual { opacity: 0; transform: translateY(-14%) scale(.95); pointer-events: none; }
 
   .search-hero-copy { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); text-align: center; }
-  .search-hero-copy h1 { position: relative; z-index: 1; font-size: clamp(54px, 6vw, 84px); font-weight: 950; line-height: .95; letter-spacing: -.08em; }
+  .search-hero-copy h1 { position: relative; z-index: 1; font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif; font-size: clamp(54px, 6vw, 84px); font-weight: 900; line-height: 1.2; letter-spacing: .04em; }
   .search-hero-copy h1::after { content: ''; position: absolute; width: 115%; height: 14px; border-radius: 20px; background: var(--brand-yellow); left: -7%; bottom: -6px; z-index: -1; transform: rotate(-1deg); }
   .search-hero-copy > p:last-child { margin-top: 26px; color: var(--brand-muted); font-size: 20px; letter-spacing: .08em; }
   .search-eyebrow { margin-bottom: 18px; color: #bd8a00; font-weight: 800; letter-spacing: .2em; font-size: 11px; }
@@ -294,6 +294,18 @@
   .result-main p { margin-top: 11px; color: var(--brand-muted); font-size: 12px; }
   .result-metrics { display: grid; grid-template-columns: repeat(4, max-content); align-items: center; justify-content: end; gap: 9px 18px; max-width: 500px; color: var(--brand-muted); font-size: 12px; }
   .result-metrics > span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .result-metrics[data-count="1"] { grid-template-columns: max-content; }
+  .result-metrics[data-count="2"] { grid-template-columns: repeat(2, max-content); }
+  .result-metrics[data-count="3"] { grid-template-columns: repeat(3, max-content); }
+  .close-search-results { margin-bottom: 18px; }
+  .display-settings-overlay { position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 20px; }
+  .display-settings { width: min(420px, 100%); padding: 26px; }
+  .display-settings h2 { font-size: 23px; font-weight: 700; }
+  .display-settings p { color: var(--brand-muted); margin: 10px 0 20px; }
+  .display-settings label { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-top: 1px solid var(--brand-line); }
+  .display-settings input { width: 20px; height: 20px; accent-color: #9b6b00; }
+  .display-settings footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
+  .display-settings footer button { padding: 10px 24px; }
   .result-metrics em { color: #ff4d5e; font-style: normal; }
   .ratio-colored { display: inline-flex; align-items: baseline; gap: 2px; font-variant-numeric: tabular-nums; }
   .ratio-colored b { color: #f04452; font-weight: 750; }
@@ -430,5 +442,7 @@
   .result-index { width: 50px; height: 60px; font-size: 25px; }
   .result-main h3 { font-size: 15px; }
   .result-metrics { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; border-top: 1px solid var(--brand-line); padding-top: 12px; gap: 10px 14px; }
+  .result-metrics[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .result-metrics[data-count="3"] { grid-template-columns: minmax(0, 1fr); }
   .upload-drawer { width: 100%; height: min(82svh, 720px); align-self: flex-end; margin: 0; border-radius: 28px 28px 0 0; }
 }
