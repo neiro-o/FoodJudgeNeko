@@ -246,6 +246,36 @@
   .quick-pill:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(75,55,0,.1); }
   .quick-pill span { margin-right: 9px; }
   .quick-pill .coin-icon { color: #ffc400; }
+  .dark .quick-pill,
+  .dark .result-settings,
+  .dark .brand-primary-button,
+  .dark .search-command button,
+  .dark .upload-fab,
+  .dark .upload-tabs .active {
+    background: #302c24;
+    color: #f8fafc;
+    border: 1px solid #625744;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+  }
+  .dark .quick-pill:hover,
+  .dark .result-settings:hover,
+  .dark .brand-primary-button:hover,
+  .dark .search-command button:hover,
+  .dark .upload-fab:hover {
+    background: #423b2e;
+    border-color: #ffc800;
+  }
+  .dark :is(.quick-pill, .result-settings, .brand-primary-button, .search-command button, .upload-fab):focus-visible {
+    outline: 2px solid #ffc800;
+    outline-offset: 3px;
+  }
+  .dark .brand-section-header { background: #302c24; color: #f8fafc; }
+  .dark .upload-form textarea {
+    background: #211e18;
+    color: #f8fafc;
+    border-color: #625744;
+  }
+  .dark .upload-form textarea::placeholder { color: #aeb8ca; }
 
   .search-results-shell { margin: 34px auto 80px; padding: 30px 28px; animation: brand-rise .45s ease both; }
   .search-results-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; padding: 0 5px; }
