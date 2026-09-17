@@ -349,6 +349,32 @@ export default function ProblemsPage() {
     }
   };
 
+  const analyzeUnifiedUploads = (text: string) => {
+    const urls = text.match(/https?:\/\/[^\s\n\t,;]+/gi) || [];
+    const regular = urls.flatMap((url) => {
+      const parsed = parseUrl(url);
+      return parsed.userId && parsed.taskId ? [{ userId: parsed.userId, taskId: parsed.taskId }] : [];
+    });
+    const daily = urls.flatMap((url) => {
+      const parsed = parseDailyUrl(url);
+      return parsed.userId && parsed.dateId ? [{ userId: parsed.userId, dateId: parsed.dateId }] : [];
+    });
+
+    const uniqueRegular = regular.filter((item, index, items) =>
+      index === items.findIndex((candidate) => candidate.userId === item.userId && candidate.taskId === item.taskId)
+    );
+    const uniqueDaily = daily.filter((item, index, items) =>
+      index === items.findIndex((candidate) => candidate.userId === item.userId && candidate.dateId === item.dateId)
+    );
+
+    return {
+      regular: uniqueRegular,
+      daily: uniqueDaily,
+      total: uniqueRegular.length + uniqueDaily.length,
+      invalid: Math.max(0, urls.length - uniqueRegular.length - uniqueDaily.length),
+    };
+  };
+
   // Parse single URL in real-time
   useEffect(() => {
     if (uploadMode === 'single' && singleUrl.trim()) {
@@ -525,6 +551,45 @@ export default function ProblemsPage() {
     }
   };
 
+  const handleUnifiedUpload = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setUploadError('');
+    setUploadSuccess('');
+    const analysis = analyzeUnifiedUploads(multipleUrls);
+    if (analysis.total === 0) {
+      setUploadError('没有识别到有效的普通题目链接或 daily 链接');
+      return;
+    }
+
+    setUploadLoading(true);
+    let success = 0;
+    let failed = 0;
+    try {
+      if (analysis.regular.length === 1) {
+        await problemAPI.upload(analysis.regular[0]);
+        success += 1;
+      } else if (analysis.regular.length > 1) {
+        const result = await problemAPI.uploadMultiple({ problems: analysis.regular });
+        success += result.success || 0;
+        failed += result.failed || 0;
+      }
+
+      const dailyResults = await Promise.allSettled(
+        analysis.daily.map((item) => problemAPI.uploadDaily(item))
+      );
+      success += dailyResults.filter((result) => result.status === 'fulfilled').length;
+      failed += dailyResults.filter((result) => result.status === 'rejected').length;
+
+      if (success > 0) setUploadSuccess(`上传完成：成功 ${success} 道${failed ? `，失败 ${failed} 道` : ''}`);
+      if (failed > 0 && success === 0) setUploadError(`上传失败：${failed} 道，请检查链接或稍后重试`);
+      if (failed === 0) setMultipleUrls('');
+    } catch (error: any) {
+      setUploadError(error.message || t('problems.upload.error'));
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchKeyword.trim()) {
@@ -653,8 +718,12 @@ export default function ProblemsPage() {
     return new Date(timestamp * 1000).toLocaleString();
   };
 
-  const formatRatio = (ratio1: number, ratio2: number): string => {
-    return `${Math.round(ratio1)}-${Math.round(ratio2)}`;
+  const formatRatio = (ratio1: number, ratio2: number): JSX.Element => {
+    return (
+      <span className="ratio-colored">
+        <b>{Math.round(ratio1)}</b><i>-</i><em>{Math.round(ratio2)}</em>
+      </span>
+    );
   };
 
   const truncateTaskId = (taskId: string, maxLength: number = 80): string => {
@@ -676,6 +745,7 @@ export default function ProblemsPage() {
     return null;
   }
 
+  const unifiedUploadAnalysis = analyzeUnifiedUploads(multipleUrls);
   const legacyPage = (
     <>
       <PageTitle titleKey="pageTitle.problems" />
@@ -1246,46 +1316,31 @@ export default function ProblemsPage() {
         </main>
 
         {!hasSearchState && <p className="search-footer-note">让每一道题，<br />都有更好的答案！</p>}
-        <button className="upload-fab" onClick={() => setIsUploadOpen(true)} aria-label="上传题目">
+        <button className="upload-fab" onClick={() => setIsUploadOpen((open) => !open)} aria-label="上传题目">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         </button>
 
         {isUploadOpen && (
-          <div className="upload-overlay" role="dialog" aria-modal="true" aria-label="上传题目">
-            <button className="upload-backdrop" onClick={() => setIsUploadOpen(false)} aria-label="关闭上传窗口" />
-            <section className="upload-drawer brand-card">
+          <section className="upload-popover brand-card" role="dialog" aria-label="上传题目">
               <header>
                 <div><span>CONTRIBUTE</span><h2>{t('problems.upload.title')}</h2></div>
                 <button onClick={() => setIsUploadOpen(false)} aria-label="关闭">×</button>
               </header>
-              <div className="upload-tabs">
-                <button className={uploadMode === 'single' ? 'active' : ''} onClick={() => handleModeClick('single')}>{t('problems.upload.single')}</button>
-                <button className={uploadMode === 'multiple' ? 'active' : ''} onClick={() => handleModeClick('multiple')}>{t('problems.upload.multiple')}</button>
-              </div>
               {uploadError && <div className="search-alert error">{uploadError}</div>}
               {uploadSuccess && <div className="search-alert success">{uploadSuccess}</div>}
-
-              {uploadMode === 'single' ? (
-                <form onSubmit={handleSingleUpload} className="upload-form">
-                  <label htmlFor="singleUrl">粘贴题目链接</label>
-                  <textarea id="singleUrl" value={singleUrl} onChange={(event) => setSingleUrl(event.target.value)} placeholder={t('problems.upload.urlPlaceholder')} rows={6} />
-                  {(singleParsed || singleDailyParsed) && <p className="upload-detected">已识别 1 道题，可直接上传</p>}
-                  <button className="brand-primary-button" type="submit" disabled={uploadLoading || (!singleParsed && !singleDailyParsed)}>
-                    {uploadLoading ? t('problems.upload.submitting') : t('problems.upload.submit')}
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleMultipleUpload} className="upload-form">
-                  <label htmlFor="multipleUrls">{t('problems.upload.multipleUrls')}</label>
-                  <textarea id="multipleUrls" value={multipleUrls} onChange={(event) => setMultipleUrls(event.target.value)} placeholder={t('problems.upload.multipleUrlsPlaceholder')} rows={9} />
-                  <p className="upload-detected">检测到 {multipleParsed.pairs.length} 道有效题目</p>
-                  <button className="brand-primary-button" type="submit" disabled={uploadLoading || !multipleParsed.isValid}>
-                    {uploadLoading ? t('problems.upload.submitting') : t('problems.upload.submitMultiple')}
-                  </button>
-                </form>
-              )}
-            </section>
-          </div>
+              <form onSubmit={handleUnifiedUpload} className="upload-form">
+                <label htmlFor="unifiedUrls">粘贴题目链接</label>
+                <textarea id="unifiedUrls" value={multipleUrls} onChange={(event) => setMultipleUrls(event.target.value)} placeholder="支持普通题目链接和 daily 链接；多条链接可换行粘贴" rows={5} autoFocus />
+                <div className="upload-detection-row">
+                  <span>普通题目 <b>{unifiedUploadAnalysis.regular.length}</b></span>
+                  <span>Daily <b>{unifiedUploadAnalysis.daily.length}</b></span>
+                  {unifiedUploadAnalysis.invalid > 0 && <span className="invalid">未识别 {unifiedUploadAnalysis.invalid}</span>}
+                </div>
+                <button className="brand-primary-button" type="submit" disabled={uploadLoading || unifiedUploadAnalysis.total === 0}>
+                  {uploadLoading ? t('problems.upload.submitting') : `上传 ${unifiedUploadAnalysis.total || ''} 道题`}
+                </button>
+              </form>
+          </section>
         )}
 
         <ColumnCustomizer
