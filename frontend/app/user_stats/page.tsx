@@ -287,7 +287,7 @@ export default function RankingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="brand-page min-h-screen">
         <PageTitle titleKey="pageTitle.rankings" />
         <Navbar title={t('rankings.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
@@ -299,7 +299,7 @@ export default function RankingsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="brand-page min-h-screen">
         <PageTitle titleKey="pageTitle.rankings" />
         <Navbar title={t('rankings.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
@@ -310,7 +310,7 @@ export default function RankingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="brand-page min-h-screen">
       <PageTitle titleKey="pageTitle.rankings" />
       <Navbar title={t('rankings.title')} showBackButton backHref="/problems" />
 
@@ -370,7 +370,7 @@ export default function RankingsPage() {
 
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 flex items-center justify-between">
+          <div className="brand-section-header px-6 py-4 flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">{t('rankings.title')}</h2>
             {total > 0 && (
               <span className="text-sm text-indigo-100">

@@ -115,7 +115,7 @@ export default function UserPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark:bg-gray-950">
+      <div className="brand-page min-h-screen flex items-center justify-center">
         <div className="text-gray-600 dark:text-gray-300">{t('loading')}</div>
       </div>
     );
@@ -128,7 +128,7 @@ export default function UserPage() {
   return (
     <>
       <PageTitle titleKey="pageTitle.user" />
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="brand-page min-h-screen">
         <Navbar title={t('user.title')} />
 
         <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -342,4 +342,3 @@ export default function UserPage() {
     </>
   );
 }
-

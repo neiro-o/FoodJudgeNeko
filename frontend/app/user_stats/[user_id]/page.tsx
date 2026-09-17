@@ -420,7 +420,7 @@ export default function UserStatsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="brand-page min-h-screen">
         <Navbar title={t('userStats.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-500 dark:text-gray-400">{t('userStats.loading')}</div>
@@ -431,7 +431,7 @@ export default function UserStatsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="brand-page min-h-screen">
         <Navbar title={t('userStats.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
           <div className="text-red-500">{error}</div>
@@ -441,7 +441,7 @@ export default function UserStatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="brand-page min-h-screen">
       <Navbar title={t('userStats.title')} showBackButton backHref="/problems" />
 
       <div className="max-w-4xl mx-auto px-4 py-6">

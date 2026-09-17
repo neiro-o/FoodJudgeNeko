@@ -215,7 +215,7 @@ export default function PointsPage() {
 
   if (authLoading || (loading && rankings.length === 0)) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="brand-page min-h-screen">
         <PageTitle titleKey="pageTitle.points" />
         <Navbar title={t('points.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
@@ -227,7 +227,7 @@ export default function PointsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="brand-page min-h-screen">
         <PageTitle titleKey="pageTitle.points" />
         <Navbar title={t('points.title')} showBackButton backHref="/problems" />
         <div className="flex items-center justify-center h-64">
@@ -238,14 +238,14 @@ export default function PointsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="brand-page min-h-screen">
       <PageTitle titleKey="pageTitle.points" />
       <Navbar title={t('points.title')} showBackButton backHref="/problems" />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 flex items-center justify-between flex-wrap gap-2">
+          <div className="brand-section-header px-6 py-4 flex items-center justify-between flex-wrap gap-2">
             <div>
               <h2 className="text-xl font-bold text-white">{t('points.title')}</h2>
               {year !== null && weekId !== null && (

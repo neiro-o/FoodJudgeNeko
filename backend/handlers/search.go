@@ -139,17 +139,17 @@ type SearchResponse struct {
 
 // ESDocument represents a simplified search result with only required fields
 type ESDocument struct {
-	ESID          interface{}         `json:"id"`                   // Elasticsearch unique identifier (_id)
-	MongoID       string              `json:"mongo_id"`             // MongoDB unique identifier
-	UserReview    string              `json:"user_review"`          // user's text review
-	Timestamp     int64               `json:"timestamp"`            // user review timestamp in seconds
-	Answer        int                 `json:"answer"`               // review result: 1-support user, 2-support merchant
-	Hot1Answer    *int                `json:"hot1_answer"`          // choice from comments[0].choice (nullable)
-	CommentAnswer *int                `json:"comment_answer"`       // most selected choice from comments (excluding last if even length)
-	Ratio1        float64             `json:"ratio_1"`              // ratio of choice 1 (0~100)
-	Ratio2        float64             `json:"ratio_2"`              // ratio of choice 2 (0~100)
-	Score         float64             `json:"_score"`               // Elasticsearch relevance score
-	Highlight     map[string][]string `json:"_highlight,omitempty"` // search highlights
+	ESID         interface{}         `json:"id"`                   // Elasticsearch unique identifier (_id)
+	MongoID      string              `json:"mongo_id"`             // MongoDB unique identifier
+	UserReview   string              `json:"user_review"`          // user's text review
+	Timestamp    int64               `json:"timestamp"`            // user review timestamp in seconds
+	Answer       int                 `json:"answer"`               // review result: 1-support user, 2-support merchant
+	Hot1Answer   *int                `json:"hot1_answer"`          // choice from comments[0].choice (nullable)
+	CommentRatio *float64            `json:"comment_ratio"`        // percentage of valid comment choices matching answer
+	Ratio1       float64             `json:"ratio_1"`              // ratio of choice 1 (0~100)
+	Ratio2       float64             `json:"ratio_2"`              // ratio of choice 2 (0~100)
+	Score        float64             `json:"_score"`               // Elasticsearch relevance score
+	Highlight    map[string][]string `json:"_highlight,omitempty"` // search highlights
 }
 
 // FullESDocument is the full document structure (kept for other functions)
@@ -347,7 +347,7 @@ func executeESQuery(ctx context.Context, query map[string]interface{}, limit int
 				hot1Answer := parsedComments[0].Choice
 				doc.Hot1Answer = &hot1Answer
 			}
-			doc.CommentAnswer = calculateCommentAnswer(parsedComments)
+			doc.CommentRatio = calculateCommentRatio(parsedComments, doc.Answer)
 		}
 
 		results = append(results, doc)
@@ -561,10 +561,10 @@ func Search122(ctx context.Context, ans int, limit int, orderByRandom bool) ([]E
 			doc.Ratio2 = ratio2
 		}
 
-		// Set hot1_answer and comment_answer
+		// Set hot1_answer and comment_ratio
 		hot1Answer := firstComment.Choice
 		doc.Hot1Answer = &hot1Answer
-		doc.CommentAnswer = calculateCommentAnswer(parsedComments)
+		doc.CommentRatio = calculateCommentRatio(parsedComments, doc.Answer)
 
 		filteredResults = append(filteredResults, doc)
 		if len(filteredResults) >= limit {
@@ -748,7 +748,7 @@ func Search2026WaiTi(ctx context.Context, limit int, orderByRandom bool) ([]ESDo
 			choice := parsedComments[0].Choice
 			doc.Hot1Answer = &choice
 		}
-		doc.CommentAnswer = calculateCommentAnswer(parsedComments)
+		doc.CommentRatio = calculateCommentRatio(parsedComments, doc.Answer)
 
 		filteredResults = append(filteredResults, doc)
 	}
@@ -1132,7 +1132,7 @@ func Search(c *gin.Context) {
 			doc.Ratio2 = ratio2
 		}
 
-		// Parse comments to calculate hot1_answer and comment_answer
+		// Parse comments to calculate hot1_answer and comment_ratio
 		if comments, ok := source["comments"].([]interface{}); ok {
 			parsedComments := parseComments(comments)
 			if len(parsedComments) > 0 {
@@ -1140,8 +1140,8 @@ func Search(c *gin.Context) {
 				hot1Answer := parsedComments[0].Choice
 				doc.Hot1Answer = &hot1Answer
 			}
-			// comment_answer: most selected choice, excluding last if even length
-			doc.CommentAnswer = calculateCommentAnswer(parsedComments)
+			// comment_ratio: percentage of valid choices matching the answer
+			doc.CommentRatio = calculateCommentRatio(parsedComments, doc.Answer)
 		}
 
 		results = append(results, doc)
@@ -1422,44 +1422,30 @@ func reverseString(s string) string {
 	return string(runes)
 }
 
-// calculateCommentAnswer calculates the most selected choice from comments
-// Excludes the last comment if the comments length is even
-func calculateCommentAnswer(comments []Comment) *int {
-	if len(comments) == 0 {
+// calculateCommentRatio returns the percentage of valid comment choices that
+// match the document answer. Only choices 1 and 2 are included in the sample.
+func calculateCommentRatio(comments []Comment, answer int) *float64 {
+	if answer != 1 && answer != 2 {
 		return nil
 	}
 
-	// Determine the range to consider (exclude last if even length)
-	endIndex := len(comments)
-	if len(comments)%2 == 0 {
-		endIndex = len(comments) - 1
-	}
-
-	if endIndex == 0 {
-		return nil
-	}
-
-	// Count choices (1 or 2)
-	count1 := 0
-	count2 := 0
-	for i := 0; i < endIndex; i++ {
-		if comments[i].Choice == 1 {
-			count1++
-		} else if comments[i].Choice == 2 {
-			count2++
+	validChoices := 0
+	matchingChoices := 0
+	for _, comment := range comments {
+		if comment.Choice == 1 || comment.Choice == 2 {
+			validChoices++
+			if comment.Choice == answer {
+				matchingChoices++
+			}
 		}
 	}
 
-	// Return the most selected choice
-	if count1 > count2 {
-		result := 1
-		return &result
-	} else if count2 > count1 {
-		result := 2
-		return &result
+	if validChoices == 0 {
+		return nil
 	}
-	// If equal, return nil (no clear winner)
-	return nil
+
+	ratio := float64(matchingChoices) / float64(validChoices) * 100
+	return &ratio
 }
 
 // parseDocument parses a single document from Elasticsearch source
@@ -1958,7 +1944,7 @@ func GetRecentProblems(c *gin.Context) {
 			doc.Ratio2 = ratio2
 		}
 
-		// Parse comments to calculate hot1_answer and comment_answer
+		// Parse comments to calculate hot1_answer and comment_ratio
 		if comments, ok := source["comments"].([]interface{}); ok {
 			parsedComments := parseComments(comments)
 			if len(parsedComments) > 0 {
@@ -1966,8 +1952,8 @@ func GetRecentProblems(c *gin.Context) {
 				hot1Answer := parsedComments[0].Choice
 				doc.Hot1Answer = &hot1Answer
 			}
-			// comment_answer: most selected choice, excluding last if even length
-			doc.CommentAnswer = calculateCommentAnswer(parsedComments)
+			// comment_ratio: percentage of valid choices matching the answer
+			doc.CommentRatio = calculateCommentRatio(parsedComments, doc.Answer)
 		}
 
 		results = append(results, doc)

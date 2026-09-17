@@ -8,9 +8,23 @@ import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, CODE_IN
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/components/ColumnCustomizer';
+import Image from 'next/image';
+
+const PREVIEW_RESULTS: SearchResult[] = [
+  { id: 'preview-1', mongo_id: 'preview-1', user_review: '商家拒绝履行活动承诺，消费者申请退款是否应该支持？', timestamp: 1758090191, answer: 1, hot1_answer: 1, comment_ratio: 76, ratio_1: 57, ratio_2: 43, _score: 1 },
+  { id: 'preview-2', mongo_id: 'preview-2', user_review: '外卖食品中吃出异物，无法提供完整证据时，平台应如何处理？', timestamp: 1758085527, answer: 2, hot1_answer: 2, comment_ratio: 61, ratio_1: 53, ratio_2: 47, _score: 1 },
+  { id: 'preview-3', mongo_id: 'preview-3', user_review: '骑手未按备注要求送达，导致餐品变质，责任应由谁承担？', timestamp: 1758022928, answer: 1, hot1_answer: 1, comment_ratio: 50, ratio_1: 71, ratio_2: 29, _score: 1 },
+  { id: 'preview-4', mongo_id: 'preview-4', user_review: '用户使用优惠券下单后，商家单方面取消订单，是否应赔付？', timestamp: 1757992653, answer: 2, hot1_answer: 2, comment_ratio: 24, ratio_1: 48, ratio_2: 52, _score: 1 },
+];
+
+const COUNT_METRICS = [
+  { key: 'elasticsearch', icon: '📋', label: '题目总数' },
+  { key: 'redis', icon: '📤', label: '上传队列' },
+  { key: 'mongodb', icon: '📖', label: '原始数据' },
+] as const;
 
 export default function ProblemsPage() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,12 +71,25 @@ export default function ProblemsPage() {
   // Count states
   const [counts, setCounts] = useState<{ elasticsearch: number; mongodb: number; redis: number } | null>(null);
   const [countsLoading, setCountsLoading] = useState(false);
+  const [countMetricIndex, setCountMetricIndex] = useState(0);
 
   // Column customization states
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+  const [displayItems, setDisplayItems] = useState({ ratio: false, comments: false, ai: false });
+  const [draftDisplayItems, setDraftDisplayItems] = useState(displayItems);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('problemDisplayItemsV1') || '{}');
+      setDisplayItems({ ratio: saved.ratio === true, comments: saved.comments === true, ai: saved.ai === true });
+    } catch { /* Keep defaults if stored preferences are invalid. */ }
+  }, []);
+  const returnToSearch = () => window.location.assign('/problems');
   const [resultLimit, setResultLimit] = useState(15);
   const [blockMaliciousComment, setBlockMaliciousComment] = useState(true);
+  const [draftResultLimit, setDraftResultLimit] = useState(15);
+  const [draftBlockMaliciousComment, setDraftBlockMaliciousComment] = useState(true);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -139,35 +166,19 @@ export default function ProblemsPage() {
         };
         performSearch();
       } else {
-        // Mark empty keyword as processed (use empty string to distinguish from initial undefined)
+        // The initial page is intentionally a calm search landing state.
+        // Recent problems are loaded only after the user requests them.
         lastProcessedUrlKeyword.current = '';
-        
-        // Load recent problems
-        const loadRecentProblems = async () => {
-          setSearchLoading(true);
-          setSearchError('');
-          setSearchErrorIsInsufficientPoints(false);
-          try {
-            const response = await searchAPI.recent(limit);
-            setSearchResults(response.results);
-            setSearchTotal(response.total);
-            setCurrentSearchKeyword('');
-          } catch (error: any) {
-            applySearchError(error);
-            setSearchResults([]);
-            setSearchTotal(0);
-          } finally {
-            setSearchLoading(false);
-          }
-        };
-        loadRecentProblems();
+        setSearchResults([]);
+        setSearchTotal(0);
+        setCurrentSearchKeyword('');
       }
     }
   }, [isAuthenticated, loading, t, searchParams]);
 
   // Load counts on page load
   useEffect(() => {
-    if (isAuthenticated && !loading) {
+    if (isAuthenticated && !loading && process.env.NEXT_PUBLIC_UI_PREVIEW !== '1') {
       const loadCounts = async () => {
         setCountsLoading(true);
         try {
@@ -356,6 +367,32 @@ export default function ProblemsPage() {
     }
   };
 
+  const analyzeUnifiedUploads = (text: string) => {
+    const urls = text.match(/https?:\/\/[^\s\n\t,;]+/gi) || [];
+    const regular = urls.flatMap((url) => {
+      const parsed = parseUrl(url);
+      return parsed.userId && parsed.taskId ? [{ userId: parsed.userId, taskId: parsed.taskId }] : [];
+    });
+    const daily = urls.flatMap((url) => {
+      const parsed = parseDailyUrl(url);
+      return parsed.userId && parsed.dateId ? [{ userId: parsed.userId, dateId: parsed.dateId }] : [];
+    });
+
+    const uniqueRegular = regular.filter((item, index, items) =>
+      index === items.findIndex((candidate) => candidate.userId === item.userId && candidate.taskId === item.taskId)
+    );
+    const uniqueDaily = daily.filter((item, index, items) =>
+      index === items.findIndex((candidate) => candidate.userId === item.userId && candidate.dateId === item.dateId)
+    );
+
+    return {
+      regular: uniqueRegular,
+      daily: uniqueDaily,
+      total: uniqueRegular.length + uniqueDaily.length,
+      invalid: Math.max(0, urls.length - uniqueRegular.length - uniqueDaily.length),
+    };
+  };
+
   // Parse single URL in real-time
   useEffect(() => {
     if (uploadMode === 'single' && singleUrl.trim()) {
@@ -532,6 +569,45 @@ export default function ProblemsPage() {
     }
   };
 
+  const handleUnifiedUpload = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setUploadError('');
+    setUploadSuccess('');
+    const analysis = analyzeUnifiedUploads(multipleUrls);
+    if (analysis.total === 0) {
+      setUploadError('没有识别到有效的普通题目链接或 daily 链接');
+      return;
+    }
+
+    setUploadLoading(true);
+    let success = 0;
+    let failed = 0;
+    try {
+      if (analysis.regular.length === 1) {
+        await problemAPI.upload(analysis.regular[0]);
+        success += 1;
+      } else if (analysis.regular.length > 1) {
+        const result = await problemAPI.uploadMultiple({ problems: analysis.regular });
+        success += result.success || 0;
+        failed += result.failed || 0;
+      }
+
+      const dailyResults = await Promise.allSettled(
+        analysis.daily.map((item) => problemAPI.uploadDaily(item))
+      );
+      success += dailyResults.filter((result) => result.status === 'fulfilled').length;
+      failed += dailyResults.filter((result) => result.status === 'rejected').length;
+
+      if (success > 0) setUploadSuccess(`上传完成：成功 ${success} 道${failed ? `，失败 ${failed} 道` : ''}`);
+      if (failed > 0 && success === 0) setUploadError(`上传失败：${failed} 道，请检查链接或稍后重试`);
+      if (failed === 0) setMultipleUrls('');
+    } catch (error: any) {
+      setUploadError(error.message || t('problems.upload.error'));
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchKeyword.trim()) {
@@ -551,11 +627,20 @@ export default function ProblemsPage() {
     lastProcessedUrlKeyword.current = keyword;
 
     try {
+      if (process.env.NEXT_PUBLIC_UI_PREVIEW === '1') {
+        await new Promise((resolve) => setTimeout(resolve, 650));
+        setSearchResults(PREVIEW_RESULTS);
+        setSearchTotal(PREVIEW_RESULTS.length);
+        setCurrentSearchKeyword(keyword);
+        setSearchKeyword(keyword);
+        router.push(`/problems?q=${encodeURIComponent(keyword)}`);
+        return;
+      }
       const response = await searchAPI.search(keyword, resultLimit);
       setSearchResults(response.results);
       setSearchTotal(response.total);
       setCurrentSearchKeyword(keyword);
-      setSearchKeyword(''); // Clear the input after successful search
+      setSearchKeyword(keyword);
       
       // Update URL with search keyword
       const params = new URLSearchParams(searchParams.toString());
@@ -584,6 +669,34 @@ export default function ProblemsPage() {
     }
   };
 
+  const handleRecentProblems = async () => {
+    setSearchError('');
+    setSearchErrorIsInsufficientPoints(false);
+    setSearchLoading(true);
+    setCurrentSearchKeyword('最近题目');
+    setSearchKeyword('');
+    try {
+      if (process.env.NEXT_PUBLIC_UI_PREVIEW === '1') {
+        await new Promise((resolve) => setTimeout(resolve, 650));
+        setSearchResults(PREVIEW_RESULTS);
+        setSearchTotal(PREVIEW_RESULTS.length);
+        lastProcessedUrlKeyword.current = '';
+        router.push('/problems?view=recent');
+        return;
+      }
+      const response = await searchAPI.recent(resultLimit);
+      setSearchResults(response.results);
+      setSearchTotal(response.total);
+      router.push('/problems?view=recent');
+    } catch (error: any) {
+      applySearchError(error);
+      setSearchResults([]);
+      setSearchTotal(0);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
   const getProblemTitle = (result: SearchResult): string | JSX.Element => {
     // Check for highlight first
     if (result._highlight?.user_review && result._highlight.user_review.length > 0) {
@@ -605,13 +718,13 @@ export default function ProblemsPage() {
   const renderAnswerCell = (answer: number | null | undefined) => {
     if (answer === 1) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+        <span className="answer-capsule answer-one">
           1
         </span>
       );
     } else if (answer === 2) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+        <span className="answer-capsule answer-two">
           2
         </span>
       );
@@ -623,8 +736,30 @@ export default function ProblemsPage() {
     return new Date(timestamp * 1000).toLocaleString();
   };
 
-  const formatRatio = (ratio1: number, ratio2: number): string => {
-    return `${Math.round(ratio1)}-${Math.round(ratio2)}`;
+  const formatRatio = (ratio1: number, ratio2: number): JSX.Element => {
+    return (
+      <span className="ratio-colored">
+        <b>{Math.round(ratio1)}</b><i>-</i><em>{Math.round(ratio2)}</em>
+      </span>
+    );
+  };
+
+  const renderCommentRatio = (ratio: number | null | undefined): JSX.Element => {
+    if (ratio === null || ratio === undefined || !Number.isFinite(ratio)) {
+      return <span className="text-gray-500 dark:text-gray-400">N/A</span>;
+    }
+
+    const value = Math.min(100, Math.max(0, ratio));
+    const distanceFromMiddle = Math.abs(value - 50) / 50;
+    const endpoint = value >= 50 ? [34, 197, 94] : [239, 68, 68];
+    const channel = (target: number) => Math.round(255 + (target - 255) * distanceFromMiddle);
+    const color = `rgb(${channel(endpoint[0])}, ${channel(endpoint[1])}, ${channel(endpoint[2])})`;
+
+    return (
+      <span className="comment-ratio" style={{ color }}>
+        {Math.round(value)}%
+      </span>
+    );
   };
 
   const truncateTaskId = (taskId: string, maxLength: number = 80): string => {
@@ -646,7 +781,8 @@ export default function ProblemsPage() {
     return null;
   }
 
-  return (
+  const unifiedUploadAnalysis = analyzeUnifiedUploads(multipleUrls);
+  const legacyPage = (
     <>
       <PageTitle titleKey="pageTitle.problems" />
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -984,7 +1120,7 @@ export default function ProblemsPage() {
                             if (col.id === 'comment') {
                               return (
                                 <td key={col.id} className="px-2 py-2 whitespace-nowrap text-sm">
-                                  {renderAnswerCell(result.comment_answer)}
+                                  {renderCommentRatio(result.comment_ratio)}
                                 </td>
                               );
                             }
@@ -1069,6 +1205,249 @@ export default function ProblemsPage() {
         onBlockMaliciousCommentChange={handleBlockMaliciousCommentChange}
       />
     </div>
+    </>
+  );
+
+  void legacyPage;
+  const hasSearchState = searchLoading || Boolean(currentSearchKeyword) || searchResults.length > 0 || Boolean(searchError);
+  const activeCountMetric = COUNT_METRICS[countMetricIndex];
+  const activeCount = counts?.[activeCountMetric.key];
+
+  return (
+    <>
+      <PageTitle titleKey="pageTitle.problems" />
+      <div className={`brand-page search-page ${hasSearchState ? 'search-page-results' : 'search-page-landing'}`}>
+        <Navbar title="美团评审团 · 题目答案搜索" />
+
+        <main className="search-stage">
+          <section className="search-landing-visual" aria-hidden={hasSearchState}>
+            <div className="search-scribble search-scribble-left">人人不掉心，<br /><span>期期 105！</span></div>
+            <div className="search-scribble search-scribble-right">打爆唐 B 评审！</div>
+            <div className="search-mascot-wrap">
+              <Image
+                src="/brand/kangaroo-reader.png?v=2"
+                alt="正在读题的袋鼠"
+                width={1254}
+                height={1254}
+                priority
+                unoptimized
+                className="search-mascot"
+              />
+              <Image
+                src="/brand/book-stack.png"
+                unoptimized
+                alt="真实题目、高分答案、少走弯路书堆"
+                width={1698}
+                height={926}
+                className="search-book-stack"
+                priority
+              />
+            </div>
+            <Image
+              src="/brand/kangaroo-milk-tea.png"
+              unoptimized
+              alt="袋鼠造型奶茶"
+              width={1024}
+              height={1536}
+              className="search-milk-tea"
+              priority
+            />
+            <div className="search-hero-copy">
+              <p className="search-eyebrow">ANSWER FINDER · 题目答案搜索</p>
+              <h1>小美搜题</h1>
+              <p>打爆歪题，少掉歪心！</p>
+            </div>
+          </section>
+
+          <section className="search-workspace">
+            <form onSubmit={handleSearch} className="search-command" role="search">
+              <input
+                type="search"
+                value={searchKeyword}
+                onChange={(event) => setSearchKeyword(event.target.value)}
+                placeholder="今天想搜点什么？"
+                aria-label="搜索题目"
+              />
+              {!hasSearchState && <span className="search-hint">加空格带上日期可以精确搜索对应日期评价</span>}
+              {searchKeyword && (
+                <button
+                  type="button"
+                  className="search-clear"
+                  onClick={() => setSearchKeyword('')}
+                  aria-label="清空搜索内容"
+                  title="清空"
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
+              )}
+              <button type="submit" disabled={searchLoading} aria-label="提交搜索">
+                {searchLoading ? (
+                  <span className="search-spinner search-spinner-small" />
+                ) : (
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 3-7.2 18-3.9-7-6.9-4L21 3Z" /><path d="m10 14 4-4" /></svg>
+                )}
+              </button>
+            </form>
+
+            {!hasSearchState && (
+              <div className="search-quick-actions">
+                <button
+                  type="button"
+                  className="quick-pill count-switcher"
+                  onClick={() => setCountMetricIndex((index) => (index + 1) % COUNT_METRICS.length)}
+                  data-tooltip={activeCountMetric.label}
+                  aria-label={`${activeCountMetric.label}：${activeCount ?? '加载中'}，点击查看下一项`}
+                >
+                  <span aria-hidden="true">{activeCountMetric.icon}</span>
+                  <b>{countsLoading || activeCount === undefined ? '—' : activeCount}</b>
+                </button>
+                <button className="quick-pill" onClick={() => router.push('/points')}><span className="coin-icon">●</span>{user?.points ?? 0}</button>
+                <button className="quick-pill" onClick={() => router.push('/points')}><span>▥</span> 查询分榜</button>
+                <button className="quick-pill" onClick={() => router.push('/user_stats')}><span>♙</span> 查询用户</button>
+                <button className="quick-pill" onClick={handleRecentProblems}><span>▤</span> 最近题目</button>
+              </div>
+            )}
+
+            {hasSearchState && (
+              <div className="search-results-shell brand-card">
+                {searchLoading ? (
+                  <div className="search-loading-state">
+                    <span className="search-spinner" />
+                    <strong>袋鼠增肥中……</strong>
+                    <p>哦呦，掉小心心了！</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="search-results-heading">
+                      <div>
+                        <span>SEARCH RESULTS</span>
+                        <h2>共找到 <b>{searchTotal}</b> 道题，显示前 <b>{searchResults.length}</b> 个</h2>
+                      </div>
+                      <div className="result-heading-actions">
+                      <button onClick={() => { setDraftDisplayItems(displayItems); setDraftResultLimit(resultLimit); setDraftBlockMaliciousComment(blockMaliciousComment); setIsCustomizerOpen(true); }} className="result-settings" aria-label="选择显示项">
+                        <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2m4 0h10M14 4v6M6 14v6" /></svg>
+                      </button>
+                      <button type="button" className="result-settings" onClick={returnToSearch} aria-label="关闭结果，返回搜题" title="关闭结果，返回搜题">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                      </button>
+                      </div>
+                    </div>
+
+                    {searchError && (
+                      <div className={`search-alert ${searchErrorIsInsufficientPoints ? 'warning' : 'error'}`}>
+                        {searchErrorIsInsufficientPoints ? `⚠️ ${t('problems.search.errorInsufficientPoints')}` : searchError}
+                      </div>
+                    )}
+
+                    {!searchError && searchResults.length === 0 && (
+                      <div className="search-empty">没有找到相关题目，换个关键词试试吧。</div>
+                    )}
+
+                    <div className="result-card-list">
+                      {searchResults.map((result, index) => (
+                        <a
+                          href={`/problems/${result.mongo_id}`}
+                          className="result-card"
+                          key={result.mongo_id || index}
+                          style={{ animationDelay: `${Math.min(index, 10) * 75}ms` }}
+                        >
+                          <span className="result-index">{index + 1}</span>
+                          <div className="result-main">
+                            <h3>{getProblemTitle(result)}</h3>
+                            <p>上传时间：{formatTimestamp(result.timestamp)}</p>
+                          </div>
+                          <div className="result-metrics" data-count={1 + Object.values(displayItems).filter(Boolean).length}>
+                            <span>答案 {renderAnswerCell(result.answer)}</span>
+                            {displayItems.ratio && <span>比例 <em>{formatRatio(result.ratio_1, result.ratio_2)}</em></span>}
+                            {displayItems.comments && <span>评论区比例 {renderCommentRatio(result.comment_ratio)}</span>}
+                            {displayItems.ai && <span>AI 判断 {renderAnswerCell(result.hot1_answer)}</span>}
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+
+                    {notesSearchResults.length > 0 && (
+                      <div className="notes-results">
+                        <h3>{t('problems.search.otherNotesTitle')}</h3>
+                        {notesSearchResults.map((item, index) => (
+                          <div key={`${item.text}-${index}`}><span>{index + 1}</span><p>{item.text}</p>{renderAnswerCell(item.answer)}</div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+        </main>
+
+        {!hasSearchState && <p className="search-footer-note">让每一道题，<br />都有更好的答案！</p>}
+        <button className="upload-fab" onClick={() => setIsUploadOpen((open) => !open)} aria-label="上传题目">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+
+        {isUploadOpen && (
+          <section className="upload-popover brand-card" role="dialog" aria-label="上传题目">
+              <header>
+                <div><span>CONTRIBUTE</span><h2>{t('problems.upload.title')}</h2></div>
+                <button onClick={() => setIsUploadOpen(false)} aria-label="关闭">×</button>
+              </header>
+              {uploadError && <div className="search-alert error">{uploadError}</div>}
+              {uploadSuccess && <div className="search-alert success">{uploadSuccess}</div>}
+              <form onSubmit={handleUnifiedUpload} className="upload-form">
+                <label htmlFor="unifiedUrls">粘贴题目链接</label>
+                <textarea id="unifiedUrls" value={multipleUrls} onChange={(event) => setMultipleUrls(event.target.value)} placeholder="支持普通题目链接和 daily 链接；多条链接可换行粘贴" rows={5} autoFocus />
+                <div className="upload-detection-row">
+                  <span>普通题目 <b>{unifiedUploadAnalysis.regular.length}</b></span>
+                  <span>Daily <b>{unifiedUploadAnalysis.daily.length}</b></span>
+                  {unifiedUploadAnalysis.invalid > 0 && <span className="invalid">未识别 {unifiedUploadAnalysis.invalid}</span>}
+                </div>
+                <button className="brand-primary-button" type="submit" disabled={uploadLoading || unifiedUploadAnalysis.total === 0}>
+                  {uploadLoading ? t('problems.upload.submitting') : unifiedUploadAnalysis.total > 0 ? `上传 ${unifiedUploadAnalysis.total} 道题` : '上传题目'}
+                </button>
+              </form>
+          </section>
+        )}
+
+        {isCustomizerOpen && (
+          <div className="display-settings-overlay" onClick={() => setIsCustomizerOpen(false)}>
+            <section className="display-settings brand-card" role="dialog" aria-modal="true" aria-labelledby="display-settings-title" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === 'Escape') setIsCustomizerOpen(false); }}>
+              <h2 id="display-settings-title">选择显示项</h2>
+              <p>答案始终显示，以下信息可按需开启。</p>
+              {([['ratio', '比例'], ['comments', '评论区比例'], ['ai', 'AI 判断']] as const).map(([key, label]) => (
+                <label key={key}><span>{label}</span><input type="checkbox" checked={draftDisplayItems[key]} onChange={(event) => setDraftDisplayItems({ ...draftDisplayItems, [key]: event.target.checked })} /></label>
+              ))}
+              <div className="display-settings-section">
+                <h3>搜索设置</h3>
+                <label>
+                  <span><b>每页显示条数</b><small>设置搜索结果一次显示的数量</small></span>
+                  <span className="display-limit-control">
+                    <input type="range" min="5" max="20" value={draftResultLimit} onChange={(event) => setDraftResultLimit(Number(event.target.value))} />
+                    <output>{draftResultLimit}</output>
+                  </span>
+                </label>
+                <label>
+                  <span><b>屏蔽恶意用户</b><small>隐藏疑似恶意用户产生的内容</small></span>
+                  <span className="display-toggle-text">
+                    <input type="checkbox" checked={draftBlockMaliciousComment} onChange={(event) => setDraftBlockMaliciousComment(event.target.checked)} />
+                    {draftBlockMaliciousComment ? '开启' : '关闭'}
+                  </span>
+                </label>
+              </div>
+              <footer>
+                <button className="quick-pill" autoFocus onClick={() => setIsCustomizerOpen(false)}>取消</button>
+                <button className="brand-primary-button" onClick={() => {
+                  localStorage.setItem('problemDisplayItemsV1', JSON.stringify(draftDisplayItems));
+                  setDisplayItems(draftDisplayItems);
+                  handleBlockMaliciousCommentChange(draftBlockMaliciousComment);
+                  if (draftResultLimit !== resultLimit) void handleResultLimitChange(draftResultLimit);
+                  setIsCustomizerOpen(false);
+                }}>保存</button>
+              </footer>
+            </section>
+          </div>
+        )}
+      </div>
     </>
   );
 }
