@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export default function BrandLogo({ compact = false }: { compact?: boolean }) {
   return (
-    <Link href="/problems" className="brand-logo" aria-label="搜题首页">
+    <Link href="/" className="brand-logo" aria-label="搜题首页">
       <span className="brand-logo-mark" aria-hidden="true">
         <svg viewBox="0 0 48 48" role="img">
           <path d="M7 10.5 22.5 16v23L7 32.5zM41 10.5 25.5 16v23L41 32.5z" fill="currentColor" />

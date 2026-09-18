@@ -33,7 +33,7 @@ export default function Home() {
               <Link href={destination} className="home-enter"> 进去瞧瞧 <span aria-hidden="true">↗</span></Link>
             </div>
           </section>
-          <footer className="home-footer"><span className="home-status-dot" />缅怀老刘！永远为你应援~</footer>
+          <footer className="home-footer"><span className="home-status-dot" />缅怀美团主播乐一欧~</footer>
         </main>
       </AssetPreloader>
     </>

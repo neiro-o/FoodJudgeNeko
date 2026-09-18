@@ -5,19 +5,32 @@ import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ProblemsStateProvider } from '@/contexts/ProblemsStateContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { Noto_Sans_SC, Noto_Serif_SC } from 'next/font/google'
+import localFont from 'next/font/local'
 
 const notoSansSC = Noto_Sans_SC({
   variable: '--font-noto-sans-sc',
   weight: 'variable',
-  display: 'swap',
+  display: 'fallback',
   preload: false,
+  adjustFontFallback: false,
 })
 
 const notoSerifSC = Noto_Serif_SC({
   variable: '--font-noto-serif-sc',
   weight: ['700', '900'],
-  display: 'swap',
+  display: 'fallback',
   preload: false,
+  adjustFontFallback: false,
+})
+
+const handwritingSC = localFont({
+  src: './fonts/mtv2-handwriting-subset.woff2',
+  variable: '--font-handwriting-sc',
+  weight: '400',
+  style: 'normal',
+  display: 'fallback',
+  preload: true,
+  adjustFontFallback: false,
 })
 
 export const metadata: Metadata = {
@@ -31,7 +44,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN" className={`${notoSansSC.variable} ${notoSerifSC.variable}`} suppressHydrationWarning>
+    <html lang="zh-CN" className={`${notoSansSC.variable} ${notoSerifSC.variable} ${handwritingSC.variable}`} suppressHydrationWarning>
       <body>
         <ThemeProvider>
           <LanguageProvider>

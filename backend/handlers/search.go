@@ -576,7 +576,7 @@ func Search122(ctx context.Context, ans int, limit int, orderByRandom bool) ([]E
 }
 
 // Search2026WaiTi searches problems with timestamp after 2026-01-01 00:00:00 (UTC+8)
-// where over 85% of comment choices are different from the document's answer.
+// where over ~2/3 of valid comment choices (choice 1 or 2 only) differ from the document's answer.
 func Search2026WaiTi(ctx context.Context, limit int, orderByRandom bool) ([]ESDocument, int64, error) {
 	// 2026-01-01 00:00:00 UTC+8 = 2025-12-31 16:00:00 UTC
 	threshold := time.Date(2026, 1, 1, 0, 0, 0, 0, time.FixedZone("CST", 8*3600)).Unix()
@@ -711,16 +711,24 @@ func Search2026WaiTi(ctx context.Context, limit int, orderByRandom bool) ([]ESDo
 			continue
 		}
 
-		// Count how many comments have choice != answer
+		// Only choice 1/2 count as the statistical base (same as calculateCommentRatio).
+		validCount := 0
 		differentCount := 0
 		for _, c := range parsedComments {
+			if c.Choice != 1 && c.Choice != 2 {
+				continue
+			}
+			validCount++
 			if c.Choice != answer {
 				differentCount++
 			}
 		}
+		if validCount == 0 {
+			continue
+		}
 
-		// Over 85% of comments must be different from answer
-		ratio := float64(differentCount) / float64(len(parsedComments))
+		// Over ~2/3 of valid comments must disagree with the document answer
+		ratio := float64(differentCount) / float64(validCount)
 		if ratio <= 0.667 {
 			continue
 		}

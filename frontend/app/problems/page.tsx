@@ -33,6 +33,14 @@ export default function ProblemsPage() {
   // Ref to track the last processed URL keyword to prevent duplicate API calls
   // Use a sentinel value distinct from null so that the initial empty-keyword load is not skipped
   const lastProcessedUrlKeyword = useRef<string | undefined>(undefined);
+  // Last keyword that successfully returned search results (used to skip duplicate submits)
+  const lastFetchedKeywordRef = useRef<string | null>(null);
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestSeqRef = useRef(0);
+  const pendingSearchRef = useRef<{
+    keyword: string;
+    promise: Promise<{ results: SearchResult[]; total: number; notes: NotesSearchItem[] }>;
+  } | null>(null);
 
   // Upload states
   const [uploadMode, setUploadMode] = useState<'single' | 'multiple'>('single');
@@ -58,6 +66,8 @@ export default function ProblemsPage() {
 
   // Search states
   const [searchKeyword, setSearchKeyword] = useState('');
+  const searchKeywordRef = useRef(searchKeyword);
+  searchKeywordRef.current = searchKeyword;
   const [currentSearchKeyword, setCurrentSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
@@ -147,6 +157,8 @@ export default function ProblemsPage() {
             setSearchResults(response.results);
             setSearchTotal(response.total);
             setCurrentSearchKeyword(trimmedKeyword);
+            setSearchKeyword(trimmedKeyword);
+            lastFetchedKeywordRef.current = trimmedKeyword;
             // Also fetch notes search results
             try {
               const notesResponse = await searchAPI.notesSearch(trimmedKeyword, 5);
@@ -159,6 +171,7 @@ export default function ProblemsPage() {
             setSearchResults([]);
             setSearchTotal(0);
             setCurrentSearchKeyword('');
+            lastFetchedKeywordRef.current = null;
             // Reset the ref on error so we can retry
             lastProcessedUrlKeyword.current = undefined;
           } finally {
@@ -170,6 +183,7 @@ export default function ProblemsPage() {
         // The initial page is intentionally a calm search landing state.
         // Recent problems are loaded only after the user requests them.
         lastProcessedUrlKeyword.current = '';
+        lastFetchedKeywordRef.current = null;
         setSearchResults([]);
         setSearchTotal(0);
         setCurrentSearchKeyword('');
@@ -516,8 +530,71 @@ export default function ProblemsPage() {
     }
   };
 
+  const clearPrefetchTimer = () => {
+    if (prefetchTimerRef.current) {
+      clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = null;
+    }
+  };
+
+  const syncSearchUrl = (keyword: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (params.get('q') === keyword && !params.get('view')) return;
+    params.set('q', keyword);
+    params.delete('view');
+    lastProcessedUrlKeyword.current = keyword;
+    router.push(`/problems?${params.toString()}`);
+  };
+
+  // Share in-flight requests between prefetch and explicit submit to avoid duplicate hits.
+  const fetchSearchPayload = (keyword: string, limit: number) => {
+    if (pendingSearchRef.current?.keyword === keyword) {
+      return pendingSearchRef.current.promise;
+    }
+
+    const promise = (async () => {
+      if (process.env.NEXT_PUBLIC_UI_PREVIEW === '1') {
+        await new Promise((resolve) => setTimeout(resolve, 650));
+        return { results: PREVIEW_RESULTS, total: PREVIEW_RESULTS.length, notes: [] as NotesSearchItem[] };
+      }
+      const response = await searchAPI.search(keyword, limit);
+      let notes: NotesSearchItem[] = [];
+      try {
+        notes = (await searchAPI.notesSearch(keyword, 5)) || [];
+      } catch (notesError) {
+        console.error('Notes search failed:', notesError);
+      }
+      return { results: response.results, total: response.total, notes };
+    })();
+
+    pendingSearchRef.current = { keyword, promise };
+    promise.finally(() => {
+      if (pendingSearchRef.current?.promise === promise) {
+        pendingSearchRef.current = null;
+      }
+    });
+    return promise;
+  };
+
+  const applySearchPayload = (
+    keyword: string,
+    payload: { results: SearchResult[]; total: number; notes: NotesSearchItem[] }
+  ) => {
+    setSearchResults(payload.results);
+    setSearchTotal(payload.total);
+    setCurrentSearchKeyword(keyword);
+    setSearchKeyword(keyword);
+    setNotesSearchResults(payload.notes);
+    setSearchError('');
+    setSearchErrorIsInsufficientPoints(false);
+    lastFetchedKeywordRef.current = keyword;
+    lastProcessedUrlKeyword.current = keyword;
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    clearPrefetchTimer();
+
     if (!searchKeyword.trim()) {
       setSearchError(t('problems.search.error'));
       setSearchErrorIsInsufficientPoints(false);
@@ -525,64 +602,77 @@ export default function ProblemsPage() {
     }
 
     const keyword = searchKeyword.trim();
+
+    // Same query already loaded — skip the API round-trip, only keep URL in sync
+    if (keyword === currentSearchKeyword && lastFetchedKeywordRef.current === keyword) {
+      syncSearchUrl(keyword);
+      return;
+    }
+
+    const requestSeq = ++searchRequestSeqRef.current;
     setSearchError('');
     setSearchErrorIsInsufficientPoints(false);
     setSearchLoading(true);
     setNotesSearchLoading(true);
     setNotesSearchResults([]);
-
-    // Mark as processed before any await to prevent useEffect from re-triggering
     lastProcessedUrlKeyword.current = keyword;
 
     try {
-      if (process.env.NEXT_PUBLIC_UI_PREVIEW === '1') {
-        await new Promise((resolve) => setTimeout(resolve, 650));
-        setSearchResults(PREVIEW_RESULTS);
-        setSearchTotal(PREVIEW_RESULTS.length);
-        setCurrentSearchKeyword(keyword);
-        setSearchKeyword(keyword);
-        router.push(`/problems?q=${encodeURIComponent(keyword)}`);
-        return;
-      }
-      const response = await searchAPI.search(keyword, resultLimit);
-      setSearchResults(response.results);
-      setSearchTotal(response.total);
-      setCurrentSearchKeyword(keyword);
-      setSearchKeyword(keyword);
-      
-      // Update URL with search keyword
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('q', keyword);
-      router.push(`/problems?${params.toString()}`);
-
-      // Fetch notes search results
-      try {
-        const notesResponse = await searchAPI.notesSearch(keyword, 5);
-        setNotesSearchResults(notesResponse || []);
-      } catch (notesError) {
-        // Silently fail for notes search, don't show error
-        console.error('Notes search failed:', notesError);
-        setNotesSearchResults([]);
-      }
+      const payload = await fetchSearchPayload(keyword, resultLimit);
+      if (requestSeq !== searchRequestSeqRef.current) return;
+      applySearchPayload(keyword, payload);
+      syncSearchUrl(keyword);
     } catch (error: any) {
+      if (requestSeq !== searchRequestSeqRef.current) return;
       applySearchError(error);
       setSearchResults([]);
       setSearchTotal(0);
       setCurrentSearchKeyword('');
-      // Reset the ref on error so we can retry
+      lastFetchedKeywordRef.current = null;
       lastProcessedUrlKeyword.current = undefined;
     } finally {
-      setSearchLoading(false);
-      setNotesSearchLoading(false);
+      if (requestSeq === searchRequestSeqRef.current) {
+        setSearchLoading(false);
+        setNotesSearchLoading(false);
+      }
     }
   };
 
+  // Prefetch search results after the input stays unchanged for 1s
+  useEffect(() => {
+    if (!isAuthenticated || loading) return;
+
+    clearPrefetchTimer();
+    const keyword = searchKeyword.trim();
+    if (!keyword) return;
+    if (keyword === currentSearchKeyword && lastFetchedKeywordRef.current === keyword) return;
+
+    prefetchTimerRef.current = setTimeout(async () => {
+      const requestSeq = ++searchRequestSeqRef.current;
+      try {
+        const payload = await fetchSearchPayload(keyword, resultLimit);
+        if (requestSeq !== searchRequestSeqRef.current) return;
+        // Drop stale prefetch if the user kept typing after this request started
+        if (searchKeywordRef.current.trim() !== keyword) return;
+        applySearchPayload(keyword, payload);
+      } catch {
+        // Prefetch failures stay silent; explicit submit can still surface errors.
+      }
+    }, 1000);
+
+    return () => clearPrefetchTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed off input idle + auth/limit
+  }, [searchKeyword, isAuthenticated, loading, currentSearchKeyword, resultLimit]);
+
   const handleRecentProblems = async () => {
+    clearPrefetchTimer();
+    searchRequestSeqRef.current += 1;
     setSearchError('');
     setSearchErrorIsInsufficientPoints(false);
     setSearchLoading(true);
     setCurrentSearchKeyword('最近题目');
     setSearchKeyword('');
+    lastFetchedKeywordRef.current = null;
     try {
       if (process.env.NEXT_PUBLIC_UI_PREVIEW === '1') {
         await new Promise((resolve) => setTimeout(resolve, 650));
@@ -660,11 +750,22 @@ export default function ProblemsPage() {
     const value = Math.min(100, Math.max(0, ratio));
     const distanceFromMiddle = Math.abs(value - 50) / 50;
     const endpoint = value >= 50 ? [34, 197, 94] : [239, 68, 68];
-    const channel = (target: number) => Math.round(255 + (target - 255) * distanceFromMiddle);
-    const color = `rgb(${channel(endpoint[0])}, ${channel(endpoint[1])}, ${channel(endpoint[2])})`;
+    // Light: green–black–red; Dark: green–white–red
+    const channel = (mid: number, target: number) =>
+      Math.round(mid + (target - mid) * distanceFromMiddle);
+    const mix = (mid: number) =>
+      `rgb(${channel(mid, endpoint[0])}, ${channel(mid, endpoint[1])}, ${channel(mid, endpoint[2])})`;
 
     return (
-      <span className="comment-ratio" style={{ color }}>
+      <span
+        className="comment-ratio"
+        style={
+          {
+            '--comment-ratio-light': mix(0),
+            '--comment-ratio-dark': mix(255),
+          } as React.CSSProperties
+        }
+      >
         {Math.round(value)}%
       </span>
     );
@@ -1130,7 +1231,7 @@ export default function ProblemsPage() {
         <main className="search-stage">
           <section className="search-landing-visual" aria-hidden={hasSearchState}>
             <div className="search-scribble search-scribble-left">人人不掉心，<br /><span>期期 105！</span></div>
-            <div className="search-scribble search-scribble-right">打爆唐 B 评审！</div>
+            <div className="search-scribble search-scribble-right">打爆唐B评审</div>
             <div className="search-mascot-wrap">
               <Image
                 src="/brand/kangaroo-reader.png?v=2"
@@ -1262,7 +1363,7 @@ export default function ProblemsPage() {
                           <span className="result-index">{index + 1}</span>
                           <div className="result-main">
                             <h3>{getProblemTitle(result)}</h3>
-                            <p>上传时间：{formatTimestamp(result.timestamp)}</p>
+                            <p>上传时间 {formatTimestamp(result.timestamp)}</p>
                           </div>
                           <div className="result-metrics" data-count={1 + Object.values(displayItems).filter(Boolean).length}>
                             <span>答案 {renderAnswerCell(result.answer)}</span>
