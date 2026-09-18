@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import BrandLogo from '@/components/BrandLogo';
+import AccountAvatar from '@/components/AccountAvatar';
 
 interface NavbarProps {
   title: string;
@@ -47,7 +48,7 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
             </button>
           )}
-          <BrandLogo compact />
+          <BrandLogo compact markImageSrc="/brand/navbar-logo.png" />
           <span className="brand-navbar-divider" />
           <button className="brand-navbar-title" onClick={() => setOpenMenu(openMenu === 'nav' ? null : 'nav')}>
             {title || '题目答案搜索'}
@@ -73,7 +74,15 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
           </button>
           <div className="brand-user-wrap">
             <button className="brand-avatar-button" onClick={() => setOpenMenu(openMenu === 'user' ? null : 'user')} aria-label="用户菜单">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0" /></svg>
+              {user?.id ? (
+                <AccountAvatar
+                  accountId={user.id}
+                  username={user.username}
+                  sizeClassName="brand-avatar-image"
+                />
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0" /></svg>
+              )}
             </button>
             {openMenu === 'user' && (
               <div className="brand-popover brand-user-menu">

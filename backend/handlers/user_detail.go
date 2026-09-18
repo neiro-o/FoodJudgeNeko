@@ -23,6 +23,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const userAvatarCacheTTL = 48 * time.Hour
+
+var userAvatarCacheExtensions = []string{".jpg", ".png", ".jpeg", ".gif", ".webp"}
+
 // validateTokenFromQuery validates the token passed as query parameter
 // Returns true if valid, false otherwise
 func validateTokenFromQuery(c *gin.Context) bool {
@@ -90,6 +94,53 @@ func getAvatarCachePath(userID string, ext string) (string, error) {
 	return filepath.Join(cacheDir, filename), nil
 }
 
+// findFreshUserAvatarCache returns a non-empty avatar cache entry only while it
+// is inside the refresh window. ModTime is the time at which the upstream
+// avatar was last downloaded.
+func findFreshUserAvatarCache(userID string, now time.Time) (string, bool) {
+	for _, ext := range userAvatarCacheExtensions {
+		cachePath, err := getAvatarCachePath(userID, ext)
+		if err != nil {
+			continue
+		}
+
+		info, err := os.Stat(cachePath)
+		if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+			continue
+		}
+
+		age := now.Sub(info.ModTime())
+		if age >= 0 && age < userAvatarCacheTTL {
+			return cachePath, true
+		}
+	}
+
+	return "", false
+}
+
+func latestUserAvatarOptions() *options.FindOneOptions {
+	return options.FindOne().SetSort(bson.D{
+		{Key: "createTime", Value: -1},
+		{Key: "_id", Value: -1},
+	})
+}
+
+func serveUserAvatar(c *gin.Context, cachePath string) {
+	// The URL contains an access token, so this must not be stored in a shared
+	// proxy cache. Limit browser reuse to the remaining lifetime of the server
+	// cache, otherwise two independent 48-hour windows could keep an old avatar
+	// visible for almost four days.
+	maxAge := int64(0)
+	if info, err := os.Stat(cachePath); err == nil {
+		remaining := userAvatarCacheTTL - time.Since(info.ModTime())
+		if remaining > 0 {
+			maxAge = int64(remaining / time.Second)
+		}
+	}
+	c.Header("Cache-Control", fmt.Sprintf("private, max-age=%d, must-revalidate", maxAge))
+	c.File(cachePath)
+}
+
 // getExtensionFromURL extracts file extension from URL
 func getExtensionFromURL(urlStr string) string {
 	parsedURL, err := url.Parse(urlStr)
@@ -126,17 +177,25 @@ func downloadAvatar(avatarURL, cachePath string) error {
 		return fmt.Errorf("failed to download avatar: status code %d", resp.StatusCode)
 	}
 
-	// Create cache file
-	file, err := os.Create(cachePath)
+	// Write to a temporary file before replacing the cache. Concurrent refreshes
+	// or an interrupted upstream response must not leave a truncated avatar.
+	file, err := os.CreateTemp(filepath.Dir(cachePath), ".user-avatar-*")
 	if err != nil {
 		return fmt.Errorf("failed to create cache file: %w", err)
 	}
-	defer file.Close()
+	tempPath := file.Name()
+	defer os.Remove(tempPath)
 
 	// Copy response body to file
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
+	if _, err := io.Copy(file, resp.Body); err != nil {
+		file.Close()
 		return fmt.Errorf("failed to write cache file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close cache file: %w", err)
+	}
+	if err := os.Rename(tempPath, cachePath); err != nil {
+		return fmt.Errorf("failed to replace cache file: %w", err)
 	}
 
 	return nil
@@ -161,27 +220,20 @@ func GetUserAvatar(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Check if cached avatar exists
-	// First check with common extensions
-	extensions := []string{".jpg", ".png", ".jpeg", ".gif", ".webp"}
-	for _, ext := range extensions {
-		cachePath, err := getAvatarCachePath(userID, ext)
-		if err != nil {
-			continue
-		}
-		if _, err := os.Stat(cachePath); err == nil {
-			// Serve cached file
-			c.File(cachePath)
-			return
-		}
+	// Reuse the downloaded avatar for at most 48 hours. Older files stay on
+	// disk until the refreshed image is safely downloaded, but are not served.
+	if cachePath, ok := findFreshUserAvatarCache(userID, time.Now()); ok {
+		serveUserAvatar(c, cachePath)
+		return
 	}
 
-	// No cache found, search in MongoDB
+	// No fresh cache found. Always use the latest non-anonymous comment so a
+	// changed profile picture becomes visible after the refresh window.
 	var comment bson.M
 	err := database.Comments.FindOne(ctx, bson.M{
 		"userId":      userID,
 		"isAnonymous": false,
-	}).Decode(&comment)
+	}, latestUserAvatarOptions()).Decode(&comment)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -213,8 +265,8 @@ func GetUserAvatar(c *gin.Context) {
 		return
 	}
 
-	// Serve the cached file
-	c.File(cachePath)
+	// Serve the refreshed cached file.
+	serveUserAvatar(c, cachePath)
 }
 
 // UserInfoResponse represents the response for user info

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -35,6 +36,14 @@ type LoadMediaRequest struct {
 	Hash string `json:"hash" binding:"required"`
 }
 
+var hlsURIAttributePattern = regexp.MustCompile(`URI="([^"]+)"`)
+
+func generateMediaHash(urlStr string) string {
+	mac := hmac.New(sha256.New, []byte(config.AppConfig.Server.JWTSecret))
+	mac.Write([]byte(urlStr))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
 // validateHash validates the URL hash using HMAC-SHA256
 func validateHash(urlStr, providedHash string) bool {
 	secret := config.AppConfig.Server.JWTSecret
@@ -42,11 +51,96 @@ func validateHash(urlStr, providedHash string) bool {
 		return false
 	}
 
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(urlStr))
-	expectedHash := hex.EncodeToString(mac.Sum(nil))
+	expectedHash := generateMediaHash(urlStr)
 
 	return hmac.Equal([]byte(providedHash), []byte(expectedHash))
+}
+
+func isHLSPlaylistURL(urlStr string) bool {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(filepath.Ext(parsedURL.Path), ".m3u8")
+}
+
+func hlsProxyURL(rawReference, playlistURL, proxyPath string) (string, error) {
+	reference := strings.TrimSpace(rawReference)
+	if reference == "" {
+		return "", fmt.Errorf("empty HLS URI")
+	}
+	if strings.HasPrefix(strings.ToLower(reference), "data:") {
+		return reference, nil
+	}
+
+	base, err := url.Parse(playlistURL)
+	if err != nil {
+		return "", fmt.Errorf("parse playlist URL: %w", err)
+	}
+	ref, err := url.Parse(reference)
+	if err != nil {
+		return "", fmt.Errorf("parse HLS URI %q: %w", reference, err)
+	}
+	resolved := base.ResolveReference(ref).String()
+	if !isAllowedDomain(resolved) {
+		return "", fmt.Errorf("HLS URI is not from an allowed domain: %s", resolved)
+	}
+
+	query := url.Values{
+		"url":  {resolved},
+		"hash": {generateMediaHash(resolved)},
+	}
+	return proxyPath + "?" + query.Encode(), nil
+}
+
+// rewriteHLSPlaylist makes every playlist, segment, encryption-key, and init
+// file URI go back through this proxy. Returning the upstream manifest as-is
+// breaks relative URIs because the browser resolves them against /api/media/.
+func rewriteHLSPlaylist(data []byte, playlistURL, proxyPath string) ([]byte, error) {
+	input := string(data)
+	hadTrailingNewline := strings.HasSuffix(input, "\n")
+	lines := strings.Split(strings.TrimSuffix(input, "\n"), "\n")
+
+	for i, line := range lines {
+		line = strings.TrimSuffix(line, "\r")
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			lines[i] = line
+			continue
+		}
+
+		if !strings.HasPrefix(trimmed, "#") {
+			proxied, err := hlsProxyURL(trimmed, playlistURL, proxyPath)
+			if err != nil {
+				return nil, err
+			}
+			lines[i] = proxied
+			continue
+		}
+
+		var rewriteErr error
+		lines[i] = hlsURIAttributePattern.ReplaceAllStringFunc(line, func(match string) string {
+			if rewriteErr != nil {
+				return match
+			}
+			reference := match[len(`URI="`) : len(match)-1]
+			proxied, err := hlsProxyURL(reference, playlistURL, proxyPath)
+			if err != nil {
+				rewriteErr = err
+				return match
+			}
+			return `URI="` + proxied + `"`
+		})
+		if rewriteErr != nil {
+			return nil, rewriteErr
+		}
+	}
+
+	result := strings.Join(lines, "\n")
+	if hadTrailingNewline {
+		result += "\n"
+	}
+	return []byte(result), nil
 }
 
 // isAllowedDomain checks if the URL is from an allowed domain
@@ -123,17 +217,25 @@ func downloadAndCacheMedia(mediaURL, cachePath string) error {
 		return fmt.Errorf("failed to download media: status code %d", resp.StatusCode)
 	}
 
-	// Create cache file
-	file, err := os.Create(cachePath)
+	// Download atomically so parallel HLS requests never observe a partial
+	// playlist or segment.
+	file, err := os.CreateTemp(filepath.Dir(cachePath), ".media-*")
 	if err != nil {
 		return fmt.Errorf("failed to create cache file: %w", err)
 	}
-	defer file.Close()
+	tempPath := file.Name()
+	defer os.Remove(tempPath)
 
 	// Copy response body to file
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
+	if _, err := io.Copy(file, resp.Body); err != nil {
+		file.Close()
 		return fmt.Errorf("failed to write cache file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close cache file: %w", err)
+	}
+	if err := os.Rename(tempPath, cachePath); err != nil {
+		return fmt.Errorf("failed to replace cache file: %w", err)
 	}
 
 	return nil
@@ -260,9 +362,7 @@ func GenerateMediaHash(c *gin.Context) {
 		return
 	}
 
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(req.URL))
-	hash := hex.EncodeToString(mac.Sum(nil))
+	hash := generateMediaHash(req.URL)
 
 	utils.SuccessResponse(c, gin.H{
 		"url":  req.URL,
@@ -306,6 +406,23 @@ func LoadVideo(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, "Failed to download video: "+err.Error())
 			return
 		}
+	}
+
+	if isHLSPlaylistURL(videoURL) {
+		playlist, err := os.ReadFile(cachePath)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, "Failed to read HLS playlist: "+err.Error())
+			return
+		}
+		rewritten, err := rewriteHLSPlaylist(playlist, videoURL, c.Request.URL.Path)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, "Failed to rewrite HLS playlist: "+err.Error())
+			return
+		}
+
+		c.Header("Cache-Control", "private, max-age=300")
+		c.Data(http.StatusOK, "application/vnd.apple.mpegurl", rewritten)
+		return
 	}
 
 	c.Header("Accept-Ranges", "bytes")

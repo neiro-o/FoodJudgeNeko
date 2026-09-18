@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { mediaAPI } from '@/lib/api';
 
 interface ImageModalProps {
@@ -97,12 +98,17 @@ export default function ImageModal({ imageUrl, isOpen, onClose }: ImageModalProp
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
+      const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
+
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.body.style.overflow = previousOverflow;
+      };
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
     };
   }, [isOpen, onClose]);
 
@@ -115,57 +121,62 @@ export default function ImageModal({ imageUrl, isOpen, onClose }: ImageModalProp
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+      className="fixed inset-0 z-[200] overflow-y-auto overscroll-contain bg-black/80 backdrop-blur-sm"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="图片预览"
     >
-      <div className="relative max-w-[90vw] max-h-[90vh]">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute -top-10 right-0 text-white hover:text-gray-300 transition"
-        >
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+      {/* Keep the media centered when it fits, while allowing tall images to scroll. */}
+      <div className="grid min-h-full place-items-center px-4 py-16 sm:px-8">
+        <div className="relative max-w-[92vw]" onClick={(e) => e.stopPropagation()}>
+          {/* Loading spinner */}
+          {isLoading && (
+            <div className="flex min-h-[200px] min-w-[200px] items-center justify-center">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent"></div>
+            </div>
+          )}
 
-        {/* Loading spinner */}
-        {isLoading && (
-          <div className="flex items-center justify-center min-w-[200px] min-h-[200px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent"></div>
-          </div>
-        )}
-        
-        {/* Video player */}
-        {isVideo && proxiedUrl && (
-          <video
-            ref={videoRef}
-            src={proxiedUrl}
-            controls
-            autoPlay
-            className={`max-w-full max-h-[85vh] rounded-lg ${isLoading ? 'hidden' : 'block'}`}
-            onClick={(e) => e.stopPropagation()}
-            onLoadedData={() => setIsLoading(false)}
-            onError={() => setIsLoading(false)}
-          >
-            Your browser does not support video playback.
-          </video>
-        )}
+          {/* Video player */}
+          {isVideo && proxiedUrl && (
+            <video
+              ref={videoRef}
+              src={proxiedUrl}
+              controls
+              autoPlay
+              className={`max-h-[calc(100svh-8rem)] max-w-full rounded-lg ${isLoading ? 'hidden' : 'block'}`}
+              onLoadedData={() => setIsLoading(false)}
+              onError={() => setIsLoading(false)}
+            >
+              Your browser does not support video playback.
+            </video>
+          )}
 
-        {/* Image - only render when we have a valid URL and it's not a video */}
-        {!isVideo && proxiedUrl && (
-          <img
-            src={proxiedUrl}
-            alt="Preview"
-            className={`max-w-full max-h-[85vh] object-contain rounded-lg ${isLoading ? 'hidden' : 'block'}`}
-            onClick={(e) => e.stopPropagation()}
-            onLoad={() => setIsLoading(false)}
-            onError={() => setIsLoading(false)}
-          />
-        )}
+          {/* Preserve tall images at a readable size; the overlay provides scrolling. */}
+          {!isVideo && proxiedUrl && (
+            <img
+              src={proxiedUrl}
+              alt="Preview"
+              className={`h-auto max-w-full rounded-lg object-contain ${isLoading ? 'hidden' : 'block'}`}
+              onLoad={() => setIsLoading(false)}
+              onError={() => setIsLoading(false)}
+            />
+          )}
+        </div>
       </div>
-    </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="fixed right-4 top-4 z-[201] grid h-11 w-11 place-items-center rounded-full bg-black/45 text-white transition hover:bg-black/70 hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-white sm:right-6 sm:top-6"
+        aria-label="关闭图片预览"
+      >
+        <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>,
+    document.body
   );
 }

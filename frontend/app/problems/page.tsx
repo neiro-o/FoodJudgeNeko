@@ -24,6 +24,31 @@ const COUNT_METRICS = [
   { key: 'mongodb', icon: '📖', label: '原始数据' },
 ] as const;
 
+type SearchPayload = {
+  results: SearchResult[];
+  total: number;
+  notes: NotesSearchItem[];
+};
+
+type ResultViewMode = 'list' | 'table';
+type DisplayItems = { ratio: boolean; comments: boolean; ai: boolean };
+
+const REQUIRED_TABLE_COLUMNS: ColumnId[] = ['index', 'problemTitle', 'time', 'answer', 'detail'];
+const OPTIONAL_TABLE_COLUMNS: Record<keyof DisplayItems, ColumnId> = {
+  ratio: 'ratio',
+  comments: 'comment',
+  ai: 'hot1',
+};
+
+const getVisibleTableColumnIds = (order: ColumnId[], items: DisplayItems) => {
+  const optionalIds = new Set(
+    (Object.keys(OPTIONAL_TABLE_COLUMNS) as Array<keyof DisplayItems>)
+      .filter((key) => items[key])
+      .map((key) => OPTIONAL_TABLE_COLUMNS[key])
+  );
+  return order.filter((id) => REQUIRED_TABLE_COLUMNS.includes(id) || optionalIds.has(id));
+};
+
 export default function ProblemsPage() {
   const { isAuthenticated, loading, user } = useAuth();
   const { t } = useLanguage();
@@ -39,7 +64,13 @@ export default function ProblemsPage() {
   const searchRequestSeqRef = useRef(0);
   const pendingSearchRef = useRef<{
     keyword: string;
-    promise: Promise<{ results: SearchResult[]; total: number; notes: NotesSearchItem[] }>;
+    limit: number;
+    promise: Promise<SearchPayload>;
+  } | null>(null);
+  const prefetchedSearchRef = useRef<{
+    keyword: string;
+    limit: number;
+    payload: SearchPayload;
   } | null>(null);
 
   // Upload states
@@ -66,8 +97,6 @@ export default function ProblemsPage() {
 
   // Search states
   const [searchKeyword, setSearchKeyword] = useState('');
-  const searchKeywordRef = useRef(searchKeyword);
-  searchKeywordRef.current = searchKeyword;
   const [currentSearchKeyword, setCurrentSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
@@ -87,13 +116,23 @@ export default function ProblemsPage() {
   // Column customization states
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
-  const [displayItems, setDisplayItems] = useState({ ratio: false, comments: false, ai: false });
+  const [displayItems, setDisplayItems] = useState<DisplayItems>({ ratio: false, comments: false, ai: false });
   const [draftDisplayItems, setDraftDisplayItems] = useState(displayItems);
+  const [resultViewMode, setResultViewMode] = useState<ResultViewMode>('list');
+  const [draftResultViewMode, setDraftResultViewMode] = useState<ResultViewMode>('list');
+  const [draftColumnOrder, setDraftColumnOrder] = useState<ColumnId[]>(
+    [...DEFAULT_COLUMNS].sort((a, b) => a.order - b.order).map((column) => column.id)
+  );
+  const [draggedColumnId, setDraggedColumnId] = useState<ColumnId | null>(null);
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('problemDisplayItemsV1') || '{}');
       setDisplayItems({ ratio: saved.ratio === true, comments: saved.comments === true, ai: saved.ai === true });
     } catch { /* Keep defaults if stored preferences are invalid. */ }
+    const savedViewMode = localStorage.getItem('problemResultViewMode');
+    if (savedViewMode === 'list' || savedViewMode === 'table') {
+      setResultViewMode(savedViewMode);
+    }
   }, []);
   const returnToSearch = () => window.location.assign('/problems');
   const [resultLimit, setResultLimit] = useState(15);
@@ -157,7 +196,7 @@ export default function ProblemsPage() {
             setSearchResults(response.results);
             setSearchTotal(response.total);
             setCurrentSearchKeyword(trimmedKeyword);
-            setSearchKeyword(trimmedKeyword);
+            setSearchKeyword('');
             lastFetchedKeywordRef.current = trimmedKeyword;
             // Also fetch notes search results
             try {
@@ -320,6 +359,63 @@ export default function ProblemsPage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('blockMaliciousComment', String(block));
     }
+  };
+
+  const getCurrentColumnOrder = () => {
+    const savedOrder = [...columns].sort((a, b) => a.order - b.order).map((column) => column.id);
+    const missingColumns = DEFAULT_COLUMNS.map((column) => column.id).filter((id) => !savedOrder.includes(id));
+    return [...savedOrder, ...missingColumns];
+  };
+
+  const openDisplaySettings = () => {
+    setDraftDisplayItems(displayItems);
+    setDraftResultViewMode(resultViewMode);
+    setDraftColumnOrder(getCurrentColumnOrder());
+    setDraftResultLimit(resultLimit);
+    setDraftBlockMaliciousComment(blockMaliciousComment);
+    setDraggedColumnId(null);
+    setIsCustomizerOpen(true);
+  };
+
+  const moveDraftColumn = (columnId: ColumnId, direction: -1 | 1) => {
+    const visibleIds = getVisibleTableColumnIds(draftColumnOrder, draftDisplayItems);
+    const currentIndex = visibleIds.indexOf(columnId);
+    const targetId = visibleIds[currentIndex + direction];
+    if (!targetId) return;
+
+    setDraftColumnOrder((currentOrder) => {
+      const nextOrder = [...currentOrder];
+      const sourceIndex = nextOrder.indexOf(columnId);
+      const targetIndex = nextOrder.indexOf(targetId);
+      [nextOrder[sourceIndex], nextOrder[targetIndex]] = [nextOrder[targetIndex], nextOrder[sourceIndex]];
+      return nextOrder;
+    });
+  };
+
+  const dropDraftColumn = (targetId: ColumnId) => {
+    if (!draggedColumnId || draggedColumnId === targetId) return;
+    setDraftColumnOrder((currentOrder) => {
+      const nextOrder = [...currentOrder];
+      const sourceIndex = nextOrder.indexOf(draggedColumnId);
+      const targetIndex = nextOrder.indexOf(targetId);
+      [nextOrder[sourceIndex], nextOrder[targetIndex]] = [nextOrder[targetIndex], nextOrder[sourceIndex]];
+      return nextOrder;
+    });
+    setDraggedColumnId(null);
+  };
+
+  const saveDisplaySettings = () => {
+    const visibleIds = new Set(getVisibleTableColumnIds(draftColumnOrder, draftDisplayItems));
+    const nextColumns = draftColumnOrder.map((id, order) => ({ id, order, visible: visibleIds.has(id) }));
+
+    localStorage.setItem('problemDisplayItemsV1', JSON.stringify(draftDisplayItems));
+    localStorage.setItem('problemResultViewMode', draftResultViewMode);
+    setDisplayItems(draftDisplayItems);
+    setResultViewMode(draftResultViewMode);
+    handleColumnsChange(nextColumns);
+    handleBlockMaliciousCommentChange(draftBlockMaliciousComment);
+    if (draftResultLimit !== resultLimit) void handleResultLimitChange(draftResultLimit);
+    setIsCustomizerOpen(false);
   };
 
   // Handle upload mode button click
@@ -546,9 +642,14 @@ export default function ProblemsPage() {
     router.push(`/problems?${params.toString()}`);
   };
 
-  // Share in-flight requests between prefetch and explicit submit to avoid duplicate hits.
+  // Cache prefetched payloads and share in-flight requests with explicit submits.
   const fetchSearchPayload = (keyword: string, limit: number) => {
-    if (pendingSearchRef.current?.keyword === keyword) {
+    const prefetched = prefetchedSearchRef.current;
+    if (prefetched?.keyword === keyword && prefetched.limit === limit) {
+      return Promise.resolve(prefetched.payload);
+    }
+
+    if (pendingSearchRef.current?.keyword === keyword && pendingSearchRef.current.limit === limit) {
       return pendingSearchRef.current.promise;
     }
 
@@ -567,23 +668,34 @@ export default function ProblemsPage() {
       return { results: response.results, total: response.total, notes };
     })();
 
-    pendingSearchRef.current = { keyword, promise };
-    promise.finally(() => {
-      if (pendingSearchRef.current?.promise === promise) {
-        pendingSearchRef.current = null;
+    pendingSearchRef.current = { keyword, limit, promise };
+    promise.then(
+      (payload) => {
+        prefetchedSearchRef.current = { keyword, limit, payload };
+        if (pendingSearchRef.current?.promise === promise) {
+          pendingSearchRef.current = null;
+        }
+      },
+      () => {
+        if (pendingSearchRef.current?.promise === promise) {
+          pendingSearchRef.current = null;
+        }
       }
-    });
+    );
     return promise;
   };
 
   const applySearchPayload = (
     keyword: string,
-    payload: { results: SearchResult[]; total: number; notes: NotesSearchItem[] }
+    payload: SearchPayload
   ) => {
+    if (prefetchedSearchRef.current?.keyword === keyword) {
+      prefetchedSearchRef.current = null;
+    }
     setSearchResults(payload.results);
     setSearchTotal(payload.total);
     setCurrentSearchKeyword(keyword);
-    setSearchKeyword(keyword);
+    setSearchKeyword('');
     setNotesSearchResults(payload.notes);
     setSearchError('');
     setSearchErrorIsInsufficientPoints(false);
@@ -605,6 +717,7 @@ export default function ProblemsPage() {
 
     // Same query already loaded — skip the API round-trip, only keep URL in sync
     if (keyword === currentSearchKeyword && lastFetchedKeywordRef.current === keyword) {
+      setSearchKeyword('');
       syncSearchUrl(keyword);
       return;
     }
@@ -648,13 +761,8 @@ export default function ProblemsPage() {
     if (keyword === currentSearchKeyword && lastFetchedKeywordRef.current === keyword) return;
 
     prefetchTimerRef.current = setTimeout(async () => {
-      const requestSeq = ++searchRequestSeqRef.current;
       try {
-        const payload = await fetchSearchPayload(keyword, resultLimit);
-        if (requestSeq !== searchRequestSeqRef.current) return;
-        // Drop stale prefetch if the user kept typing after this request started
-        if (searchKeywordRef.current.trim() !== keyword) return;
-        applySearchPayload(keyword, payload);
+        await fetchSearchPayload(keyword, resultLimit);
       } catch {
         // Prefetch failures stay silent; explicit submit can still surface errors.
       }
@@ -1221,6 +1329,18 @@ export default function ProblemsPage() {
   const hasSearchState = searchLoading || Boolean(currentSearchKeyword) || searchResults.length > 0 || Boolean(searchError);
   const activeCountMetric = COUNT_METRICS[countMetricIndex];
   const activeCount = counts?.[activeCountMetric.key];
+  const activeTableColumnIds = getVisibleTableColumnIds(getCurrentColumnOrder(), displayItems);
+  const draftVisibleTableColumnIds = getVisibleTableColumnIds(draftColumnOrder, draftDisplayItems);
+  const tableColumnLabels: Record<ColumnId, string> = {
+    index: '序号',
+    problemTitle: '题目',
+    time: '上传时间',
+    answer: '答案',
+    ratio: '比例',
+    hot1: 'AI 判断',
+    comment: '评论区比例',
+    detail: '详情',
+  };
 
   return (
     <>
@@ -1333,7 +1453,7 @@ export default function ProblemsPage() {
                         <h2>共找到 <b>{searchTotal}</b> 道题，显示前 <b>{searchResults.length}</b> 个</h2>
                       </div>
                       <div className="result-heading-actions">
-                      <button onClick={() => { setDraftDisplayItems(displayItems); setDraftResultLimit(resultLimit); setDraftBlockMaliciousComment(blockMaliciousComment); setIsCustomizerOpen(true); }} className="result-settings" aria-label="选择显示项">
+                      <button onClick={openDisplaySettings} className="result-settings" aria-label="设置结果显示方式">
                         <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2m4 0h10M14 4v6M6 14v6" /></svg>
                       </button>
                       <button type="button" className="result-settings" onClick={returnToSearch} aria-label="关闭结果，返回搜题" title="关闭结果，返回搜题">
@@ -1352,28 +1472,58 @@ export default function ProblemsPage() {
                       <div className="search-empty">没有找到相关题目，换个关键词试试吧。</div>
                     )}
 
-                    <div className="result-card-list">
-                      {searchResults.map((result, index) => (
-                        <a
-                          href={`/problems/${result.mongo_id}`}
-                          className="result-card"
-                          key={result.mongo_id || index}
-                          style={{ animationDelay: `${Math.min(index, 10) * 75}ms` }}
-                        >
-                          <span className="result-index">{index + 1}</span>
-                          <div className="result-main">
-                            <h3>{getProblemTitle(result)}</h3>
-                            <p>上传时间 {formatTimestamp(result.timestamp)}</p>
-                          </div>
-                          <div className="result-metrics" data-count={1 + Object.values(displayItems).filter(Boolean).length}>
-                            <span>答案 {renderAnswerCell(result.answer)}</span>
-                            {displayItems.ratio && <span>比例 <em>{formatRatio(result.ratio_1, result.ratio_2)}</em></span>}
-                            {displayItems.comments && <span>评论区比例 {renderCommentRatio(result.comment_ratio)}</span>}
-                            {displayItems.ai && <span>AI 判断 {renderAnswerCell(result.hot1_answer)}</span>}
-                          </div>
-                        </a>
-                      ))}
-                    </div>
+                    {resultViewMode === 'list' ? (
+                      <div className="result-card-list">
+                        {searchResults.map((result, index) => (
+                          <a
+                            href={`/problems/${result.mongo_id}`}
+                            className="result-card"
+                            key={result.mongo_id || index}
+                            style={{ animationDelay: `${Math.min(index, 10) * 75}ms` }}
+                          >
+                            <span className="result-index">{index + 1}</span>
+                            <div className="result-main">
+                              <h3>{getProblemTitle(result)}</h3>
+                              <p>上传时间 {formatTimestamp(result.timestamp)}</p>
+                            </div>
+                            <div className="result-metrics" data-count={1 + Object.values(displayItems).filter(Boolean).length}>
+                              <span>答案 {renderAnswerCell(result.answer)}</span>
+                              {displayItems.ratio && <span>比例 <em>{formatRatio(result.ratio_1, result.ratio_2)}</em></span>}
+                              {displayItems.comments && <span>评论区比例 {renderCommentRatio(result.comment_ratio)}</span>}
+                              {displayItems.ai && <span>AI 判断 {renderAnswerCell(result.hot1_answer)}</span>}
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="result-table-wrap">
+                        <table className="result-table">
+                          <thead>
+                            <tr>
+                              {activeTableColumnIds.map((columnId) => <th key={columnId}>{tableColumnLabels[columnId]}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {searchResults.map((result, index) => (
+                              <tr key={result.mongo_id || index}>
+                                {activeTableColumnIds.map((columnId) => (
+                                  <td key={columnId} data-column={columnId}>
+                                    {columnId === 'index' && index + 1}
+                                    {columnId === 'problemTitle' && <a href={`/problems/${result.mongo_id}`}>{getProblemTitle(result)}</a>}
+                                    {columnId === 'time' && formatTimestamp(result.timestamp)}
+                                    {columnId === 'answer' && renderAnswerCell(result.answer)}
+                                    {columnId === 'ratio' && formatRatio(result.ratio_1, result.ratio_2)}
+                                    {columnId === 'hot1' && renderAnswerCell(result.hot1_answer)}
+                                    {columnId === 'comment' && renderCommentRatio(result.comment_ratio)}
+                                    {columnId === 'detail' && <a className="result-table-detail" href={`/problems/${result.mongo_id}`}>查看 →</a>}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
 
                     {notesSearchResults.length > 0 && (
                       <div className="notes-results">
@@ -1421,11 +1571,54 @@ export default function ProblemsPage() {
         {isCustomizerOpen && (
           <div className="display-settings-overlay" onClick={() => setIsCustomizerOpen(false)}>
             <section className="display-settings brand-card" role="dialog" aria-modal="true" aria-labelledby="display-settings-title" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === 'Escape') setIsCustomizerOpen(false); }}>
-              <h2 id="display-settings-title">选择显示项</h2>
-              <p>答案始终显示，以下信息可按需开启。</p>
+              <h2 id="display-settings-title">结果显示设置</h2>
+              <p>选择结果的输出形式和需要展示的信息。</p>
+              <div className="display-settings-section display-view-section">
+                <h3>输出形式</h3>
+                <div className="result-view-options" role="radiogroup" aria-label="结果输出形式">
+                  <button type="button" role="radio" aria-checked={draftResultViewMode === 'list'} className={draftResultViewMode === 'list' ? 'active' : ''} onClick={() => setDraftResultViewMode('list')}>
+                    <svg viewBox="0 0 88 58" aria-hidden="true"><rect x="11" y="9" width="66" height="9" rx="2" /><rect x="11" y="25" width="66" height="9" rx="2" /><rect x="11" y="41" width="66" height="9" rx="2" /></svg>
+                    <strong>列表</strong>
+                  </button>
+                  <button type="button" role="radio" aria-checked={draftResultViewMode === 'table'} className={draftResultViewMode === 'table' ? 'active' : ''} onClick={() => setDraftResultViewMode('table')}>
+                    <svg viewBox="0 0 88 58" aria-hidden="true"><rect x="8" y="7" width="72" height="44" rx="2" /><path d="M8 22h72M8 37h72M32 7v44M56 7v44" /></svg>
+                    <strong>表格</strong>
+                  </button>
+                </div>
+              </div>
+              <div className="display-settings-section display-items-section">
+                <h3>显示信息</h3>
+                <p className="display-section-help">题目、上传时间、答案和详情始终显示，以下信息可按需开启。</p>
               {([['ratio', '比例'], ['comments', '评论区比例'], ['ai', 'AI 判断']] as const).map(([key, label]) => (
                 <label key={key}><span>{label}</span><input type="checkbox" checked={draftDisplayItems[key]} onChange={(event) => setDraftDisplayItems({ ...draftDisplayItems, [key]: event.target.checked })} /></label>
               ))}
+              </div>
+              {draftResultViewMode === 'table' && (
+                <div className="display-settings-section table-order-section">
+                  <h3>列顺序</h3>
+                  <p className="display-section-help">拖动列名，或使用左右箭头调整最终表格顺序。</p>
+                  <div className="table-column-order">
+                    {draftVisibleTableColumnIds.map((columnId, index) => (
+                      <div
+                        key={columnId}
+                        className={`table-column-order-item ${draggedColumnId === columnId ? 'dragging' : ''}`}
+                        draggable
+                        onDragStart={() => setDraggedColumnId(columnId)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => dropDraftColumn(columnId)}
+                        onDragEnd={() => setDraggedColumnId(null)}
+                      >
+                        <span className="column-drag-handle" aria-hidden="true">⠿</span>
+                        <b>{tableColumnLabels[columnId]}</b>
+                        <span className="column-order-actions">
+                          <button type="button" disabled={index === 0} onClick={() => moveDraftColumn(columnId, -1)} aria-label={`向左移动${tableColumnLabels[columnId]}`}>←</button>
+                          <button type="button" disabled={index === draftVisibleTableColumnIds.length - 1} onClick={() => moveDraftColumn(columnId, 1)} aria-label={`向右移动${tableColumnLabels[columnId]}`}>→</button>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="display-settings-section">
                 <h3>搜索设置</h3>
                 <label>
@@ -1444,14 +1637,8 @@ export default function ProblemsPage() {
                 </label>
               </div>
               <footer>
-                <button className="quick-pill" autoFocus onClick={() => setIsCustomizerOpen(false)}>取消</button>
-                <button className="brand-primary-button" onClick={() => {
-                  localStorage.setItem('problemDisplayItemsV1', JSON.stringify(draftDisplayItems));
-                  setDisplayItems(draftDisplayItems);
-                  handleBlockMaliciousCommentChange(draftBlockMaliciousComment);
-                  if (draftResultLimit !== resultLimit) void handleResultLimitChange(draftResultLimit);
-                  setIsCustomizerOpen(false);
-                }}>保存</button>
+                <button className="quick-pill" onClick={() => setIsCustomizerOpen(false)}>取消</button>
+                <button className="brand-primary-button" onClick={saveDisplaySettings}>保存</button>
               </footer>
             </section>
           </div>
