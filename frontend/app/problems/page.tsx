@@ -60,17 +60,11 @@ export default function ProblemsPage() {
   const lastProcessedUrlKeyword = useRef<string | undefined>(undefined);
   // Last keyword that successfully returned search results (used to skip duplicate submits)
   const lastFetchedKeywordRef = useRef<string | null>(null);
-  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRequestSeqRef = useRef(0);
   const pendingSearchRef = useRef<{
     keyword: string;
     limit: number;
     promise: Promise<SearchPayload>;
-  } | null>(null);
-  const prefetchedSearchRef = useRef<{
-    keyword: string;
-    limit: number;
-    payload: SearchPayload;
   } | null>(null);
 
   // Upload states
@@ -626,13 +620,6 @@ export default function ProblemsPage() {
     }
   };
 
-  const clearPrefetchTimer = () => {
-    if (prefetchTimerRef.current) {
-      clearTimeout(prefetchTimerRef.current);
-      prefetchTimerRef.current = null;
-    }
-  };
-
   const syncSearchUrl = (keyword: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (params.get('q') === keyword && !params.get('view')) return;
@@ -642,13 +629,8 @@ export default function ProblemsPage() {
     router.push(`/problems?${params.toString()}`);
   };
 
-  // Cache prefetched payloads and share in-flight requests with explicit submits.
+  // Share in-flight requests when the same search is submitted again.
   const fetchSearchPayload = (keyword: string, limit: number) => {
-    const prefetched = prefetchedSearchRef.current;
-    if (prefetched?.keyword === keyword && prefetched.limit === limit) {
-      return Promise.resolve(prefetched.payload);
-    }
-
     if (pendingSearchRef.current?.keyword === keyword && pendingSearchRef.current.limit === limit) {
       return pendingSearchRef.current.promise;
     }
@@ -670,8 +652,7 @@ export default function ProblemsPage() {
 
     pendingSearchRef.current = { keyword, limit, promise };
     promise.then(
-      (payload) => {
-        prefetchedSearchRef.current = { keyword, limit, payload };
+      () => {
         if (pendingSearchRef.current?.promise === promise) {
           pendingSearchRef.current = null;
         }
@@ -689,9 +670,6 @@ export default function ProblemsPage() {
     keyword: string,
     payload: SearchPayload
   ) => {
-    if (prefetchedSearchRef.current?.keyword === keyword) {
-      prefetchedSearchRef.current = null;
-    }
     setSearchResults(payload.results);
     setSearchTotal(payload.total);
     setCurrentSearchKeyword(keyword);
@@ -705,7 +683,6 @@ export default function ProblemsPage() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearPrefetchTimer();
 
     if (!searchKeyword.trim()) {
       setSearchError(t('problems.search.error'));
@@ -751,29 +728,7 @@ export default function ProblemsPage() {
     }
   };
 
-  // Prefetch search results after the input stays unchanged for 1s
-  useEffect(() => {
-    if (!isAuthenticated || loading) return;
-
-    clearPrefetchTimer();
-    const keyword = searchKeyword.trim();
-    if (!keyword) return;
-    if (keyword === currentSearchKeyword && lastFetchedKeywordRef.current === keyword) return;
-
-    prefetchTimerRef.current = setTimeout(async () => {
-      try {
-        await fetchSearchPayload(keyword, resultLimit);
-      } catch {
-        // Prefetch failures stay silent; explicit submit can still surface errors.
-      }
-    }, 1000);
-
-    return () => clearPrefetchTimer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed off input idle + auth/limit
-  }, [searchKeyword, isAuthenticated, loading, currentSearchKeyword, resultLimit]);
-
   const handleRecentProblems = async () => {
-    clearPrefetchTimer();
     searchRequestSeqRef.current += 1;
     setSearchError('');
     setSearchErrorIsInsufficientPoints(false);

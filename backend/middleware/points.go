@@ -12,10 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// minSearchPoints is the points threshold at or below which a non-group
-// account is blocked from using the search endpoints.
-const minSearchPoints = -3
-
 // resolveSearchAccountID validates an optional admin-only accountId query
 // override and returns the account id that search quota/points should be
 // evaluated against (either the override, or the caller's own account id).
@@ -38,17 +34,13 @@ func resolveSearchAccountID(c *gin.Context, callerAccountID string) (string, boo
 	return overrideAccountID, true
 }
 
-// RequireSearchQuota allows the request through when the effective account
-// (the caller, or an admin-specified accountId override) belongs to the
-// group (is_in_group == true). Otherwise it checks the account's points
-// balance and blocks the request with utils.CodeInsufficientPoints when
-// points <= minSearchPoints.
+// RequireSearchQuota lets group accounts and accounts with remaining daily
+// free searches through. Once the 15 free result-bearing searches are used,
+// non-group accounts need points above utils.MinSearchPoints.
 //
 // The resolved account id and its is_in_group flag are stashed on the
 // context (utils.CtxKeySearchAccountID / utils.CtxKeySearchIsInGroup) so
-// handlers can apply the post-search points deduction (see
-// utils.DeductSearchPointIfApplicable) against the same account that was
-// checked here.
+// handlers can finalize billing against the same account that was checked here.
 func RequireSearchQuota() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		callerAccountID, exists := utils.GetUserID(c)
@@ -75,8 +67,10 @@ func RequireSearchQuota() gin.HandlerFunc {
 		defer cancel()
 
 		var account struct {
-			IsInGroup bool `bson:"is_in_group"`
-			Points    int  `bson:"points"`
+			IsInGroup      bool   `bson:"is_in_group"`
+			Points         int    `bson:"points"`
+			SearchFreeDay  string `bson:"search_free_day"`
+			SearchFreeUsed int    `bson:"search_free_used"`
 		}
 		if err := database.Accounts.FindOne(ctx, bson.M{"_id": objID}).Decode(&account); err != nil {
 			utils.NotFoundResponse(c, "Account not found")
@@ -92,7 +86,7 @@ func RequireSearchQuota() gin.HandlerFunc {
 			return
 		}
 
-		if account.Points <= minSearchPoints {
+		if account.Points <= utils.MinSearchPoints && !utils.HasDailyFreeSearch(account.SearchFreeDay, account.SearchFreeUsed) {
 			utils.InsufficientPointsResponse(c)
 			c.Abort()
 			return

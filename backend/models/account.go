@@ -12,6 +12,8 @@ type Account struct {
 	Password          string             `bson:"password" json:"-"` // Exclude from JSON
 	Email             string             `bson:"email" json:"email"`
 	Points            int                `bson:"points" json:"points"`
+	SearchFreeDay     string             `bson:"search_free_day,omitempty" json:"-"`
+	SearchFreeUsed    int                `bson:"search_free_used,omitempty" json:"-"`
 	IsAdmin           bool               `bson:"is_admin" json:"is_admin"`
 	IsInGroup         bool               `bson:"is_in_group" json:"is_in_group"`
 	TokenVersion      int                `bson:"token_version" json:"-"`                 // Token version for invalidating old tokens

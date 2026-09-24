@@ -797,7 +797,9 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
-		utils.DeductSearchPointIfApplicable(c, total)
+		if !utils.FinalizeSearchBilling(c, total) {
+			return
+		}
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -810,7 +812,9 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
-		utils.DeductSearchPointIfApplicable(c, total)
+		if !utils.FinalizeSearchBilling(c, total) {
+			return
+		}
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -829,7 +833,9 @@ func Search(c *gin.Context) {
 				utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 				return
 			}
-			utils.DeductSearchPointIfApplicable(c, total)
+			if !utils.FinalizeSearchBilling(c, total) {
+				return
+			}
 			utils.SuccessResponse(c, SearchResponse{
 				Total:   total,
 				Results: results,
@@ -845,7 +851,9 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
-		utils.DeductSearchPointIfApplicable(c, total)
+		if !utils.FinalizeSearchBilling(c, total) {
+			return
+		}
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -860,7 +868,9 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
-		utils.DeductSearchPointIfApplicable(c, total)
+		if !utils.FinalizeSearchBilling(c, total) {
+			return
+		}
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -875,7 +885,9 @@ func Search(c *gin.Context) {
 			utils.InternalServerErrorResponse(c, fmt.Sprintf("Search failed: %v", err))
 			return
 		}
-		utils.DeductSearchPointIfApplicable(c, total)
+		if !utils.FinalizeSearchBilling(c, total) {
+			return
+		}
 		utils.SuccessResponse(c, SearchResponse{
 			Total:   total,
 			Results: results,
@@ -1169,7 +1181,9 @@ func Search(c *gin.Context) {
 		})
 	}
 
-	utils.DeductSearchPointIfApplicable(c, int64(totalValue))
+	if !utils.FinalizeSearchBilling(c, int64(totalValue)) {
+		return
+	}
 	utils.SuccessResponse(c, SearchResponse{
 		Total:   int64(totalValue),
 		Results: results,
@@ -2154,7 +2168,9 @@ func QuickSearch(c *gin.Context) {
 		return
 	}
 
-	utils.DeductSearchPointIfApplicable(c, total)
+	if !utils.FinalizeSearchBilling(c, total) {
+		return
+	}
 	utils.SuccessResponse(c, BotSearchResponse{
 		Total:   total,
 		Results: results,

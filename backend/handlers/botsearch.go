@@ -396,7 +396,9 @@ func BotSearch(c *gin.Context) {
 		}
 	}
 
-	utils.DeductSearchPointIfApplicable(c, total)
+	if !utils.FinalizeSearchBilling(c, total) {
+		return
+	}
 	utils.SuccessResponse(c, BotSearchResponse{
 		Total:   total,
 		Results: results,
