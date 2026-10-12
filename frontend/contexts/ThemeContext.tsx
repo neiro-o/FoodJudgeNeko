@@ -22,10 +22,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Load saved preference on mount
   useEffect(() => {
-    const saved = localStorage.getItem('themeMode') as ThemeMode | null;
-    if (saved === 'light' || saved === 'dark' || saved === 'system') {
-      setModeState(saved);
-    }
+    try {
+      const saved = localStorage.getItem('themeMode');
+      if (saved === 'light' || saved === 'dark' || saved === 'system') setModeState(saved);
+    } catch { /* Fall back to the system theme. */ }
   }, []);
 
   // Apply dark class to <html> whenever mode or system preference changes
@@ -55,7 +55,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setMode = (m: ThemeMode) => {
     setModeState(m);
-    localStorage.setItem('themeMode', m);
+    try { localStorage.setItem('themeMode', m); } catch { /* Keep the current selection. */ }
   };
 
   return (

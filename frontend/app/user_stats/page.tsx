@@ -1,5 +1,7 @@
 'use client';
 
+import { PreferenceImg } from '@/components/PreferenceImage';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
@@ -139,7 +141,7 @@ export default function RankingsPage() {
       }
       const paramString = newParams.toString();
       router.push(`/user_stats${paramString ? `?${paramString}` : ''}`);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: document.documentElement.dataset.displayMode === 'energy-saving' ? 'instant' : 'smooth' });
     }
   };
 
@@ -352,7 +354,7 @@ export default function RankingsPage() {
                     onClick={() => handleSearchResultClick(user.userId)}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition"
                   >
-                    <img
+                    <PreferenceImg
                       src={getAvatarUrl(user.userId)}
                       alt="Avatar"
                       className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0"
@@ -405,7 +407,7 @@ export default function RankingsPage() {
                     <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${getRankBadgeClass(item.rank)}`}>
                       {item.rank}
                     </span>
-                    <img
+                    <PreferenceImg
                       src={getAvatarUrl(item.userId)}
                       alt="Avatar"
                       className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700"
@@ -440,7 +442,7 @@ export default function RankingsPage() {
                       </span>
                     </div>
                     <div className="col-span-7 flex items-center gap-3">
-                      <img
+                      <PreferenceImg
                         src={getAvatarUrl(item.userId)}
                         alt="Avatar"
                         className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700"

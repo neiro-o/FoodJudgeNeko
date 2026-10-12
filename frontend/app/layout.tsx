@@ -3,6 +3,7 @@ import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ProblemsStateProvider } from '@/contexts/ProblemsStateContext'
+import { DisplayModeProvider } from '@/contexts/DisplayModeContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { Noto_Sans_SC, Noto_Serif_SC } from 'next/font/google'
 import localFont from 'next/font/local'
@@ -45,14 +46,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN" className={`${notoSansSC.variable} ${notoSerifSC.variable} ${handwritingSC.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `try { document.documentElement.dataset.displayMode = localStorage.getItem('displayMode') === 'energy-saving' ? 'energy-saving' : 'normal'; } catch {}` }} />
+      </head>
       <body>
-        <ThemeProvider>
-          <LanguageProvider>
-            <AuthProvider>
-              <ProblemsStateProvider>{children}</ProblemsStateProvider>
-            </AuthProvider>
-          </LanguageProvider>
-        </ThemeProvider>
+        <DisplayModeProvider>
+          <ThemeProvider>
+            <LanguageProvider>
+              <AuthProvider>
+                <ProblemsStateProvider>{children}</ProblemsStateProvider>
+              </AuthProvider>
+            </LanguageProvider>
+          </ThemeProvider>
+        </DisplayModeProvider>
       </body>
     </html>
   )

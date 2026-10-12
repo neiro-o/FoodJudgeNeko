@@ -1,7 +1,9 @@
 'use client';
 
+import { PreferenceImg } from '@/components/PreferenceImage';
+
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useTheme } from '@/contexts/ThemeContext';
+import InterfaceSettings from '@/components/InterfaceSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import PageTitle from '@/components/PageTitle';
 import AssetPreloader from '@/components/AssetPreloader';
@@ -11,7 +13,6 @@ const mascots = ['classic', 'reader', 'computer', 'yellow-dress', 'black-dress',
 
 export default function Home() {
   const { t } = useLanguage();
-  const { isDark, setMode } = useTheme();
   const { isAuthenticated } = useAuth();
   const destination = isAuthenticated ? '/problems' : '/login';
   return (
@@ -21,11 +22,11 @@ export default function Home() {
         <main className="home-scene">
           <div className="home-atmosphere" aria-hidden="true"><i /><i /><i /></div>
           <div className="home-mascots" aria-hidden="true">
-            {mascots.map((name, index) => <div key={name} className={`home-mascot home-mascot-${index + 1}`}><img src={`/landing/${name}.png`} alt="" draggable={false} /></div>)}
+            {mascots.map((name, index) => <div key={name} className={`home-mascot home-mascot-${index + 1}`}><PreferenceImg src={`/landing/${name}.png`} alt="" draggable={false} /></div>)}
           </div>
-          <header className="home-header"><span>掉心心 <i>·</i> 你的胆子真是肥嘟嘟的！</span><button onClick={() => setMode(isDark ? 'light' : 'dark')} aria-label={isDark ? '切换到日间模式' : '切换到夜间模式'}>{isDark ? '☀' : '☾'}</button></header>
+          <header className="home-header"><span>掉心心 <i>·</i> 你的胆子真是肥嘟嘟的！</span><InterfaceSettings /></header>
           <section className="home-intro">
-            <Link href={destination} className="home-avatar" aria-label={isAuthenticated ? '进入题目页' : '进入登录页'}><img src="/indexpage/le1ou.jpg" width={144} height={144} alt="掉心心头像" /></Link>
+            <Link href={destination} className="home-avatar" aria-label={isAuthenticated ? '进入题目页' : '进入登录页'}><PreferenceImg src="/indexpage/le1ou.jpg" width={144} height={144} alt="掉心心头像" /></Link>
             <div className="home-copy">
               <p className="home-eyebrow">哦哟，掉心心了！</p>
               <h1>{t('home.title')}<span aria-hidden="true">。</span></h1>

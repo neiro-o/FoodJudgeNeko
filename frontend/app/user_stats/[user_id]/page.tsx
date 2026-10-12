@@ -1,9 +1,12 @@
 'use client';
 
+import { PreferenceImg } from '@/components/PreferenceImage';
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import ImageModal from '@/components/ImageModal';
+import { useDisplayMode } from '@/contexts/DisplayModeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { userDetailAPI, mediaAPI, UserInfoResponse, UserComment, UserCommentsResponse, AIUserSummaryResponse } from '@/lib/api';
@@ -34,6 +37,7 @@ export default function UserStatsPage() {
   const searchParams = useSearchParams();
   const userId = params.user_id as string;
   const { t } = useLanguage();
+  const { ready: displayReady, isEnergySaving } = useDisplayMode();
   const { user } = useAuth();
 
   const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
@@ -168,20 +172,24 @@ export default function UserStatsPage() {
 
   // Preload proxied URLs for images/audios in the current comments
   useEffect(() => {
+    if (!displayReady) return;
+    let cancelled = false;
     const preload = async () => {
       const urls: { url: string; isAudio: boolean }[] = [];
       comments.forEach((comment) => {
-        (comment.images || []).forEach((url) => urls.push({ url, isAudio: false }));
+        (displayReady && !isEnergySaving ? comment.images || [] : []).forEach((url) => urls.push({ url, isAudio: false }));
         (comment.audios || []).forEach((audio) => urls.push({ url: audio.url, isAudio: true }));
       });
 
       const uniqueUrls = Array.from(new Map(urls.map((u) => [u.url, u])).values());
       for (const { url, isAudio } of uniqueUrls) {
+        if (cancelled) return;
         if (!isExternalMediaUrl(url) || mediaUrlMap.has(url)) continue;
         try {
           const proxiedUrl = isAudio
             ? await mediaAPI.getAudioUrl(url)
             : await mediaAPI.getImageUrl(url);
+          if (cancelled) return;
           setMediaUrlMap((prev) => new Map(prev).set(url, proxiedUrl));
         } catch (error) {
           console.error('Failed to preload comment media:', url, error);
@@ -190,8 +198,9 @@ export default function UserStatsPage() {
     };
 
     preload();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comments]);
+  }, [comments, displayReady, isEnergySaving]);
 
   // Close tooltip on Escape key
   useEffect(() => {
@@ -270,7 +279,7 @@ export default function UserStatsPage() {
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       fetchComments(page);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: document.documentElement.dataset.displayMode === 'energy-saving' ? 'instant' : 'smooth' });
       
       // Update URL with page number
       const newParams = new URLSearchParams(searchParams.toString());
@@ -451,7 +460,7 @@ export default function UserStatsPage() {
             {/* Avatar */}
             <div className="flex-shrink-0">
               {avatarUrl ? (
-                <img
+                <PreferenceImg
                   src={avatarUrl}
                   alt="Avatar"
                   className={`w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 ${
@@ -814,7 +823,7 @@ export default function UserStatsPage() {
                       title="View Problem"
                     >
                       {avatarUrl ? (
-                        <img
+                        <PreferenceImg
                           src={avatarUrl}
                           alt="Avatar"
                           className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700 hover:ring-2 hover:ring-indigo-400 transition"
@@ -879,10 +888,10 @@ export default function UserStatsPage() {
                       )}
 
                       {/* Image thumbnails */}
-                      {comment.images && comment.images.length > 0 && (
+                      {!isEnergySaving && comment.images && comment.images.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
                           {comment.images.map((imageUrl, idx) => (
-                            <img
+                            <PreferenceImg
                               key={idx}
                               src={getProxiedMediaUrl(imageUrl)}
                               alt={`${comment.userName} image ${idx + 1}`}

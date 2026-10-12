@@ -5,7 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import Image from '@/components/PreferenceImage';
+import InterfaceSettings from '@/components/InterfaceSettings';
 import BrandLogo from '@/components/BrandLogo';
 import PageTitle from '@/components/PageTitle';
 
@@ -61,6 +62,7 @@ function LoginForm() {
 
   return (
     <div className="brand-page auth-page">
+        <div className="auth-interface-settings"><InterfaceSettings /></div>
       <section className="auth-visual">
         <BrandLogo />
         <div className="auth-kicker">认真搜题，<br /><span>少走一点弯路。</span></div>

@@ -8,7 +8,7 @@ import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, CODE_IN
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/components/ColumnCustomizer';
-import Image from 'next/image';
+import Image from '@/components/PreferenceImage';
 import { analyzeUnifiedUploads, extractUploadUrls, parseDailyUrl, parseProblemUrl } from '@/lib/uploadParsing';
 
 const PREVIEW_RESULTS: SearchResult[] = [

@@ -1,6 +1,9 @@
 'use client';
 
+import { PreferenceImg } from '@/components/PreferenceImage';
+
 import { useState, useEffect, useMemo } from 'react';
+import { useDisplayMode } from '@/contexts/DisplayModeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import ChatTimeline from './ChatTimeline';
 import { ChatMessageData } from './ChatMessage';
@@ -47,6 +50,7 @@ export default function ProblemType4({
   uploaders,
 }: ProblemType4Props) {
   const { language } = useLanguage();
+  const { ready: displayReady, isEnergySaving } = useDisplayMode();
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [imageUrlMap, setImageUrlMap] = useState<Map<string, string>>(new Map());
 
@@ -87,6 +91,8 @@ export default function ProblemType4({
 
   // Preload external media (images and videos)
   useEffect(() => {
+    if (!displayReady || isEnergySaving) return;
+    let cancelled = false;
     const preloadMedia = async () => {
       const mediaUrls: string[] = [];
 
@@ -109,9 +115,11 @@ export default function ProblemType4({
       // Preload all external media
       const uniqueUrls = Array.from(new Set(mediaUrls));
       for (const url of uniqueUrls) {
+        if (cancelled) return;
         try {
           const getProxiedUrl = isVideoUrl(url) ? mediaAPI.getVideoUrl : mediaAPI.getImageUrl;
           const proxiedUrl = await getProxiedUrl(url);
+          if (cancelled) return;
           setImageUrlMap((prev) => new Map(prev).set(url, proxiedUrl));
         } catch (error) {
           console.error('Failed to preload media:', url, error);
@@ -120,7 +128,8 @@ export default function ProblemType4({
     };
 
     preloadMedia();
-  }, [orderInfo, appeals]);
+    return () => { cancelled = true; };
+  }, [displayReady, isEnergySaving, orderInfo, appeals]);
 
   // Get role name based on role and language
   const getRoleName = (role: string): string => {
@@ -182,7 +191,7 @@ export default function ProblemType4({
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">{ordersTitle}</h3>
           <div className="flex gap-4">
             {/* Product Image */}
-            {productImageUrl && (
+            {!isEnergySaving && productImageUrl && (
               <div className="flex-shrink-0">
                 {isExternalUrl(orderInfo?.raw?.productImageUrl || '') && !imageUrlMap.has(orderInfo?.raw?.productImageUrl || '') ? (
                   // Show placeholder while loading proxied URL
@@ -190,7 +199,7 @@ export default function ProblemType4({
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-400 border-t-transparent"></div>
                   </div>
                 ) : (
-                  <img
+                  <PreferenceImg
                     src={productImageUrl}
                     alt={orderInfo?.raw?.productName || 'Product'}
                     className="w-20 h-20 object-cover rounded cursor-pointer hover:opacity-80 transition"

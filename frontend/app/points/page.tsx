@@ -70,7 +70,7 @@ export default function PointsPage() {
       }
       const paramString = newParams.toString();
       router.push(`/points${paramString ? `?${paramString}` : ''}`);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: document.documentElement.dataset.displayMode === 'energy-saving' ? 'instant' : 'smooth' });
     }
   };
 

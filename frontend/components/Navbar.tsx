@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useTheme } from '@/contexts/ThemeContext';
+import InterfaceSettings from '@/components/InterfaceSettings';
 import BrandLogo from '@/components/BrandLogo';
 import AccountAvatar from '@/components/AccountAvatar';
 
@@ -16,8 +16,7 @@ interface NavbarProps {
 
 export default function Navbar({ title, showBackButton = false, backHref = '/problems' }: NavbarProps) {
   const { logout, user } = useAuth();
-  const { language, setLanguage, t } = useLanguage();
-  const { isDark, setMode } = useTheme();
+  const { t } = useLanguage();
   const router = useRouter();
   const [openMenu, setOpenMenu] = useState<'nav' | 'user' | null>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -64,14 +63,7 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
         </div>
 
         <div className="brand-navbar-actions">
-          <button className="brand-icon-button" onClick={() => setLanguage(language === 'zh' ? 'en' : 'zh')} aria-label="切换语言">
-            <span className="brand-language-label">{language === 'zh' ? '中' : 'EN'}</span>
-          </button>
-          <button className="brand-icon-button" onClick={() => setMode(isDark ? 'light' : 'dark')} aria-label="切换主题">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              {isDark ? <path d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.4-6.4L17 7M7 17l-1.4 1.4M18.4 18.4 17 17M7 7 5.6 5.6M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" /> : <path d="M20 15.2A8 8 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z" />}
-            </svg>
-          </button>
+          <InterfaceSettings onOpen={() => setOpenMenu(null)} />
           <div className="brand-user-wrap">
             <button className="brand-avatar-button" onClick={() => setOpenMenu(openMenu === 'user' ? null : 'user')} aria-label="用户菜单">
               {user?.id ? (

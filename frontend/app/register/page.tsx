@@ -6,7 +6,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
 import Link from 'next/link';
-import Image from 'next/image';
+import Image from '@/components/PreferenceImage';
+import InterfaceSettings from '@/components/InterfaceSettings';
 import BrandLogo from '@/components/BrandLogo';
 import PageTitle from '@/components/PageTitle';
 
@@ -46,6 +47,7 @@ export default function RegisterPage() {
     <>
       <PageTitle titleKey="pageTitle.register" />
       <div className="brand-page auth-page">
+        <div className="auth-interface-settings"><InterfaceSettings /></div>
         <section className="auth-visual">
           <BrandLogo />
           <div className="auth-kicker">一起把题库，<br /><span>变得更可靠。</span></div>

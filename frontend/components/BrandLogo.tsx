@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import Image from '@/components/PreferenceImage';
 
 export default function BrandLogo({ compact = false, markImageSrc }: { compact?: boolean; markImageSrc?: string }) {
   return (

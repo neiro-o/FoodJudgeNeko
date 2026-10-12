@@ -586,3 +586,52 @@
 @media(max-width:640px){.home-header{padding:18px 22px;font-size:10px;letter-spacing:.04em}.home-intro{gap:20px;padding:24px;width:100%;justify-content:center}.home-avatar{width:82px;flex-basis:82px;border-radius:18px;padding:3px}.home-avatar img{border-radius:14px}.home-copy h1{font-size:clamp(30px,8vw,42px);letter-spacing:.03em}.home-eyebrow{font-size:9px;margin-bottom:12px;letter-spacing:.17em}.home-subtitle{font-size:11px;letter-spacing:.02em;max-width:190px;margin-top:12px}.home-enter{margin-top:18px;font-size:11px}.home-mascot-1{top:13%;left:7%}.home-mascot-2{top:16%;right:8%;width:112px}.home-mascot-3{top:60%;left:-13%;width:100px;opacity:.55}.home-mascot-4{top:56%;right:-11%;width:90px;opacity:.6}.home-mascot-5{bottom:12%;left:13%;width:100px}.home-mascot-6{bottom:10%;right:12%;width:105px}}
 @media(max-height:600px) and (min-width:641px){.home-mascot{width:100px;opacity:.6}.home-mascot-5,.home-mascot-6{bottom:0}}
 @media(prefers-reduced-motion:reduce){.home-scene *,.home-loading *{animation:none!important;transition:none!important}}
+
+/* Shared interface preferences, including pages without the main navbar. */
+.interface-settings { position: relative; flex-shrink: 0; letter-spacing: normal; }
+.interface-settings-panel { right: 0; z-index: 150; width: 208px; max-width: calc(100vw - 24px); }
+.interface-settings-panel fieldset { min-width: 0; border: 0; margin: 0; padding: 0; }
+.interface-settings-panel hr { margin: 7px 4px; border: 0; border-top: 1px solid var(--brand-line); }
+.interface-setting-option { position: relative; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 9px 12px; border-radius: 10px; color: var(--brand-ink); font-size: 14px; font-weight: 500; cursor: pointer; }
+.interface-setting-option:hover, .interface-setting-option:focus-within { background: rgba(255, 200, 0, .13); }
+.interface-setting-option:has(input:focus-visible) { outline: 2px solid var(--brand-yellow-strong); outline-offset: -2px; }
+.interface-setting-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.interface-setting-check { margin-left: auto; color: #b58200; visibility: hidden; }
+.interface-setting-option:has(input:checked) .interface-setting-check { visibility: visible; }
+.dark .interface-setting-check { color: var(--brand-yellow); }
+.home-header .interface-settings-trigger { display: grid; place-items: center; font: inherit; }
+.auth-interface-settings { position: absolute; top: 24px; right: 24px; z-index: 150; }
+.auth-interface-settings .interface-settings-trigger { background: var(--brand-card); border: 1px solid var(--brand-line); }
+
+/* Apply to every page and portal. Keep controls and text usable without motion. */
+html[data-display-mode='energy-saving'],
+html[data-display-mode='energy-saving'] *,
+html[data-display-mode='energy-saving'] *::before,
+html[data-display-mode='energy-saving'] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+html[data-display-mode='energy-saving'] img,
+html[data-display-mode='energy-saving'] picture,
+html[data-display-mode='energy-saving'] video,
+html[data-display-mode='energy-saving'] canvas,
+html[data-display-mode='energy-saving'] svg image,
+html[data-display-mode='energy-saving'] .brand-logo-mark,
+html[data-display-mode='energy-saving'] .home-avatar,
+html[data-display-mode='energy-saving'] .home-mascots,
+html[data-display-mode='energy-saving'] .home-atmosphere,
+html[data-display-mode='energy-saving'] .search-mascot-wrap { display: none !important; }
+html[data-display-mode='energy-saving'] .brand-page::before,
+html[data-display-mode='energy-saving'] .brand-page::after { display: none !important; }
+/* Result rows start transparent and normally become visible via an animation. */
+html[data-display-mode='energy-saving'] .result-card { opacity: 1; }
+html[data-display-mode='energy-saving'] .brand-icon-button:hover,
+html[data-display-mode='energy-saving'] .result-card:hover,
+html[data-display-mode='energy-saving'] .upload-fab:hover { transform: none; }
+
+html[data-display-mode='energy-saving'] .brand-primary-button:hover,
+html[data-display-mode='energy-saving'] .search-command button:hover,
+html[data-display-mode='energy-saving'] .quick-pill:hover,
+html[data-display-mode='energy-saving'] .result-view-options button:hover { transform: none; }
+html[data-display-mode='energy-saving'] [style*='url('] { background-image: none !important; }

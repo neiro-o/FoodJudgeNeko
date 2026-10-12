@@ -1,12 +1,15 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
+import InterfaceSettings from '@/components/InterfaceSettings';
+import { useDisplayMode } from '@/contexts/DisplayModeContext';
 import { useRouter } from 'next/navigation';
 
 type Manifest = { version: string; assets: { url: string; bytes: number }[] };
 
 export default function AssetPreloader({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { ready: preferencesReady, isEnergySaving } = useDisplayMode();
   const [attempt, setAttempt] = useState(0);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [ready, setReady] = useState(false);
@@ -14,6 +17,7 @@ export default function AssetPreloader({ children }: { children: ReactNode }) {
   const [persistent, setPersistent] = useState(true);
 
   useEffect(() => {
+    if (!preferencesReady || isEnergySaving) return;
     const abort = new AbortController();
     let cancelled = false;
     let fontRetryTimer: number | undefined;
@@ -114,12 +118,13 @@ export default function AssetPreloader({ children }: { children: ReactNode }) {
     }
     void load();
     return () => { cancelled = true; abort.abort(); clearTimeout(fontRetryTimer); };
-  }, [attempt, router]);
+  }, [attempt, router, preferencesReady, isEnergySaving]);
 
-  if (ready) return <>{children}</>;
+  if (ready || (preferencesReady && isEnergySaving)) return <>{children}</>;
   const percent = progress.total ? Math.floor(progress.done / progress.total * 100) : 0;
   return (
     <main className="home-loading" aria-busy={!error}>
+      <div className="auth-interface-settings"><InterfaceSettings /></div>
       <section className="home-loading-card">
         <span className="home-loading-mark" aria-hidden="true">✦</span>
         <p className="home-eyebrow">准备一点好心情</p>

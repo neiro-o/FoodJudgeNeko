@@ -515,30 +515,24 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>('en');
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize language from localStorage or browser
   useEffect(() => {
-    if (typeof window !== 'undefined' && !isInitialized) {
-      const savedLanguage = localStorage.getItem('language') as Language | null;
-      
-      if (savedLanguage && (savedLanguage === 'en' || savedLanguage === 'zh')) {
-        setLanguageState(savedLanguage);
-      } else {
-        // Detect browser language
-        const browserLang = navigator.language || (navigator as any).userLanguage;
-        const detectedLang = browserLang.startsWith('zh') ? 'zh' : 'en';
-        setLanguageState(detectedLang);
-        localStorage.setItem('language', detectedLang);
-      }
-      
-      setIsInitialized(true);
-    }
-  }, [isInitialized]);
+    let detectedLang: Language = navigator.language.startsWith('zh') ? 'zh' : 'en';
+    try {
+      const saved = localStorage.getItem('language');
+      if (saved === 'en' || saved === 'zh') detectedLang = saved;
+      localStorage.setItem('language', detectedLang);
+    } catch { /* Use the browser language when storage is unavailable. */ }
+    setLanguageState(detectedLang);
+    setIsInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (isInitialized) document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+  }, [language, isInitialized]);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('language', lang);
-    }
+    try { localStorage.setItem('language', lang); } catch { /* Keep the current selection. */ }
   };
 
   const t = (key: string, params?: Record<string, string | number>): string => {
