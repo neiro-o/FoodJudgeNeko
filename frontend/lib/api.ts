@@ -198,9 +198,22 @@ export const problemAPI = {
   },
 };
 
+export interface AccountPointsResponse {
+  accountId: string;
+  username: string;
+  totalPoints: number;
+  weeklyPoints: number;
+  year: number;
+  weekId: number;
+}
+
 export const accountAPI = {
   getAvatarUrl: (accountId: string): string => {
     return `${API_BASE_URL}/account/avatar?id=${encodeURIComponent(accountId)}`;
+  },
+
+  getAccountPoints: async (accountId: string): Promise<AccountPointsResponse> => {
+    return apiRequest<AccountPointsResponse>(`/user_detail/account_points?accountId=${encodeURIComponent(accountId)}`);
   },
 };
 

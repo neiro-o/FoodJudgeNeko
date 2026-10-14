@@ -232,6 +232,7 @@ const translations: Record<Language, Record<string, string>> = {
     'rankings.searchNoResults': 'No matching users',
     'rankings.searchLoading': 'Searching...',
 
+    'pageTitle.locator': 'Locator',
     'pageTitle.points': 'Leaderboards',
     'points.title': 'Leaderboards',
     'points.rank': 'Rank',
@@ -474,6 +475,7 @@ const translations: Record<Language, Record<string, string>> = {
     'rankings.searchNoResults': '没有找到匹配的用户',
     'rankings.searchLoading': '搜索中...',
 
+    'pageTitle.locator': '定位',
     'pageTitle.points': '积分榜',
     'points.title': '分榜',
     'points.rank': '排名',
