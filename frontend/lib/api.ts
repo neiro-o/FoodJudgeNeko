@@ -10,6 +10,10 @@ interface ApiResponse<T> {
 // points balance is too low to use the search endpoints.
 export const CODE_INSUFFICIENT_POINTS = 4290;
 
+// Returned when the 5-hour or weekly search quota is used up. The message
+// already states which quota is exhausted and when it resets.
+export const CODE_SEARCH_QUOTA_EXCEEDED = 4291;
+
 // ApiError carries the backend's numeric error code alongside the message so
 // callers can branch on specific error conditions (e.g. CODE_INSUFFICIENT_POINTS).
 export class ApiError extends Error {
@@ -239,6 +243,28 @@ export interface SearchResponse {
   results: SearchResult[];
 }
 
+export interface SearchQuotaWindow {
+  limit: number;
+  used: number;
+  remaining: number;
+  started_at?: string;
+  reset_at: string | null; // null: the 5-hour window has not started yet
+  reset_at_unix: number | null;
+}
+
+export interface SearchQuotaStatus {
+  unlimited: boolean; // admin / group accounts have no quota
+  last_week_score: number;
+  five_hour?: SearchQuotaWindow;
+  weekly?: SearchQuotaWindow;
+  next_reset_at: string | null;
+  next_reset_at_unix: number | null;
+  blocked: boolean;
+  unlock_at: string | null;
+  unlock_at_unix: number | null;
+  exhausted_windows?: Array<'five_hour' | 'weekly'>;
+}
+
 export interface NotesSearchItem {
   text: string;
   answer: number;
@@ -259,6 +285,11 @@ export const searchAPI = {
       limit: limit.toString(),
     });
     return apiRequest<SearchResponse>(`/problem/search?${params.toString()}`);
+  },
+
+  // Read-only: never consumes search quota.
+  quota: async (): Promise<SearchQuotaStatus> => {
+    return apiRequest<SearchQuotaStatus>('/problem/quota');
   },
 
   recent: async (limit: number = 15): Promise<SearchResponse> => {

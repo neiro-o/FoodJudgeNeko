@@ -24,3 +24,16 @@ func NowSGT() time.Time {
 func ISOYearWeekSGT() (int, int) {
 	return NowSGT().ISOWeek()
 }
+
+// WeekStartSGT returns Monday 00:00 SGT of the week containing t.
+func WeekStartSGT(t time.Time) time.Time {
+	t = t.In(sgtLocation)
+	offset := (int(t.Weekday()) + 6) % 7 // Monday = 0 ... Sunday = 6
+	year, month, day := t.Date()
+	return time.Date(year, month, day-offset, 0, 0, 0, 0, sgtLocation)
+}
+
+// SGTLocation exposes the Singapore Time location for formatting.
+func SGTLocation() *time.Location {
+	return sgtLocation
+}

@@ -22,10 +22,6 @@ type Response struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// CodeInsufficientPoints is the unique error code returned when a non-group
-// account's points balance is too low to use the search endpoints.
-const CodeInsufficientPoints = 4290
-
 // SuccessResponse sends a successful response
 func SuccessResponse(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{
@@ -58,6 +54,11 @@ func InternalServerErrorResponse(c *gin.Context, message string) {
 	ErrorResponse(c, 500, message)
 }
 
+// ForbiddenResponse sends a forbidden error response
+func ForbiddenResponse(c *gin.Context, message string) {
+	ErrorResponse(c, 403, message)
+}
+
 // ConflictResponse sends a conflict error response
 func ConflictResponse(c *gin.Context, message string) {
 	ErrorResponse(c, 409, message)
@@ -66,12 +67,6 @@ func ConflictResponse(c *gin.Context, message string) {
 // NotFoundResponse sends a not found error response
 func NotFoundResponse(c *gin.Context, message string) {
 	ErrorResponse(c, 404, message)
-}
-
-// InsufficientPointsResponse sends the unique error response used when a
-// non-group account does not have enough points to search.
-func InsufficientPointsResponse(c *gin.Context) {
-	ErrorResponse(c, CodeInsufficientPoints, "积分不足，请上传题目后获得积分。")
 }
 
 // GetUserID returns the authenticated user's MongoDB ObjectID as a hex string

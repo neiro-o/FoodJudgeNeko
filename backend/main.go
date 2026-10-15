@@ -112,6 +112,8 @@ func main() {
 		protected.GET("/problem/search", middleware.ProblemRateLimit("/api/problem/search", 4), middleware.RequireSearchQuota(), handlers.Search)
 		protected.GET("/problem/quicksearch", middleware.RequireSearchQuota(), handlers.QuickSearch)
 		protected.GET("/bot/search", middleware.RequireSearchQuota(), handlers.BotSearch)
+		// Quota query: read-only, never consumes quota.
+		protected.GET("/problem/quota", handlers.GetSearchQuota)
 		protected.GET("/problem/recent", middleware.ProblemRateLimit("/api/problem/recent", 3), handlers.GetRecentProblems)
 		protected.GET("/problem/count", handlers.CountItems)
 		// Short alias used by the search landing-page count switcher.

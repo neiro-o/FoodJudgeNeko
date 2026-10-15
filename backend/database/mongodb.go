@@ -26,6 +26,7 @@ var (
 	UserRankings    *mongo.Collection
 	AIUserSummaries *mongo.Collection
 	WeeklyScores    *mongo.Collection
+	SearchQuotas    *mongo.Collection
 )
 
 func Connect() error {
@@ -70,6 +71,14 @@ func Connect() error {
 		weeklyScoresCollectionName = "weekly_scores"
 	}
 	WeeklyScores = DB.Collection(weeklyScoresCollectionName)
+
+	// search_quotas holds one document per account (_id = accounts._id) with
+	// the usage counters of the 5-hour and weekly search quotas.
+	searchQuotasCollectionName := config.AppConfig.MongoDB.Collections.SearchQuotas
+	if searchQuotasCollectionName == "" {
+		searchQuotasCollectionName = "search_quotas"
+	}
+	SearchQuotas = DB.Collection(searchQuotasCollectionName)
 
 	// Ensure the AI summary cache has a unique index on userId so a
 	// concurrent generation can never leave two cache rows for the same

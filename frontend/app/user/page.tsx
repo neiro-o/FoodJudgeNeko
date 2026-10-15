@@ -107,7 +107,7 @@ export default function UserPage() {
       setInviteCount(1);
       loadInvitations();
     } catch (error: any) {
-      setInviteError(error.response?.data?.error || t('user.inviteError'));
+      setInviteError(error.message || t('user.inviteError'));
     } finally {
       setInviteLoading(false);
     }

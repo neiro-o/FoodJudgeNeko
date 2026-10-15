@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, CODE_INSUFFICIENT_POINTS } from '@/lib/api';
+import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, CODE_INSUFFICIENT_POINTS, CODE_SEARCH_QUOTA_EXCEEDED } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/components/ColumnCustomizer';
@@ -145,8 +145,14 @@ export default function ProblemsPage() {
   // insufficient-points restriction so the UI can render a special hint.
   const applySearchError = (error: any) => {
     const isInsufficientPoints = error instanceof ApiError && error.code === CODE_INSUFFICIENT_POINTS;
-    setSearchErrorIsInsufficientPoints(isInsufficientPoints);
-    setSearchError(error.message || t('problems.search.errorFailed'));
+    // Quota errors carry a server-built message with the reset time.
+    const isQuotaExceeded = error instanceof ApiError && error.code === CODE_SEARCH_QUOTA_EXCEEDED;
+    setSearchErrorIsInsufficientPoints(isInsufficientPoints || isQuotaExceeded);
+    setSearchError(
+      isInsufficientPoints
+        ? t('problems.search.errorInsufficientPoints')
+        : error.message || t('problems.search.errorFailed')
+    );
   };
 
   // Load recent problems on page load or search from URL params
@@ -1082,7 +1088,7 @@ export default function ProblemsPage() {
                   }`}
                 >
                   {searchErrorIsInsufficientPoints
-                    ? `⚠️ ${t('problems.search.errorInsufficientPoints')}`
+                    ? `⚠️ ${searchError}`
                     : searchError}
                 </p>
               </div>
@@ -1419,7 +1425,7 @@ export default function ProblemsPage() {
 
                     {searchError && (
                       <div className={`search-alert ${searchErrorIsInsufficientPoints ? 'warning' : 'error'}`}>
-                        {searchErrorIsInsufficientPoints ? `⚠️ ${t('problems.search.errorInsufficientPoints')}` : searchError}
+                        {searchErrorIsInsufficientPoints ? `⚠️ ${searchError}` : searchError}
                       </div>
                     )}
 

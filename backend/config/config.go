@@ -22,6 +22,7 @@ type Config struct {
 			UserRankings    string `yaml:"user_rankings"`
 			AIUserSummaries string `yaml:"ai_user_summaries"`
 			WeeklyScores    string `yaml:"weekly_scores"`
+			SearchQuotas    string `yaml:"search_quotas"`
 		} `yaml:"collections"`
 	} `yaml:"mongodb"`
 	Redis struct {
