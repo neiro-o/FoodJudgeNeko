@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, CODE_INSUFFICIENT_POINTS, CODE_SEARCH_QUOTA_EXCEEDED } from '@/lib/api';
+import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, SearchQuotaStatus, SearchQuotaWindow, CODE_INSUFFICIENT_POINTS, CODE_SEARCH_QUOTA_EXCEEDED } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import ColumnCustomizer, { ColumnConfig, ColumnId, DEFAULT_COLUMNS } from '@/components/ColumnCustomizer';
@@ -23,6 +23,27 @@ const COUNT_METRICS = [
   { key: 'redis', icon: '📤', label: '上传队列' },
   { key: 'mongodb', icon: '📖', label: '原始数据' },
 ] as const;
+
+const PREVIEW_QUOTA: SearchQuotaStatus = {
+  unlimited: false,
+  last_week_score: 52,
+  five_hour: { limit: 60, used: 18, remaining: 42, reset_at: null, reset_at_unix: Math.floor(Date.now() / 1000) + 3 * 3600 + 24 * 60 },
+  weekly: { limit: 800, used: 236, remaining: 564, reset_at: null, reset_at_unix: Math.floor(Date.now() / 1000) + 71 * 3600 + 8 * 60 },
+  next_reset_at: null,
+  next_reset_at_unix: null,
+  blocked: false,
+  unlock_at: null,
+  unlock_at_unix: null,
+};
+
+// "3小时24分钟" — hours are not rolled into days so the weekly reset reads the same way.
+const formatQuotaCountdown = (resetAtUnix: number | null | undefined, nowSec: number): string => {
+  if (resetAtUnix == null) return '尚未开始计时';
+  const remainingSeconds = resetAtUnix - nowSec;
+  if (remainingSeconds <= 0) return '即将重置';
+  const totalMinutes = Math.max(1, Math.ceil(remainingSeconds / 60));
+  return `${Math.floor(totalMinutes / 60)}小时${totalMinutes % 60}分钟后重置`;
+};
 
 type SearchPayload = {
   results: SearchResult[];
@@ -106,6 +127,10 @@ export default function ProblemsPage() {
   const [counts, setCounts] = useState<{ elasticsearch: number; mongodb: number; redis: number } | null>(null);
   const [countsLoading, setCountsLoading] = useState(false);
   const [countMetricIndex, setCountMetricIndex] = useState(0);
+
+  // Search quota (read-only endpoint, never consumes quota)
+  const [quota, setQuota] = useState<SearchQuotaStatus | null>(null);
+  const [quotaNowSec, setQuotaNowSec] = useState(() => Math.floor(Date.now() / 1000));
 
   // Column customization states
   const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
@@ -248,6 +273,39 @@ export default function ProblemsPage() {
       loadCounts();
     }
   }, [isAuthenticated, loading]);
+
+  // Load the search quota, keep the reset countdown ticking and refetch once a window resets.
+  useEffect(() => {
+    if (!isAuthenticated || loading) return;
+    if (process.env.NEXT_PUBLIC_UI_PREVIEW === '1') {
+      setQuota(PREVIEW_QUOTA);
+      return;
+    }
+    let cancelled = false;
+    const loadQuota = async () => {
+      try {
+        const status = await searchAPI.quota();
+        if (!cancelled) setQuota(status);
+      } catch (error) {
+        console.error('Failed to load search quota:', error);
+      }
+    };
+    loadQuota();
+    const interval = window.setInterval(() => setQuotaNowSec(Math.floor(Date.now() / 1000)), 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [isAuthenticated, loading]);
+
+  useEffect(() => {
+    if (!quota || quota.unlimited || process.env.NEXT_PUBLIC_UI_PREVIEW === '1') return;
+    const expired = [quota.five_hour, quota.weekly].some(
+      (window_) => window_?.reset_at_unix != null && window_.reset_at_unix <= quotaNowSec
+    );
+    if (!expired) return;
+    searchAPI.quota().then(setQuota).catch(() => {});
+  }, [quotaNowSec, quota]);
 
   // Load column configuration and result limit from localStorage
   useEffect(() => {
@@ -1288,6 +1346,23 @@ export default function ProblemsPage() {
 
   void legacyPage;
   const hasSearchState = searchLoading || Boolean(currentSearchKeyword) || searchResults.length > 0 || Boolean(searchError);
+  const renderQuotaCard = (label: string, window_: SearchQuotaWindow | undefined) => {
+    if (!window_) return null;
+    const percent = window_.limit > 0 ? Math.min(100, Math.max(0, (window_.remaining / window_.limit) * 100)) : 0;
+    const level = window_.remaining === 0 ? 'empty' : percent <= 20 ? 'low' : 'ok';
+    return (
+      <div className={`quota-card quota-${level}`} role="group" aria-label={`${label}，剩余 ${window_.remaining} / ${window_.limit}`}>
+        <div className="quota-card-head">
+          <span>{label}</span>
+          <strong><b>{window_.remaining}</b><i>/ {window_.limit}</i></strong>
+        </div>
+        <div className="quota-bar" role="progressbar" aria-valuemin={0} aria-valuemax={window_.limit} aria-valuenow={window_.remaining}>
+          <span style={{ width: `${percent}%` }} />
+        </div>
+        <small>{formatQuotaCountdown(window_.reset_at_unix, quotaNowSec)}</small>
+      </div>
+    );
+  };
   const activeCountMetric = COUNT_METRICS[countMetricIndex];
   const activeCount = counts?.[activeCountMetric.key];
   const activeTableColumnIds = getVisibleTableColumnIds(getCurrentColumnOrder(), displayItems);
@@ -1392,9 +1467,24 @@ export default function ProblemsPage() {
                   <b>{countsLoading || activeCount === undefined ? '—' : activeCount}</b>
                 </button>
                 <button className="quick-pill" onClick={() => router.push('/points')}><span className="coin-icon">●</span>{user?.points ?? 0}</button>
-                <button className="quick-pill" onClick={() => router.push('/points')}><span>▥</span> 查询分榜</button>
-                <button className="quick-pill" onClick={() => router.push('/user_stats')}><span>♙</span> 查询用户</button>
+                <button className="quick-pill quick-pill-optional" onClick={() => router.push('/points')}><span>▥</span> 查询分榜</button>
+                <button className="quick-pill quick-pill-optional" onClick={() => router.push('/user_stats')}><span>♙</span> 查询用户</button>
                 <button className="quick-pill" onClick={handleRecentProblems}><span>▤</span> 最近题目</button>
+              </div>
+            )}
+
+            {!hasSearchState && quota && (
+              <div className="search-quota" aria-label="搜索额度">
+                {quota.unlimited ? (
+                  <div className="quota-card quota-unlimited">
+                    <div className="quota-card-head"><span>搜索额度</span><strong><b>∞</b><i>不限次数</i></strong></div>
+                  </div>
+                ) : (
+                  <>
+                    {renderQuotaCard('5 小时额度', quota.five_hour)}
+                    {renderQuotaCard('周额度', quota.weekly)}
+                  </>
+                )}
               </div>
             )}
 

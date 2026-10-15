@@ -1,9 +1,6 @@
 'use client';
 
-import { PreferenceImg } from '@/components/PreferenceImage';
-
 import { useState, useEffect } from 'react';
-import { useDisplayMode } from '@/contexts/DisplayModeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import ImageModal from './ImageModal';
 import RatioBar, { type UploaderAccount } from './RatioBar';
@@ -29,7 +26,6 @@ export default function ProblemType5({
   uploaders,
 }: ProblemType5Props) {
   const { language } = useLanguage();
-  const { ready: displayReady, isEnergySaving } = useDisplayMode();
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [imageUrlMap, setImageUrlMap] = useState<Map<string, string>>(new Map());
 
@@ -55,7 +51,6 @@ export default function ProblemType5({
 
   // Preload external images
   useEffect(() => {
-    if (!displayReady || isEnergySaving) return;
     let cancelled = false;
     const preloadMedia = async () => {
       const mediaUrls: string[] = [];
@@ -82,7 +77,7 @@ export default function ProblemType5({
 
     preloadMedia();
     return () => { cancelled = true; };
-  }, [displayReady, isEnergySaving, reviewPics]);
+  }, [reviewPics]);
 
   // Format timestamp to GMT+8
   const formatTimestamp = (ts: number): string => {
@@ -129,7 +124,7 @@ export default function ProblemType5({
       </div>
 
       {/* Two Trademark Images */}
-      {!isEnergySaving && reviewPics.length > 0 && (
+      {reviewPics.length > 0 && (
         <div className="mb-6">
           <div className="flex flex-row gap-4 justify-center">
             {reviewPics.map((pic, index) => (
@@ -140,7 +135,8 @@ export default function ProblemType5({
                     <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-400 border-t-transparent"></div>
                   </div>
                 ) : (
-                  <PreferenceImg
+                  <img
+                    data-content-media
                     src={getImageUrl(pic)}
                     alt={`Trademark ${index + 1}`}
                     className="w-full aspect-square object-contain rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 cursor-pointer hover:opacity-90 transition"

@@ -1,10 +1,7 @@
 'use client';
 
-import { PreferenceImg } from '@/components/PreferenceImage';
-
 import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useDisplayMode } from '@/contexts/DisplayModeContext';
 import { mediaAPI } from '@/lib/api';
 
 interface ImageModalProps {
@@ -13,9 +10,7 @@ interface ImageModalProps {
   onClose: () => void;
 }
 
-export default function ImageModal({ imageUrl, isOpen: requestedOpen, onClose }: ImageModalProps) {
-  const { ready, isEnergySaving } = useDisplayMode();
-  const isOpen = requestedOpen && ready && !isEnergySaving;
+export default function ImageModal({ imageUrl, isOpen, onClose }: ImageModalProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [proxiedUrl, setProxiedUrl] = useState<string>('');
   const [isVideo, setIsVideo] = useState(false);
@@ -34,6 +29,10 @@ export default function ImageModal({ imageUrl, isOpen: requestedOpen, onClose }:
     : 1;
   const widthScale = imageSize.width && viewportSize.width ? viewportSize.width / imageSize.width : 1;
   const scale = viewMode === 'screen' ? screenScale : viewMode === 'width' ? widthScale : customScale;
+  // Round to whole pixels (never above the viewport in fit modes) so a sub-pixel overflow
+  // can't toggle the scrollbars, which changes the viewport and re-triggers the layout.
+  const displayWidth = Math.max(1, Math.floor(imageSize.width * scale + 1e-6));
+  const displayHeight = Math.max(1, Math.floor(imageSize.height * scale + 1e-6));
   const imageReady = !isLoading && !mediaError && imageSize.width > 0 && viewportSize.width > 0;
   const toolbarButtonClass = 'shrink-0 rounded-lg px-3 py-2 text-sm text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-40';
 
@@ -209,12 +208,18 @@ export default function ImageModal({ imageUrl, isOpen: requestedOpen, onClose }:
       aria-label={isVideo ? '视频预览' : '图片预览'}
     >
       <div className="flex min-h-0 flex-1 px-4 pb-4 pt-16 sm:px-8">
-        <div ref={viewportRef} className="relative min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain">
+        <div
+          ref={viewportRef}
+          className={`relative min-h-0 min-w-0 flex-1 overscroll-contain ${viewMode === 'screen' ? 'overflow-hidden' : 'overflow-auto'}`}
+          // Reserve the scrollbar space in scrollable modes (Windows classic scrollbars take layout
+          // space); otherwise the scrollbar appearing resizes the viewport and "fit width" flickers.
+          style={viewMode === 'screen' ? undefined : { scrollbarGutter: 'stable' }}
+        >
           <div
             className="grid min-h-full min-w-full place-items-center"
             style={!isVideo && imageReady ? {
-              width: Math.max(viewportSize.width, imageSize.width * scale),
-              height: Math.max(viewportSize.height, imageSize.height * scale),
+              width: Math.max(viewportSize.width, displayWidth),
+              height: Math.max(viewportSize.height, displayHeight),
             } : undefined}
           >
           {/* Loading spinner */}
@@ -228,6 +233,7 @@ export default function ImageModal({ imageUrl, isOpen: requestedOpen, onClose }:
           {isVideo && proxiedUrl && (
             <video
               ref={videoRef}
+              data-content-media
               src={proxiedUrl}
               controls
               autoPlay
@@ -242,14 +248,15 @@ export default function ImageModal({ imageUrl, isOpen: requestedOpen, onClose }:
           )}
 
           {!isVideo && proxiedUrl && (
-            <PreferenceImg
+            <img
               key={proxiedUrl}
+              data-content-media
               src={proxiedUrl}
               alt="图片预览"
               draggable={false}
               onClick={(e) => e.stopPropagation()}
               className={`max-w-none rounded-lg ${imageReady ? 'block' : 'hidden'}`}
-              style={{ width: imageSize.width * scale, height: imageSize.height * scale }}
+              style={{ width: displayWidth, height: displayHeight }}
               onLoad={(event) => {
                 setImageSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
                 setIsLoading(false);

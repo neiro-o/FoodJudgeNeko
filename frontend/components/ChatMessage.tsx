@@ -3,7 +3,6 @@
 import { PreferenceImg } from '@/components/PreferenceImage';
 
 import { useState } from 'react';
-import { useDisplayMode } from '@/contexts/DisplayModeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ImageModal from './ImageModal';
@@ -28,7 +27,6 @@ export default function ChatMessage({
   merchantAvatar = '/avatars/avatar_2.png'
 }: ChatMessageProps) {
   const { t, language } = useLanguage();
-  const { isEnergySaving } = useDisplayMode();
   const { isDark } = useTheme();
   const [modalImage, setModalImage] = useState<string | null>(null);
 
@@ -122,7 +120,7 @@ export default function ChatMessage({
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
             
             {/* Picture/Video links */}
-            {!isEnergySaving && message.pics && message.pics.length > 0 && (
+            {message.pics && message.pics.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {message.pics.map((pic, index) => (
                   <button

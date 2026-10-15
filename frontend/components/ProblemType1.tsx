@@ -1,9 +1,6 @@
 'use client';
 
-import { PreferenceImg } from '@/components/PreferenceImage';
-
 import { useState, useEffect, useMemo } from 'react';
-import { useDisplayMode } from '@/contexts/DisplayModeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import ChatTimeline from './ChatTimeline';
 import { ChatMessageData } from './ChatMessage';
@@ -74,7 +71,6 @@ export default function ProblemType1({
   uploaders,
 }: ProblemType1Props) {
   const { language } = useLanguage();
-  const { ready: displayReady, isEnergySaving } = useDisplayMode();
   const [expandedDescs, setExpandedDescs] = useState<Set<number>>(new Set());
   const [modalImage, setModalImage] = useState<string | null>(null);
   const [imageUrlMap, setImageUrlMap] = useState<Map<string, string>>(new Map());
@@ -138,7 +134,6 @@ export default function ProblemType1({
 
   // Preload external media (images and videos)
   useEffect(() => {
-    if (!displayReady || isEnergySaving) return;
     let cancelled = false;
     const preloadMedia = async () => {
       const mediaUrls: string[] = [];
@@ -185,7 +180,7 @@ export default function ProblemType1({
 
     preloadMedia();
     return () => { cancelled = true; };
-  }, [displayReady, isEnergySaving, orders, reviewPics, appeals]);
+  }, [orders, reviewPics, appeals]);
 
   // Get role name based on role and language
   const getRoleName = (role: string): string => {
@@ -391,14 +386,15 @@ export default function ProblemType1({
                 {orders.map((order, index) => (
                   <div key={index} className="flex gap-3">
                     {/* Product Image */}
-                    <div className="flex-shrink-0" hidden={isEnergySaving}>
+                    <div className="flex-shrink-0">
                       {isExternalUrl(order.pic) && !imageUrlMap.has(order.pic) ? (
                         // Show placeholder while loading proxied URL
                         <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
                           <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-400 border-t-transparent"></div>
                         </div>
                       ) : (
-                        <PreferenceImg
+                        <img
+                          data-content-media
                           src={imageUrlMap.get(order.pic) || order.pic}
                           alt={order.name}
                           className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition"

@@ -4,7 +4,6 @@ import { PreferenceImg } from '@/components/PreferenceImage';
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useDisplayMode } from '@/contexts/DisplayModeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { mediaAPI } from '@/lib/api';
 import type { ProblemComment } from '@/lib/api';
@@ -48,7 +47,6 @@ function avatarHash(input: string): number {
 
 export default function CommentList({ comments, mongoId = '', pageSize = 8 }: CommentListProps) {
   const { language } = useLanguage();
-  const { ready: displayReady, isEnergySaving } = useDisplayMode();
   const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [inputValue, setInputValue] = useState('1');
@@ -67,12 +65,11 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
 
   // Preload proxied URLs for all images/audios on the current page
   useEffect(() => {
-    if (!displayReady) return;
     let cancelled = false;
     const preload = async () => {
       const urls: { url: string; isAudio: boolean }[] = [];
       currentComments.forEach((comment) => {
-        (displayReady && !isEnergySaving ? comment.images || [] : []).forEach((url) => urls.push({ url, isAudio: false }));
+        (comment.images || []).forEach((url) => urls.push({ url, isAudio: false }));
         (comment.audios || []).forEach((audio) => urls.push({ url: audio.url, isAudio: true }));
       });
 
@@ -95,7 +92,7 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
     preload();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentComments, displayReady, isEnergySaving]);
+  }, [currentComments]);
 
   // Format a duration in seconds as M:SS
   const formatDuration = (seconds: number): string => {
@@ -212,11 +209,12 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
               )}
 
               {/* Image thumbnails */}
-              {!isEnergySaving && comment.images && comment.images.length > 0 && (
+              {comment.images && comment.images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {comment.images.map((imageUrl, idx) => (
-                    <PreferenceImg
+                    <img
                       key={idx}
+                      data-content-media
                       src={getProxiedMediaUrl(imageUrl)}
                       alt={`${comment.name} image ${idx + 1}`}
                       className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition"
