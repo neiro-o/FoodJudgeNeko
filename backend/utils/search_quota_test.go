@@ -55,7 +55,7 @@ func TestBuildSearchQuotaStatus(t *testing.T) {
 			t.Fatalf("unexpected status %+v", s)
 		}
 		if s.FiveHour.ResetAt != nil {
-			t.Fatal("five-hour window should not be started")
+			t.Fatal("one-hour window should not be started")
 		}
 		if *s.NextResetAtUnix != weekStart.AddDate(0, 0, 7).Unix() {
 			t.Fatal("next reset should be the weekly reset")
@@ -63,22 +63,22 @@ func TestBuildSearchQuotaStatus(t *testing.T) {
 	})
 
 	t.Run("active window", func(t *testing.T) {
-		start := now.Add(-time.Hour)
+		start := now.Add(-30 * time.Minute)
 		doc := &searchQuotaDoc{FiveHourStart: start.Unix(), FiveHourUsed: 4, WeekStart: weekStart.Unix(), WeekUsed: 40}
 		s := buildSearchQuotaStatus(doc, limits, 0, now)
 		if s.FiveHour.Used != 4 || s.Weekly.Used != 40 || s.Blocked {
 			t.Fatalf("unexpected status %+v", s)
 		}
-		if *s.NextResetAtUnix != start.Add(5*time.Hour).Unix() {
-			t.Fatal("next reset should be the five-hour reset")
+		if *s.NextResetAtUnix != start.Add(time.Hour).Unix() {
+			t.Fatal("next reset should be the one-hour reset")
 		}
 	})
 
-	t.Run("five-hour exhausted", func(t *testing.T) {
-		start := now.Add(-time.Hour)
+	t.Run("one-hour exhausted", func(t *testing.T) {
+		start := now.Add(-30 * time.Minute)
 		doc := &searchQuotaDoc{FiveHourStart: start.Unix(), FiveHourUsed: 15, WeekStart: weekStart.Unix(), WeekUsed: 15}
 		s := buildSearchQuotaStatus(doc, limits, 0, now)
-		if !s.Blocked || *s.UnlockAtUnix != start.Add(5*time.Hour).Unix() {
+		if !s.Blocked || *s.UnlockAtUnix != start.Add(time.Hour).Unix() {
 			t.Fatalf("unexpected status %+v", s)
 		}
 	})
@@ -90,6 +90,32 @@ func TestBuildSearchQuotaStatus(t *testing.T) {
 			t.Fatalf("unexpected status %+v", s)
 		}
 	})
+
+	for _, elapsed := range []time.Duration{time.Hour - time.Second, time.Hour, 2 * time.Hour} {
+		t.Run("window age "+elapsed.String(), func(t *testing.T) {
+			start := now.Add(-elapsed)
+			doc := &searchQuotaDoc{
+				FiveHourStart: start.Unix(), FiveHourUsed: 15,
+				WeekStart: weekStart.Unix(), WeekUsed: 40,
+			}
+			s := buildSearchQuotaStatus(doc, limits, 0, now)
+			if elapsed < time.Hour {
+				if !s.Blocked || s.FiveHour.Used != 15 || s.UnlockAtUnix == nil || *s.UnlockAtUnix != start.Add(time.Hour).Unix() {
+					t.Fatalf("quota should stay exhausted until one hour: %+v", s)
+				}
+			} else {
+				if s.Blocked || s.FiveHour.Used != 0 || s.FiveHour.Remaining != 15 || s.FiveHour.ResetAt != nil || s.UnlockAtUnix != nil {
+					t.Fatalf("hourly quota should reset after one hour: %+v", s)
+				}
+				if s.NextResetAtUnix == nil || *s.NextResetAtUnix != weekStart.AddDate(0, 0, 7).Unix() {
+					t.Fatalf("idle window should wait for next search: %+v", s)
+				}
+			}
+			if s.Weekly.Used != 40 || s.Weekly.Remaining != 140 {
+				t.Fatalf("hourly reset must preserve weekly usage: %+v", s.Weekly)
+			}
+		})
+	}
 
 	t.Run("expired window and old week reset", func(t *testing.T) {
 		doc := &searchQuotaDoc{

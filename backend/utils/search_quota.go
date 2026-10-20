@@ -19,8 +19,8 @@ import (
 // Search quota model (replaces the old "1 point per search" billing):
 //
 //   - Every search that returns results consumes 1 unit from BOTH quotas.
-//   - 5-hour quota: a fixed window that starts at the first consumed search
-//     and ends 5 hours later; the next search after it ends starts a new one.
+//   - 1-hour quota: a fixed window that starts at the first consumed search
+//     and ends 1 hour later; the next search after it ends starts a new one.
 //   - Weekly quota: resets every Monday 00:00 SGT.
 //   - Limits are derived from last week's score in weekly_scores (see
 //     SearchQuotaLimitsForScore) and are evaluated on every request, so they
@@ -33,11 +33,11 @@ const (
 	ctxKeySearchQuotaLimits = "search_quota_limits"
 	ctxKeySearchDedupKey    = "search_dedup_key"
 
-	// CodeSearchQuotaExceeded is returned when the 5-hour or weekly search
+	// CodeSearchQuotaExceeded is returned when the 1-hour or weekly search
 	// quota is used up.
 	CodeSearchQuotaExceeded = 4291
 
-	FiveHourQuotaWindow = 5 * time.Hour
+	OneHourQuotaWindow = time.Hour
 
 	searchDedupPrefix = "search_quota_dedup:v1:"
 	// searchDedupTTL is how long an identical search by the same account is
@@ -46,6 +46,8 @@ const (
 )
 
 // SearchQuotaLimits are the per-window limits of one account.
+// FiveHour names and five_hour BSON/JSON keys are retained for compatibility;
+// they now represent the 1-hour quota.
 type SearchQuotaLimits struct {
 	FiveHour int
 	Weekly   int
@@ -130,7 +132,7 @@ func buildSearchQuotaStatus(doc *searchQuotaDoc, limits SearchQuotaLimits, score
 	weekReset := weekStart.AddDate(0, 0, 7)
 
 	if doc != nil {
-		if doc.FiveHourStart > 0 && now.Unix() < doc.FiveHourStart+int64(FiveHourQuotaWindow/time.Second) {
+		if doc.FiveHourStart > 0 && now.Unix() < doc.FiveHourStart+int64(OneHourQuotaWindow/time.Second) {
 			fiveActive = true
 			fiveStart = time.Unix(doc.FiveHourStart, 0)
 			fiveUsed = doc.FiveHourUsed
@@ -147,7 +149,7 @@ func buildSearchQuotaStatus(doc *searchQuotaDoc, limits SearchQuotaLimits, score
 	next := weekReset
 	var fiveReset time.Time
 	if fiveActive {
-		fiveReset = fiveStart.Add(FiveHourQuotaWindow)
+		fiveReset = fiveStart.Add(OneHourQuotaWindow)
 		five.StartedAt, _ = formatQuotaTime(fiveStart)
 		five.ResetAt, five.ResetAtUnix = formatQuotaTime(fiveReset)
 		if fiveReset.Before(next) {
@@ -175,7 +177,7 @@ func buildSearchQuotaStatus(doc *searchQuotaDoc, limits SearchQuotaLimits, score
 		status.Blocked = true
 		if unlock.IsZero() {
 			// A zero limit with no active window never unlocks by waiting
-			// for the 5-hour window; fall back to the weekly reset.
+			// for the 1-hour window; fall back to the weekly reset.
 			unlock = weekReset
 		}
 		status.UnlockAt, status.UnlockAtUnix = formatQuotaTime(unlock)
@@ -235,7 +237,7 @@ func GetSearchQuotaStatus(ctx context.Context, acct SearchAccount) (SearchQuotaS
 func consumeSearchQuota(ctx context.Context, accountID primitive.ObjectID, limits SearchQuotaLimits, now time.Time) (bool, error) {
 	nowUnix := now.Unix()
 	weekStart := WeekStartSGT(now).Unix()
-	fiveSecs := int64(FiveHourQuotaWindow / time.Second)
+	fiveSecs := int64(OneHourQuotaWindow / time.Second)
 
 	// Pipeline stages are separate so each one sees the previous one's output.
 	pipeline := mongo.Pipeline{
@@ -261,7 +263,7 @@ func consumeSearchQuota(ctx context.Context, accountID primitive.ObjectID, limit
 				bson.M{"$lt": bson.A{"$week_used", limits.Weekly}},
 			}},
 		}}},
-		// 4. Consume (starting the 5-hour window on its first use).
+		// 4. Consume (starting the 1-hour window on its first use).
 		{{Key: "$set", Value: bson.M{
 			"five_hour_start": bson.M{"$cond": bson.A{
 				bson.M{"$and": bson.A{"$last_ok", bson.M{"$eq": bson.A{"$five_hour_start", 0}}}},
@@ -297,11 +299,11 @@ func consumeSearchQuota(ctx context.Context, accountID primitive.ObjectID, limit
 func QuotaExceededResponse(c *gin.Context, status SearchQuotaStatus) {
 	message := "查题额度已用完，请稍后再试。"
 	if status.UnlockAt != nil && status.UnlockAtUnix != nil {
-		label := "5小时额度"
+		label := "1小时额度"
 		if len(status.ExhaustedWindows) == 1 && status.ExhaustedWindows[0] == "weekly" {
 			label = "周额度"
 		} else if len(status.ExhaustedWindows) > 1 {
-			label = "5小时额度和周额度"
+			label = "1小时额度和周额度"
 		}
 		message = fmt.Sprintf("%s已用完，禁止查题，将于 %s (SGT) 恢复。",
 			label, time.Unix(*status.UnlockAtUnix, 0).In(SGTLocation()).Format("2006-01-02 15:04"))
@@ -346,7 +348,7 @@ func CheckSearchQuota(c *gin.Context, acct SearchAccount) bool {
 	return true
 }
 
-// FinalizeSearchBilling consumes one unit of the 5-hour and weekly quotas
+// FinalizeSearchBilling consumes one unit of the 1-hour and weekly quotas
 // after a search with results. Empty results and failed searches consume
 // nothing, and neither does repeating an identical search shortly after one
 // that was already charged. It sends an error response and returns false if

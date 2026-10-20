@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetSearchQuota returns the 5-hour and weekly search quota (limit / used /
+// GetSearchQuota returns the 1-hour and weekly search quota (limit / used /
 // remaining), the next reset time and whether searching is currently blocked.
 // It never consumes quota. Admins may pass accountId to inspect another
 // account; admin and is_in_group accounts report unlimited = true.

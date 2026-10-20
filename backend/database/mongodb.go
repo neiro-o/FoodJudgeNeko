@@ -73,7 +73,7 @@ func Connect() error {
 	WeeklyScores = DB.Collection(weeklyScoresCollectionName)
 
 	// search_quotas holds one document per account (_id = accounts._id) with
-	// the usage counters of the 5-hour and weekly search quotas.
+	// the usage counters of the 1-hour and weekly search quotas.
 	searchQuotasCollectionName := config.AppConfig.MongoDB.Collections.SearchQuotas
 	if searchQuotasCollectionName == "" {
 		searchQuotasCollectionName = "search_quotas"

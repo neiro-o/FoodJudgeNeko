@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RequireSearchQuota gates the search endpoints on the 5-hour and weekly
+// RequireSearchQuota gates the search endpoints on the 1-hour and weekly
 // search quotas of the billed account: the caller itself, or the target of an
 // admin-only accountId override. Admin and is_in_group accounts are exempt.
 //
