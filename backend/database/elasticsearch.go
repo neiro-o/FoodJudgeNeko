@@ -3,9 +3,11 @@ package database
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -40,14 +42,24 @@ func ConnectElasticsearch() error {
 	}
 
 	if useHTTPS {
-		// Configure for development (skip TLS verification for HTTPS connections)
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: config.AppConfig.Elasticsearch.InsecureSkipVerify}
+		if config.AppConfig.Elasticsearch.CAFile != "" {
+			pem, err := os.ReadFile(config.AppConfig.Elasticsearch.CAFile)
+			if err != nil {
+				return fmt.Errorf("read ES CA: %w", err)
+			}
+			pool, err := x509.SystemCertPool()
+			if err != nil || pool == nil {
+				pool = x509.NewCertPool()
+			}
+			if !pool.AppendCertsFromPEM(pem) {
+				return fmt.Errorf("invalid ES CA")
+			}
+			tlsConfig.RootCAs = pool
 		}
-		cfg.Transport = transport
+		cfg.Transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
+
 	// For HTTP connections, use default transport (no TLS configuration needed)
 
 	client, err := elasticsearch.NewClient(cfg)
