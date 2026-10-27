@@ -5,11 +5,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ARG FRONTEND_ENV_REVISION
 # Public client variables must exist during next build. The env file itself
 # stays out of image layers and the repository; NEXT_PUBLIC values are
 # intentionally compiled into the browser bundle.
 RUN --mount=type=secret,id=frontend_env,target=/app/.env,required=true \
-    NODE_OPTIONS=--max-old-space-size=4096 npm run build \
+    test -n "$FRONTEND_ENV_REVISION" \
+    && NODE_OPTIONS=--max-old-space-size=4096 npm run build \
     && rm -f .next/standalone/.env .next/standalone/.env.production
 
 FROM node:22.23.4-bookworm-slim AS runner
