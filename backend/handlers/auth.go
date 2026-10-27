@@ -16,27 +16,7 @@ import (
 )
 
 // getClientIP extracts the client IP address from the request
-func getClientIP(c *gin.Context) string {
-	// Check X-Forwarded-For header (for proxies/load balancers)
-	ip := c.GetHeader("X-Forwarded-For")
-	if ip != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		ips := strings.Split(ip, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
-		}
-	}
-
-	// Check X-Real-IP header
-	ip = c.GetHeader("X-Real-IP")
-	if ip != "" {
-		return strings.TrimSpace(ip)
-	}
-
-	// Fall back to RemoteAddr
-	ip = c.ClientIP()
-	return ip
-}
+func getClientIP(c *gin.Context) string { return c.ClientIP() }
 
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`

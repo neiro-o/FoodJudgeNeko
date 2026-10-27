@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"mtv2/backend/config"
@@ -14,6 +15,8 @@ import (
 
 var (
 	Client          *mongo.Client
+	StateClient     *mongo.Client
+	StateDB         *mongo.Database
 	DB              *mongo.Database
 	Accounts        *mongo.Collection
 	Invitations     *mongo.Collection
@@ -46,50 +49,40 @@ func Connect() error {
 
 	Client = client
 	DB = client.Database(config.AppConfig.MongoDB.DatabaseName)
-	Accounts = DB.Collection(config.AppConfig.MongoDB.Collections.Accounts)
-	Invitations = DB.Collection(config.AppConfig.MongoDB.Collections.Invitations)
-	ProcessedList = DB.Collection(config.AppConfig.MongoDB.Collections.ProcessedList)
-	Problems = DB.Collection(config.AppConfig.MongoDB.Collections.Problems)
-	UploadHistory = DB.Collection("upload_history")
-	Comments = DB.Collection(config.AppConfig.MongoDB.Collections.Comments)
-	Malicious = DB.Collection("malicious")
-	Notes = DB.Collection(config.AppConfig.MongoDB.Collections.Notes)
-	userRankingsCollectionName := config.AppConfig.MongoDB.Collections.UserRankings
-	if userRankingsCollectionName == "" {
-		userRankingsCollectionName = "user_rankings"
+	StateDB = DB
+	if config.AppConfig.SharedState.URI != "" {
+		state, e := mongo.Connect(ctx, options.Client().ApplyURI(config.AppConfig.SharedState.URI))
+		if e != nil {
+			client.Disconnect(ctx)
+			return fmt.Errorf("failed to connect state MongoDB: %w", e)
+		}
+		if e = state.Ping(ctx, nil); e != nil {
+			state.Disconnect(ctx)
+			client.Disconnect(ctx)
+			return fmt.Errorf("failed to ping state MongoDB: %w", e)
+		}
+		StateClient = state
+		name := config.AppConfig.SharedState.Database
+		if name == "" {
+			name = config.AppConfig.MongoDB.DatabaseName
+		}
+		StateDB = state.Database(name)
 	}
-	UserRankings = DB.Collection(userRankingsCollectionName)
-
-	aiUserSummariesCollectionName := config.AppConfig.MongoDB.Collections.AIUserSummaries
-	if aiUserSummariesCollectionName == "" {
-		aiUserSummariesCollectionName = "ai_user_summaries"
-	}
-	AIUserSummaries = DB.Collection(aiUserSummariesCollectionName)
-
-	weeklyScoresCollectionName := config.AppConfig.MongoDB.Collections.WeeklyScores
-	if weeklyScoresCollectionName == "" {
-		weeklyScoresCollectionName = "weekly_scores"
-	}
-	WeeklyScores = DB.Collection(weeklyScoresCollectionName)
-
-	// search_quotas holds one document per account (_id = accounts._id) with
-	// the usage counters of the 1-hour and weekly search quotas.
-	searchQuotasCollectionName := config.AppConfig.MongoDB.Collections.SearchQuotas
-	if searchQuotasCollectionName == "" {
-		searchQuotasCollectionName = "search_quotas"
-	}
-	SearchQuotas = DB.Collection(searchQuotasCollectionName)
+	assignStateCollections(StateDB)
+	assignLocalCollections(DB)
 
 	// Ensure the AI summary cache has a unique index on userId so a
 	// concurrent generation can never leave two cache rows for the same
 	// user (the handler upserts by userId).
-	if _, err := AIUserSummaries.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bson.D{{Key: "userId", Value: 1}},
-		Options: options.Index().SetUnique(true),
-	}); err != nil {
-		fmt.Printf("Warning: failed to create ai_user_summaries index: %v\n", err)
-	}
+	if os.Getenv("MTV2_SKIP_STARTUP_INDEXES") != "true" {
+		if _, err := AIUserSummaries.Indexes().CreateOne(ctx, mongo.IndexModel{
+			Keys:    bson.D{{Key: "userId", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		}); err != nil {
+			fmt.Printf("Warning: failed to create ai_user_summaries index: %v\n", err)
+		}
 
+	}
 	fmt.Println("Connected to MongoDB successfully")
 	return nil
 }
@@ -98,8 +91,49 @@ func Disconnect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	if StateClient != nil {
+		if err := StateClient.Disconnect(ctx); err != nil {
+			return err
+		}
+	}
 	if Client != nil {
 		return Client.Disconnect(ctx)
 	}
 	return nil
+}
+
+func assignStateCollections(db *mongo.Database) {
+	Accounts = db.Collection(config.AppConfig.MongoDB.Collections.Accounts)
+	Invitations = db.Collection(config.AppConfig.MongoDB.Collections.Invitations)
+	name := config.AppConfig.MongoDB.Collections.SearchQuotas
+	if name == "" {
+		name = "search_quotas"
+	}
+	SearchQuotas = db.Collection(name)
+	name = config.AppConfig.MongoDB.Collections.UserRankings
+	if name == "" {
+		name = "user_rankings"
+	}
+	UserRankings = db.Collection(name)
+	name = config.AppConfig.MongoDB.Collections.WeeklyScores
+	if name == "" {
+		name = "weekly_scores"
+	}
+	WeeklyScores = db.Collection(name)
+}
+
+func assignLocalCollections(db *mongo.Database) {
+	ProcessedList = db.Collection(config.AppConfig.MongoDB.Collections.ProcessedList)
+	Problems = db.Collection(config.AppConfig.MongoDB.Collections.Problems)
+	UploadHistory = db.Collection("upload_history")
+	Comments = db.Collection(config.AppConfig.MongoDB.Collections.Comments)
+	Malicious = db.Collection("malicious")
+	Notes = db.Collection(config.AppConfig.MongoDB.Collections.Notes)
+
+	aiUserSummariesCollectionName := config.AppConfig.MongoDB.Collections.AIUserSummaries
+	if aiUserSummariesCollectionName == "" {
+		aiUserSummariesCollectionName = "ai_user_summaries"
+	}
+	AIUserSummaries = db.Collection(aiUserSummariesCollectionName)
+
 }
