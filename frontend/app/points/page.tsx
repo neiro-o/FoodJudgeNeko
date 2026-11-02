@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLoginUrl } from '@/lib/auth-redirect';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { pointsAPI, LeaderboardEntry } from '@/lib/api';
 import AccountAvatar from '@/components/AccountAvatar';
@@ -29,7 +30,7 @@ export default function PointsPage() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/login');
+      router.replace(getLoginUrl());
     }
   }, [isAuthenticated, authLoading, router]);
 

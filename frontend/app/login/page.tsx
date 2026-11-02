@@ -9,19 +9,8 @@ import Image from '@/components/PreferenceImage';
 import InterfaceSettings from '@/components/InterfaceSettings';
 import BrandLogo from '@/components/BrandLogo';
 import PageTitle from '@/components/PageTitle';
-
-const getSafeRedirectPath = (value: string | null): string => {
-  if (!value) return '/problems';
-
-  try {
-    const baseUrl = new URL('https://local.invalid');
-    const targetUrl = new URL(value, baseUrl);
-    if (targetUrl.origin !== baseUrl.origin) return '/problems';
-    return `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`;
-  } catch {
-    return '/problems';
-  }
-};
+import { getSafeRedirectPath } from '@/lib/auth-redirect';
+import { getRememberedLogin, rememberLogin } from '@/lib/auth-storage';
 
 function LoginForm() {
   const [username, setUsername] = useState('');
@@ -29,11 +18,28 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const [rememberPassword, setRememberPassword] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(false);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const { login, isAuthenticated, loading: authLoading } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectPath = getSafeRedirectPath(searchParams.get('redirect'));
+
+  useEffect(() => {
+    const saved = getRememberedLogin();
+    if (saved) {
+      setUsername(saved.username);
+      setPassword(saved.password);
+      setRememberPassword(true);
+    }
+    setPreferencesLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (preferencesLoaded) rememberLogin(rememberPassword ? { username, password } : null);
+  }, [preferencesLoaded, rememberPassword, username, password]);
 
   useEffect(() => {
     if (searchParams.get('registered') === 'true') setSuccess(t('login.success'));
@@ -49,7 +55,7 @@ function LoginForm() {
     setError('');
     setLoading(true);
     try {
-      await login(username, password);
+      await login(username, password, { rememberPassword, autoLogin });
       router.replace(redirectPath);
     } catch (loginError: any) {
       setError(loginError.message || t('login.error'));
@@ -58,7 +64,7 @@ function LoginForm() {
     }
   };
 
-  if (isAuthenticated) return null;
+  if (isAuthenticated || authLoading) return null;
 
   return (
     <div className="brand-page auth-page">
@@ -76,8 +82,12 @@ function LoginForm() {
           {error && <div className="search-alert error">{error}</div>}
           {success && <div className="search-alert success">{success}</div>}
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div><label htmlFor="username">{t('login.username')}</label><input className="brand-form-input" id="username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t('login.usernamePlaceholder')} required /></div>
-            <div><label htmlFor="password">{t('login.password')}</label><input className="brand-form-input" id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t('login.passwordPlaceholder')} required /></div>
+            <div><label htmlFor="username">{t('login.username')}</label><input className="brand-form-input" id="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t('login.usernamePlaceholder')} required /></div>
+            <div><label htmlFor="password">{t('login.password')}</label><input className="brand-form-input" id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={t('login.passwordPlaceholder')} required /></div>
+            <div className="auth-login-options">
+              <label><input type="checkbox" checked={rememberPassword} onChange={(event) => setRememberPassword(event.target.checked)} />{t('login.rememberPassword')}</label>
+              <label><input type="checkbox" checked={autoLogin} onChange={(event) => setAutoLogin(event.target.checked)} />{t('login.autoLogin')}</label>
+            </div>
             <button className="brand-primary-button w-full py-3.5" type="submit" disabled={loading}>{loading ? t('login.submitting') : t('login.submit')}</button>
           </form>
           <p className="mt-6 text-center text-sm text-gray-500">{t('login.noAccount')} <Link className="font-bold text-amber-600" href="/register">{t('login.signUp')}</Link></p>

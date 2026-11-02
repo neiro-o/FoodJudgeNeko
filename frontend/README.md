@@ -53,6 +53,19 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
   - Change Password
   - Points & Invitations
 
+## Local login preferences
+
+The login page provides two independent checkboxes on one line:
+
+- Remember password: immediately stores the entered username/password in this browser and fills them on the next visit; unchecking removes the saved copy.
+- 120h auto login: stores login credentials and the session locally until a fixed deadline 120 hours after sign-in. Expired 24h API tokens are renewed using the existing login endpoint; renewals do not extend the deadline. Logout or rejected credentials disable auto login. Without this option the session is kept in sessionStorage.
+
+These preferences are never sent to or stored on the server. Authentication still uses the existing login API. Older unlimited local sessions require one new sign-in after this update.
+
+Protected pages and API 401 responses navigate to `/login?redirect=...`, preserving the original path, query and hash. Successful login returns to that same-site destination; invalid or external destinations fall back to `/problems`.
+
+Run the authentication regression checks with `node --test scripts/test-auth.mjs`.
+
 ## Build
 
 ```bash

@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { authAPI, LoginResponse } from '@/lib/api';
+import { authAPI, restoreAutomaticLogin } from '@/lib/api';
+import { AUTH_CHANGED_EVENT, clearAuth, getStoredAuth, LoginOptions, startLogin, tokenIsExpired } from '@/lib/auth-storage';
 
 interface User {
   id: string;
@@ -15,7 +16,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, options: LoginOptions) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
@@ -37,30 +38,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    // Check for stored token and user on mount
-    if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+    let active = true;
+    const sync = () => {
+      const stored = getStoredAuth();
+      setToken(stored?.token || null);
+      setUser(stored?.user || null);
+    };
+    const restore = async () => {
+      try {
+        const stored = getStoredAuth();
+        if (!stored || tokenIsExpired(stored.token)) await restoreAutomaticLogin();
+      } catch (error) {
+        console.error('Session restore failed:', error);
+      } finally {
+        if (active) { sync(); setLoading(false); }
       }
-    }
-    setLoading(false);
+    };
+    void restore();
+    window.addEventListener(AUTH_CHANGED_EVENT, sync);
+    window.addEventListener('storage', sync);
+    window.addEventListener('focus', restore);
+    return () => {
+      active = false;
+      window.removeEventListener(AUTH_CHANGED_EVENT, sync);
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('focus', restore);
+    };
   }, [previewMode]);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, options: LoginOptions) => {
     try {
-      const response: LoginResponse = await authAPI.login({ username, password });
-      
+      const response = await authAPI.login({ username, password });
+      startLogin(response, { username, password }, options);
       setToken(response.token);
       setUser(response.user);
-      
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
-      }
     } catch (error: any) {
       throw new Error(error.message || 'Login failed');
     }
@@ -77,8 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        clearAuth();
       }
       
       router.push('/login');

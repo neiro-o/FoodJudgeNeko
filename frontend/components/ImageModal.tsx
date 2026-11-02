@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { mediaAPI } from '@/lib/api';
+import { clearAuth } from '@/lib/auth-storage';
+import { getLoginUrl } from '@/lib/auth-redirect';
 
 interface ImageModalProps {
   imageUrl: string;
@@ -47,6 +49,11 @@ export default function ImageModal({ imageUrl, isOpen, onClose }: ImageModalProp
     setDownloadError('');
     try {
       const response = await fetch(proxiedUrl);
+      if (response.status === 401) {
+        clearAuth();
+        window.location.replace(getLoginUrl(true));
+        return;
+      }
       if (!response.ok) throw new Error('下载失败');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);

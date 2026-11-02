@@ -1,4 +1,49 @@
+import { clearAuth, getAuthToken, getAutoLogin, getStoredAuth, saveAuth, tokenIsExpired } from './auth-storage';
+import { getLoginUrl } from './auth-redirect';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+
+let automaticLogin: Promise<LoginResponse | null> | null = null;
+
+// Share a single login across concurrent requests. Renewal never extends 120h.
+export function restoreAutomaticLogin(): Promise<LoginResponse | null> {
+  if (automaticLogin) return automaticLogin;
+  const credentials = getAutoLogin();
+  if (!credentials) return Promise.resolve(null);
+  const previousToken = getAuthToken();
+  const renew = async () => {
+    const latest = getAutoLogin();
+    if (!latest || latest.expiresAt !== credentials.expiresAt || latest.username !== credentials.username) return null;
+    const stored = getStoredAuth();
+    if (stored && stored.token !== previousToken && !tokenIsExpired(stored.token)) return stored;
+    const response = await fetch(`${API_BASE_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: credentials.username, password: credentials.password }),
+    });
+    const data: ApiResponse<LoginResponse> = await response.json();
+    // Logout, a different manual login, or the deadline may supersede this request.
+    const current = getAutoLogin();
+    if (!current || current.expiresAt !== credentials.expiresAt || current.username !== credentials.username) return null;
+    if (response.status === 401 || data.code === 401) {
+      clearAuth();
+      return null;
+    }
+    if (!response.ok || data.code !== 0 || !data.data) {
+      throw new Error(data.message || 'Automatic login failed');
+    }
+    saveAuth(data.data);
+    return data.data;
+  };
+  // Separate tabs share the same backend token version, so serialize renewals.
+  automaticLogin = (async () => {
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      return await navigator.locks.request('mtv2-auto-login', renew);
+    }
+    return renew();
+  })().finally(() => { automaticLogin = null; });
+  return automaticLogin;
+}
 
 interface ApiResponse<T> {
   code: number;
@@ -28,9 +73,13 @@ export class ApiError extends Error {
 
 async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retried = false
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  let token = getAuthToken();
+  if (endpoint !== '/login' && endpoint !== '/logout' && !retried && getAutoLogin() && (!token || tokenIsExpired(token))) {
+    token = (await restoreAutomaticLogin())?.token || null;
+  }
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -50,13 +99,16 @@ async function apiRequest<T>(
   // user can return to it after authenticating again. A rejected login request
   // itself should stay on the login page and display the backend error.
   if (response.status === 401 && endpoint !== '/login') {
-    // Clear auth data
+    if (!retried && endpoint !== '/logout' && getAutoLogin()) {
+      // Another concurrent request may already have replaced the rejected token.
+      const current = getStoredAuth();
+      if ((current && current.token !== token) || await restoreAutomaticLogin()) {
+        return apiRequest<T>(endpoint, options, true);
+      }
+    }
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      const params = new URLSearchParams({ expired: 'true', redirect });
-      window.location.href = `/login?${params.toString()}`;
+      clearAuth();
+      window.location.replace(getLoginUrl(true));
     }
     throw new Error('Unauthorized');
   }
@@ -521,7 +573,7 @@ export interface AIUserSummaryResponse {
 
 export const userDetailAPI = {
   getAvatarUrl: (userId: string): string => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = getAuthToken();
     if (!token) return '';
     return `${API_BASE_URL}/user_detail/avatar?userId=${userId}&token=${encodeURIComponent(token)}`;
   },

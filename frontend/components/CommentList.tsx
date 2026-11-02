@@ -1,5 +1,7 @@
 'use client';
 
+import { getAuthToken } from '@/lib/auth-storage';
+
 import { PreferenceImg } from '@/components/PreferenceImage';
 
 import { useState, useRef, useEffect } from 'react';
@@ -116,7 +118,7 @@ export default function CommentList({ comments, mongoId = '', pageSize = 8 }: Co
 
   // Get avatar URL from API with token
   const getAvatarUrl = (userid: number): string => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = getAuthToken();
     if (!token) return getDefaultAvatarPath(userid, 0);
     return `${API_BASE_URL}/user_detail/avatar?userId=${userid}&token=${encodeURIComponent(token)}`;
   };

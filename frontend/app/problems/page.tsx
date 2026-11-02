@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLoginUrl } from '@/lib/auth-redirect';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, SearchQuotaStatus, SearchQuotaWindow, CODE_INSUFFICIENT_POINTS, CODE_SEARCH_QUOTA_EXCEEDED } from '@/lib/api';
@@ -162,7 +163,7 @@ export default function ProblemsPage() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      router.replace(getLoginUrl());
     }
   }, [isAuthenticated, loading, router]);
 

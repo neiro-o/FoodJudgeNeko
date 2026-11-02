@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLoginUrl } from '@/lib/auth-redirect';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter, useParams } from 'next/navigation';
 import { problemAPI, searchAPI, ProblemComment } from '@/lib/api';
@@ -193,7 +194,7 @@ export default function ProblemDetailPage() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      router.replace(getLoginUrl());
     }
   }, [isAuthenticated, loading, router]);
 

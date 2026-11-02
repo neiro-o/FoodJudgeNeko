@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLoginUrl } from '@/lib/auth-redirect';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { accountAPI } from '@/lib/api';
 import { CHINA_PROVINCES, isInMainlandChina } from '@/lib/chinaRegions';
@@ -328,7 +329,7 @@ export default function LocatorPage() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      router.replace(getLoginUrl());
     }
   }, [isAuthenticated, loading, router]);
 

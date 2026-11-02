@@ -1,5 +1,7 @@
 'use client';
 
+import { getAuthToken } from '@/lib/auth-storage';
+
 import { PreferenceImg } from '@/components/PreferenceImage';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -37,7 +39,7 @@ export default function RankingsPage() {
 
   // Build avatar URL with auth token
   const getAvatarUrl = (userId: string) => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = getAuthToken();
     if (!token) return '';
     return `${API_BASE_URL}/user_detail/avatar?userId=${userId}&token=${encodeURIComponent(token)}`;
   };

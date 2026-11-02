@@ -498,6 +498,9 @@
   .auth-card { width: min(470px, 100%); padding: 38px; }
   .auth-card h1 { font-size: 34px; font-weight: 900; letter-spacing: -.04em; }
   .auth-card label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--brand-muted); }
+  .auth-login-options { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .auth-card .auth-login-options label { display: inline-flex; align-items: center; gap: 6px; margin: 0; white-space: nowrap; cursor: pointer; font-size: 12px; }
+  .auth-login-options input { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--brand-orange, #d97706); cursor: pointer; }
 
   @keyframes brand-pop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
   @keyframes brand-rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }

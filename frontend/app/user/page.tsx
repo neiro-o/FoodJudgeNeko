@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getLoginUrl } from '@/lib/auth-redirect';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { authAPI, invitationAPI, Invitation } from '@/lib/api';
@@ -35,7 +36,7 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      router.replace(getLoginUrl());
     }
   }, [isAuthenticated, loading, router]);
 
