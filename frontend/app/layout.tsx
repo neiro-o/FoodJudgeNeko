@@ -5,20 +5,23 @@ import { LanguageProvider } from '@/contexts/LanguageContext'
 import { ProblemsStateProvider } from '@/contexts/ProblemsStateContext'
 import { DisplayModeProvider } from '@/contexts/DisplayModeContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
-import { Noto_Sans_SC, Noto_Serif_SC } from 'next/font/google'
 import localFont from 'next/font/local'
 
-const notoSansSC = Noto_Sans_SC({
+const notoSansSC = localFont({
+  src: './fonts/noto-sans-sc-ui.woff2',
   variable: '--font-noto-sans-sc',
-  weight: 'variable',
+  weight: '100 900',
+  style: 'normal',
   display: 'fallback',
   preload: false,
   adjustFontFallback: false,
 })
 
-const notoSerifSC = Noto_Serif_SC({
+const notoSerifSC = localFont({
+  src: './fonts/noto-serif-sc-ui.woff2',
   variable: '--font-noto-serif-sc',
-  weight: ['700', '900'],
+  weight: '200 900',
+  style: 'normal',
   display: 'fallback',
   preload: false,
   adjustFontFallback: false,
