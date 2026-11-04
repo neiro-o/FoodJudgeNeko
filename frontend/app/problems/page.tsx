@@ -76,6 +76,7 @@ export default function ProblemsPage() {
   const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const urlKeyword = searchParams.get('q')?.trim() || '';
   
   // Ref to track the last processed URL keyword to prevent duplicate API calls
   // Use a sentinel value distinct from null so that the initial empty-keyword load is not skipped
@@ -116,7 +117,8 @@ export default function ProblemsPage() {
   const [currentSearchKeyword, setCurrentSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
-  const [searchLoading, setSearchLoading] = useState(false);
+  // A query link opens in the results layout immediately, before effects run.
+  const [searchLoading, setSearchLoading] = useState(() => Boolean(urlKeyword));
   const [searchError, setSearchError] = useState('');
   const [searchErrorIsInsufficientPoints, setSearchErrorIsInsufficientPoints] = useState(false);
 
@@ -184,8 +186,7 @@ export default function ProblemsPage() {
   // Load recent problems on page load or search from URL params
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      const urlKeyword = searchParams.get('q');
-      const trimmedKeyword = urlKeyword?.trim() || null;
+      const trimmedKeyword = urlKeyword || null;
       
       // Skip if we've already processed this URL keyword to avoid duplicate API calls
       // lastProcessedUrlKeyword starts as `undefined` (never processed), so the first visit always runs.
@@ -194,6 +195,7 @@ export default function ProblemsPage() {
       if (processedKey === lastProcessedUrlKeyword.current) {
         return;
       }
+      const requestSeq = ++searchRequestSeqRef.current;
       
       // Get saved result limit from localStorage (since state may not be updated yet)
       let limit = 15;
@@ -216,22 +218,14 @@ export default function ProblemsPage() {
           setSearchLoading(true);
           setSearchError('');
           setSearchErrorIsInsufficientPoints(false);
+          setNotesSearchLoading(true);
           setNotesSearchResults([]);
           try {
-            const response = await searchAPI.search(trimmedKeyword, limit);
-            setSearchResults(response.results);
-            setSearchTotal(response.total);
-            setCurrentSearchKeyword(trimmedKeyword);
-            setSearchKeyword('');
-            lastFetchedKeywordRef.current = trimmedKeyword;
-            // Also fetch notes search results
-            try {
-              const notesResponse = await searchAPI.notesSearch(trimmedKeyword, 5);
-              setNotesSearchResults(notesResponse || []);
-            } catch {
-              setNotesSearchResults([]);
-            }
+            const payload = await fetchSearchPayload(trimmedKeyword, limit);
+            if (requestSeq !== searchRequestSeqRef.current) return;
+            applySearchPayload(trimmedKeyword, payload);
           } catch (error: any) {
+            if (requestSeq !== searchRequestSeqRef.current) return;
             applySearchError(error);
             setSearchResults([]);
             setSearchTotal(0);
@@ -240,7 +234,10 @@ export default function ProblemsPage() {
             // Reset the ref on error so we can retry
             lastProcessedUrlKeyword.current = undefined;
           } finally {
-            setSearchLoading(false);
+            if (requestSeq === searchRequestSeqRef.current) {
+              setSearchLoading(false);
+              setNotesSearchLoading(false);
+            }
           }
         };
         performSearch();
@@ -252,9 +249,12 @@ export default function ProblemsPage() {
         setSearchResults([]);
         setSearchTotal(0);
         setCurrentSearchKeyword('');
+        setSearchLoading(false);
+        setNotesSearchLoading(false);
+        setNotesSearchResults([]);
       }
     }
-  }, [isAuthenticated, loading, t, searchParams]);
+  }, [isAuthenticated, loading, t, urlKeyword]);
 
   // Load counts on page load
   useEffect(() => {
@@ -686,12 +686,13 @@ export default function ProblemsPage() {
   };
 
   const syncSearchUrl = (keyword: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(window.location.search);
     if (params.get('q') === keyword && !params.get('view')) return;
     params.set('q', keyword);
     params.delete('view');
     lastProcessedUrlKeyword.current = keyword;
-    router.push(`/problems?${params.toString()}`);
+    // The results are already applied locally; only record the shareable URL.
+    window.history.pushState(null, '', `/problems?${params.toString()}`);
   };
 
   // Share in-flight requests when the same search is submitted again.

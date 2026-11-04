@@ -1,0 +1,10 @@
+node_modules
+.next
+.next*
+.env
+.env.*
+*.log
+*.tsbuildinfo
+.DS_Store
+public/asset-manifest.json
+public/asset-worker.js
