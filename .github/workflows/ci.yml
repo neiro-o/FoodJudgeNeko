@@ -1,0 +1,55 @@
+name: CI
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.4.2-bookworm
+        ports: ['6379:6379']
+        options: --health-cmd 'redis-cli ping' --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: backend/go.sum
+      - run: go test ./...
+        working-directory: backend
+        env:
+          MTV2_REDIS_TEST_ADDR: 127.0.0.1:6379
+      - run: go vet ./...
+        working-directory: backend
+      - run: go build ./... && CGO_ENABLED=0 go build -o /tmp/mtv2ctl ./cmd/mtv2ctl
+        working-directory: backend
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build && node scripts/test-assets.mjs
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_TELEMETRY_DISABLED: '1'
+  deployment-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s deploy/tests -v
+      - name: Validate all database selection combinations
+        run: python3 deploy/tests/validate_compose.py
+      - name: Build and smoke test isolated stack
+        run: python3 deploy/tests/smoke.py --build

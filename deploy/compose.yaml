@@ -1,0 +1,135 @@
+name: ${COMPOSE_PROJECT_NAME:-mtv2}
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+
+services:
+  # Host networking supports each database independently: Docker, host or remote.
+  # Application listeners bind to loopback; only the gateway is public.
+  api:
+    image: ${API_IMAGE:?Run setup.sh first}
+    build: {context: ../backend}
+    network_mode: host
+    env_file: .env
+    environment:
+      MTV2_CONFIG: /etc/mtv2/config.yml
+      MTV2_SERVER_HOST: 127.0.0.1
+      MTV2_SERVER_PORT: ${API_PORT:-18080}
+      MTV2_SKIP_STARTUP_INDEXES: "true"
+    volumes:
+      - type: bind
+        source: ./config.yml
+        target: /etc/mtv2/config.yml
+        read_only: true
+        bind: {create_host_path: false}
+      - cache:/app/cache
+      - ./certs:/etc/mtv2/certs:ro
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:$${MTV2_SERVER_PORT}/ready >/dev/null']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *logging
+
+  web:
+    image: ${WEB_IMAGE:?Run setup.sh first}
+    build: {context: ../frontend}
+    network_mode: host
+    environment: {HOSTNAME: 127.0.0.1, PORT: "${WEB_PORT:-13000}"}
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, node, -e, 'fetch("http://127.0.0.1:"+process.env.PORT+"/login").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *logging
+
+  gateway:
+    image: ${GATEWAY_IMAGE:-nginx:1.28-alpine}
+    network_mode: host
+    environment:
+      GATEWAY_BIND: ${GATEWAY_BIND:-0.0.0.0}
+      GATEWAY_PORT: ${GATEWAY_PORT:-80}
+      API_PORT: ${API_PORT:-18080}
+      WEB_PORT: ${WEB_PORT:-13000}
+      NGINX_ENVSUBST_FILTER: '^(GATEWAY_BIND|GATEWAY_PORT|API_PORT|WEB_PORT)$$'
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      api: {condition: service_healthy}
+      web: {condition: service_healthy}
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:$${GATEWAY_PORT}/health']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  mongo:
+    image: ${MONGO_IMAGE:-mongo:8.2.2}
+    profiles: [mongo]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mtv2_root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Run setup.sh first}
+    ports: ['127.0.0.1:${MONGO_PORT:-27017}:27017']
+    volumes: [mongo_data:/data/db, mongo_config:/data/configdb]
+    restart: unless-stopped
+    command: [mongod, --wiredTigerCacheSizeGB, '0.25']
+    healthcheck:
+      test: [CMD-SHELL, 'mongosh --quiet --username "$${MONGO_INITDB_ROOT_USERNAME}" --password "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --eval "quit(db.adminCommand({ping:1}).ok ? 0 : 1)"']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging: *logging
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4.2-bookworm}
+    profiles: [redis]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Run setup.sh first}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?Run setup.sh first}
+    command: [sh, -c, 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    ports: ['127.0.0.1:${REDIS_PORT:-6379}:6379']
+    volumes: [redis_data:/data]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'redis-cli ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+  es:
+    image: ${ES_IMAGE:-docker.elastic.co/elasticsearch/elasticsearch:8.11.4}
+    profiles: [es]
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'true'
+      xpack.security.enrollment.enabled: 'false'
+      xpack.security.http.ssl.enabled: 'false'
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?Run setup.sh first}
+      ES_JAVA_OPTS: '-Xms${ES_HEAP:-512m} -Xmx${ES_HEAP:-512m}'
+    ports: ['127.0.0.1:${ES_PORT:-9200}:9200']
+    volumes: [es_data:/usr/share/elasticsearch/data]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS -u "elastic:$$ELASTIC_PASSWORD" "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s" >/dev/null']
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    logging: *logging
+
+volumes:
+  mongo_data:
+  mongo_config:
+  redis_data:
+  es_data:
+  cache:

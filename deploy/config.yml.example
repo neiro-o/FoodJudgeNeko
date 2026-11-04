@@ -1,0 +1,36 @@
+# Runtime defaults. Copy to config.yml; put secrets in .env instead of this file.
+mongodb:
+  connection_string: mongodb://127.0.0.1:27017
+  database_name: mtv2
+  collections:
+    accounts: accounts
+    invitations: invitations
+    processed_list: processed_list
+    problems: problems
+    notes: notes
+    comments: comments
+    malicious: malicious
+    user_rankings: user_rankings
+    ai_user_summaries: ai_user_summaries
+    weekly_scores: weekly_scores
+    search_quotas: search_quotas
+redis:
+  host: 127.0.0.1
+  port: 6379
+  db: 0
+  fields:
+    problems_queue: problems_queue
+    daily_queue: daily_queue
+elasticsearch:
+  hosts: [http://127.0.0.1:9200]
+  index_name: problems
+server:
+  host: 127.0.0.1
+  port: 8080
+ai:
+  deepseek:
+    base_url: https://api.deepseek.com
+    model: deepseek-chat
+  openrouter:
+    base_url: https://openrouter.ai/api/v1
+    model: openai/gpt-4o-mini

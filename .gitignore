@@ -75,3 +75,23 @@ ESsync/archived/
 crawl/
 
 backend/cache
+
+# Deployment settings, initialization markers and private release history
+deploy/config.yml
+deploy/.env
+deploy/.*.env
+deploy/.initialized-*
+deploy/backups/
+
+# Local data captures and scratch files (may contain real user data)
+/api_res.json
+/sample*.json
+/temp/
+
+# Runtime state written by sync scripts
+/setup/last_sync_cmt_timestamp
+/setup/malicious_keyword.txt
+
+# Local editor settings and standalone AI experiments
+/.cursor/
+/ai/
