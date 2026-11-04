@@ -12,6 +12,11 @@ from pymongo.errors import OperationFailure
 import yaml
 
 
+# Fields that are fixed when a comment is first created. A re-sync must not
+# overwrite them on existing documents, so they are only written on insert.
+FIXED_COMMENT_FIELDS = ('userId', 'content')
+
+
 def load_config():
     """Load configuration from config.yml"""
     config_path = Path(__file__).parent.parent / "config.yml"
@@ -205,10 +210,29 @@ def sync_comments(config):
                 if not comment_id:
                     continue
                 comment['updatedAt'] = synced_at
+
+                # userId and content are fixed at creation time, so only write
+                # them when inserting a new comment; updating an existing one
+                # must leave the stored values untouched.
+                set_on_insert = {
+                    key: comment[key]
+                    for key in FIXED_COMMENT_FIELDS
+                    if key in comment
+                }
+                update_fields = {
+                    key: value
+                    for key, value in comment.items()
+                    if key not in FIXED_COMMENT_FIELDS
+                }
+
+                update = {"$set": update_fields}
+                if set_on_insert:
+                    update["$setOnInsert"] = set_on_insert
+
                 try:
                     result = comments_collection.update_one(
                         {"commentId": comment_id},
-                        {"$set": comment},
+                        update,
                         upsert=True
                     )
                     if result.upserted_id or result.modified_count > 0:
