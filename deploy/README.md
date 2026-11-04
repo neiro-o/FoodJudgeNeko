@@ -35,8 +35,8 @@ Redis 第一版配置支持普通 TCP；跨服务器连接应通过 SSH 隧道�
 也可以在初始化时指定已发布版本：
 
 ```bash
-./setup.sh --api-image ghcr.io/neiro-o/foodjudgeneko-api:v1.0.0 \
-           --web-image ghcr.io/neiro-o/foodjudgeneko-web:v1.0.0
+./setup.sh --api-image ghcr.io/neiro-o/mtv2-api:v1.0.1 \
+           --web-image ghcr.io/neiro-o/mtv2-web:v1.0.1
 ```
 
 尚未发布到 GHCR 时，可使用本次验证的离线镜像包（Linux AMD64）：
