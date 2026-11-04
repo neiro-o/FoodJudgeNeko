@@ -1,0 +1,222 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "analyzer": {
+        "chinese_ngram": {
+          "type": "custom",
+          "tokenizer": "chinese_ngram_tokenizer",
+          "filter": [
+            "lowercase"
+          ]
+        },
+        "chinese_search": {
+          "type": "custom",
+          "tokenizer": "chinese_ngram_tokenizer",
+          "filter": [
+            "lowercase"
+          ]
+        }
+      },
+      "tokenizer": {
+        "chinese_ngram_tokenizer": {
+          "type": "ngram",
+          "min_gram": 2,
+          "max_gram": 3,
+          "token_chars": [
+            "letter",
+            "digit",
+            "punctuation",
+            "symbol"
+          ]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "keyword"
+      },
+      "mongo_id": {
+        "type": "keyword"
+      },
+      "user_review": {
+        "type": "text",
+        "analyzer": "chinese_ngram",
+        "search_analyzer": "chinese_search",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "searchable_content": {
+        "type": "text",
+        "analyzer": "chinese_ngram",
+        "search_analyzer": "chinese_search"
+      },
+      "review_pics": {
+        "type": "keyword"
+      },
+      "timestamp": {
+        "type": "long"
+      },
+      "others": {
+        "type": "text",
+        "analyzer": "chinese_ngram",
+        "search_analyzer": "chinese_search"
+      },
+      "problem_type": {
+        "type": "integer"
+      },
+      "answer": {
+        "type": "integer"
+      },
+      "ratio_1": {
+        "type": "float"
+      },
+      "ratio_2": {
+        "type": "float"
+      },
+      "uploader": {
+        "type": "keyword"
+      },
+      "taskId": {
+        "type": "keyword"
+      },
+      "userId": {
+        "type": "keyword"
+      },
+      "created_at": {
+        "type": "long"
+      },
+      "replies": {
+        "type": "nested",
+        "properties": {
+          "role": {
+            "type": "keyword"
+          },
+          "timestamp": {
+            "type": "long"
+          },
+          "content": {
+            "type": "text",
+            "analyzer": "chinese_ngram",
+            "search_analyzer": "chinese_search"
+          }
+        }
+      },
+      "appeals": {
+        "type": "nested",
+        "properties": {
+          "role": {
+            "type": "keyword"
+          },
+          "timestamp": {
+            "type": "long"
+          },
+          "content": {
+            "type": "text",
+            "analyzer": "chinese_ngram",
+            "search_analyzer": "chinese_search"
+          },
+          "pics": {
+            "type": "keyword"
+          }
+        }
+      },
+      "order_info": {
+        "type": "object",
+        "enabled": true
+      },
+      "orders": {
+        "type": "nested",
+        "properties": {
+          "name": {
+            "type": "text",
+            "analyzer": "chinese_ngram",
+            "search_analyzer": "chinese_search"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "desc": {
+            "type": "text",
+            "analyzer": "chinese_ngram",
+            "search_analyzer": "chinese_search"
+          },
+          "selection": {
+            "type": "keyword"
+          },
+          "pic": {
+            "type": "keyword"
+          },
+          "others": {
+            "type": "text",
+            "analyzer": "chinese_ngram",
+            "search_analyzer": "chinese_search"
+          }
+        }
+      },
+      "order_detail": {
+        "type": "object",
+        "properties": {
+          "order_started": {
+            "type": "long"
+          },
+          "order_finished": {
+            "type": "long"
+          },
+          "deliver_time": {
+            "type": "long"
+          },
+          "total_time": {
+            "type": "long"
+          },
+          "deliver_by": {
+            "type": "keyword"
+          },
+          "note": {
+            "type": "text",
+            "analyzer": "chinese_ngram",
+            "search_analyzer": "chinese_search"
+          },
+          "utensils": {
+            "type": "integer"
+          },
+          "invoice": {
+            "type": "boolean"
+          }
+        }
+      },
+      "comments": {
+        "type": "nested",
+        "properties": {
+          "userid": {
+            "type": "long"
+          },
+          "name": {
+            "type": "keyword"
+          },
+          "content": {
+            "type": "text",
+            "analyzer": "chinese_ngram",
+            "search_analyzer": "chinese_search"
+          },
+          "timestamp": {
+            "type": "long"
+          },
+          "choice": {
+            "type": "integer"
+          },
+          "likes": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

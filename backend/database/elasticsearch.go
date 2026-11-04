@@ -3,9 +3,11 @@ package database
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -40,11 +42,23 @@ func ConnectElasticsearch() error {
 	}
 
 	if useHTTPS {
-		// Configure for development (skip TLS verification for HTTPS connections)
+		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: config.AppConfig.Elasticsearch.InsecureSkipVerify}
+		if caFile := config.AppConfig.Elasticsearch.CAFile; caFile != "" {
+			pem, err := os.ReadFile(caFile)
+			if err != nil {
+				return fmt.Errorf("read Elasticsearch CA: %w", err)
+			}
+			roots, err := x509.SystemCertPool()
+			if err != nil {
+				roots = x509.NewCertPool()
+			}
+			if !roots.AppendCertsFromPEM(pem) {
+				return fmt.Errorf("invalid Elasticsearch CA")
+			}
+			tlsConfig.RootCAs = roots
+		}
 		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+			TLSClientConfig: tlsConfig,
 		}
 		cfg.Transport = transport
 	}

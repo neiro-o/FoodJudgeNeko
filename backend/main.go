@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
-	"path/filepath"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"mtv2/backend/config"
@@ -19,14 +24,15 @@ import (
 
 func main() {
 	// Load configuration
-	configPath := filepath.Join("..", "config.yml")
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// Try current directory
-		configPath = "config.yml"
-	}
-
-	if err := config.LoadConfig(configPath); err != nil {
+	if err := config.LoadConfig(config.Path()); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+	if err := config.AppConfig.Validate(); err != nil {
+		log.Fatal(err)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "check-config" {
+		fmt.Println("Configuration is valid")
+		return
 	}
 
 	// Connect to MongoDB
@@ -79,6 +85,15 @@ func main() {
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
+		utils.SuccessResponse(c, gin.H{"status": "ok"})
+	})
+	r.GET("/ready", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
+		if err := database.Ready(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable"})
+			return
+		}
 		utils.SuccessResponse(c, gin.H{"status": "ok"})
 	})
 
@@ -150,9 +165,20 @@ func main() {
 	}
 
 	// Start server
-	port := fmt.Sprintf(":%d", config.AppConfig.Server.Port)
+	port := net.JoinHostPort(config.AppConfig.Server.Host, fmt.Sprint(config.AppConfig.Server.Port))
 	fmt.Printf("Server starting on port %s\n", port)
-	if err := r.Run(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	server := &http.Server{Addr: port, Handler: r, ReadHeaderTimeout: 10 * time.Second}
+	stopped, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go func() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+	}()
+	<-stopped.Done()
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("HTTP shutdown: %v", err)
 	}
 }

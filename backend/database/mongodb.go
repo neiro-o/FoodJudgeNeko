@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"mtv2/backend/config"
@@ -83,11 +84,13 @@ func Connect() error {
 	// Ensure the AI summary cache has a unique index on userId so a
 	// concurrent generation can never leave two cache rows for the same
 	// user (the handler upserts by userId).
-	if _, err := AIUserSummaries.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bson.D{{Key: "userId", Value: 1}},
-		Options: options.Index().SetUnique(true),
-	}); err != nil {
-		fmt.Printf("Warning: failed to create ai_user_summaries index: %v\n", err)
+	if os.Getenv("MTV2_SKIP_STARTUP_INDEXES") != "true" {
+		if _, err := AIUserSummaries.Indexes().CreateOne(ctx, mongo.IndexModel{
+			Keys:    bson.D{{Key: "userId", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		}); err != nil {
+			fmt.Printf("Warning: failed to create ai_user_summaries index: %v\n", err)
+		}
 	}
 
 	fmt.Println("Connected to MongoDB successfully")
