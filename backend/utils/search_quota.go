@@ -57,15 +57,15 @@ type SearchQuotaLimits struct {
 func SearchQuotaLimitsForScore(score float64) SearchQuotaLimits {
 	switch {
 	case score >= 75:
-		return SearchQuotaLimits{FiveHour: 75, Weekly: 1000}
+		return SearchQuotaLimits{FiveHour: 113, Weekly: 1500}
 	case score >= 50:
-		return SearchQuotaLimits{FiveHour: 60, Weekly: 800}
+		return SearchQuotaLimits{FiveHour: 90, Weekly: 1200}
 	case score >= 40:
-		return SearchQuotaLimits{FiveHour: 45, Weekly: 600}
+		return SearchQuotaLimits{FiveHour: 68, Weekly: 900}
 	case score >= 20:
-		return SearchQuotaLimits{FiveHour: 30, Weekly: 300}
+		return SearchQuotaLimits{FiveHour: 45, Weekly: 450}
 	default:
-		return SearchQuotaLimits{FiveHour: 15, Weekly: 180}
+		return SearchQuotaLimits{FiveHour: 23, Weekly: 270}
 	}
 }
 

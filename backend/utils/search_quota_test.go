@@ -10,17 +10,17 @@ func TestSearchQuotaLimitsForScore(t *testing.T) {
 		score float64
 		want  SearchQuotaLimits
 	}{
-		{100, SearchQuotaLimits{75, 1000}},
-		{75, SearchQuotaLimits{75, 1000}},
-		{74.9, SearchQuotaLimits{60, 800}},
-		{50, SearchQuotaLimits{60, 800}},
-		{49.9, SearchQuotaLimits{45, 600}},
-		{40, SearchQuotaLimits{45, 600}},
-		{39.9, SearchQuotaLimits{30, 300}},
-		{20, SearchQuotaLimits{30, 300}},
-		{19.9, SearchQuotaLimits{15, 180}},
-		{0, SearchQuotaLimits{15, 180}},
-		{-5, SearchQuotaLimits{15, 180}},
+		{100, SearchQuotaLimits{113, 1500}},
+		{75, SearchQuotaLimits{113, 1500}},
+		{74.9, SearchQuotaLimits{90, 1200}},
+		{50, SearchQuotaLimits{90, 1200}},
+		{49.9, SearchQuotaLimits{68, 900}},
+		{40, SearchQuotaLimits{68, 900}},
+		{39.9, SearchQuotaLimits{45, 450}},
+		{20, SearchQuotaLimits{45, 450}},
+		{19.9, SearchQuotaLimits{23, 270}},
+		{0, SearchQuotaLimits{23, 270}},
+		{-5, SearchQuotaLimits{23, 270}},
 	} {
 		if got := SearchQuotaLimitsForScore(tc.score); got != tc.want {
 			t.Errorf("score %v: got %+v, want %+v", tc.score, got, tc.want)
