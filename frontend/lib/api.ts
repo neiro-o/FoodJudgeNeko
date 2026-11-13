@@ -648,3 +648,45 @@ export const pointsAPI = {
     return apiRequest<LeaderboardResponse>(`/points/leaderboard?${params.toString()}`);
   },
 };
+
+// Comment word clouds use immutable snapshots so previews and pages agree.
+export type WordCloudRange = '24h' | '7d';
+export interface WordCloudComment {
+  id: string;
+  content: string;
+  createTime: number;
+  likes: number;
+  name: string;
+  isAnonymous: boolean;
+}
+export interface WordCloudWord {
+  text: string;
+  count: number;
+  preview: WordCloudComment[];
+}
+export interface WordCloudResponse {
+  snapshot: string;
+  generatedAt: number;
+  expiresAt: number;
+  range: WordCloudRange;
+  from: number;
+  to: number;
+  commentCount: number;
+  words: WordCloudWord[];
+}
+export interface WordCloudCommentsResponse {
+  snapshot: string;
+  word: string;
+  comments: WordCloudComment[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+export const statsAPI = {
+  wordCloud: (range: WordCloudRange, signal?: AbortSignal) =>
+    apiRequest<WordCloudResponse>(`/stats/wordcloud?range=${range}`, { signal }),
+  comments: (range: WordCloudRange, snapshot: string, word: string, page: number, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ range, snapshot, word, page: String(page) });
+    return apiRequest<WordCloudCommentsResponse>(`/stats/wordcloud/comments?${params}`, { signal });
+  },
+};

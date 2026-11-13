@@ -724,3 +724,34 @@ Generates a new AI summary if there is no cached result or the cached result is 
   "message": "AI summary is already being generated for this user, please retry shortly"
 }
 ```
+
+## Comment word cloud (authenticated)
+
+- `GET /api/stats/wordcloud?range=24h|7d` (default `24h`): returns `snapshot`,
+  `generatedAt`, `expiresAt`, `range`, `from`, `to` (Unix seconds), `commentCount`,
+  and up to 100 `words: [{text, count, preview}]`. `count` is the number of
+  comments mentioning that exact token, counted once per comment. Each preview
+  contains up to three comments.
+- `GET /api/stats/wordcloud/comments?range=24h|7d&snapshot=…&word=…&page=1`:
+  returns `snapshot`, `word`, `comments`, `total`, `page`, `totalPages`; fixed
+  page size 20. A comment contains `id`, `content`, `createTime`, `likes`, `name`,
+  `isAnonymous`. Anonymous names are blank; user IDs are never returned.
+- Errors use the standard numeric response `code`: `400` invalid parameters/page,
+  `404` token absent from that window's top words, `410` snapshot expired
+  (reload the cloud), `500` database/cache/generation failure. Both endpoints
+  require login but do not use search points or search quotas.
+- Windows are `[from,to)`, frozen at generation, based on comment creation time.
+  Only top-level `content` is tokenized. Malicious users, empty/invalid content,
+  links, pure numbers, punctuation, single characters and stop words are excluded.
+  Valid nonempty comments with no surviving tokens still count in `commentCount`.
+- Both windows are built in one indexed scan and cached in Redis for 10 minutes;
+  immutable snapshots remain available for 20 minutes from generation. Changes
+  to the malicious-user list take effect on the next successful refresh. Failed
+  refreshes never publish partial data. Returned comments preserve snapshot order:
+  likes descending, creation time descending, comment ID ascending.
+- Tokenizer vocabulary: `stats/stopwords.txt`, `stats/dictionary.txt`. Bump the
+  `stats:wordcloud:v1:` cache prefix if tokenization semantics or dictionaries change.
+
+Deployment warm-up: `/app/mtv2ctl init-stats` ensures the additive `createTime`
+index and initializes both windows in the configured production Redis. It reuses
+an existing fresh snapshot and prints only counts and timestamps, not comments.

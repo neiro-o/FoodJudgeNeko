@@ -15,6 +15,8 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 // Translation keys
 const translations: Record<Language, Record<string, string>> = {
   en: {
+    'nav.stats': 'Statistics',
+    'pageTitle.stats': 'Comment statistics',
     // Common
     'welcome': 'Welcome',
     'loading': 'Loading...',
@@ -260,6 +262,8 @@ const translations: Record<Language, Record<string, string>> = {
     'problemOps.refreshCommentsFailed': 'Failed to update comments',
   },
   zh: {
+    'nav.stats': '统计',
+    'pageTitle.stats': '评论统计',
     // Common
     'welcome': '欢迎',
     'loading': '加载中...',

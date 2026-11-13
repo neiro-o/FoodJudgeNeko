@@ -147,3 +147,37 @@ python3 deploy/tests/smoke.py --build
 账号、题目、搜索索引分别定义增量游标、删除标记与恢复策略。
 账号、积分、配额等可变数据需要先确定唯一写入端与冲突规则，不能直接双向覆盖。
 数据同步属于独立能力，不等同于备份或高可用。
+
+## 评论词云升级
+
+发布包含 `/stats` 的 API/Web 版本前，先创建非唯一时间索引；已有安装的普通更新
+不会重新运行首次初始化。使用现有数据库管理会话执行以下增量变更即可，无须删除初始化标记：
+
+```javascript
+use mtv2
+db.comments.createIndex({ createTime: 1 })
+```
+
+新安装由 `mtv2ctl init-mongo` 自动创建该索引，旧版 Python 初始化和评论同步脚本也已补齐。
+词云查询显式要求该索引；缺失时返回错误，避免回退到全库扫描。
+可用以下只读查询确认执行计划包含 `IXSCAN`，且扫描数量接近近 7 天评论数：
+
+```javascript
+const end = Math.floor(Date.now() / 1000)
+db.comments.find({ createTime: { $gte: end - 604800, $lt: end }, content: { $type: 'string' } })
+  .hint({ createTime: 1 }).explain('executionStats')
+```
+
+词云与关联评论使用现有 Redis；首次打开计算两个窗口，之后共享缓存 10 分钟，
+旧快照保留 20 分钟。日志 `word cloud snapshot built` 记录首次计算耗时、评论数和快照体积，
+`word cloud request` 记录接口耗时。上线后分别检查首次请求和缓存请求；接口仅限已登录用户。
+本次不新增常驻服务、定时任务或集合，不改动原始评论。
+
+部署后可显式初始化时间索引并预热两个窗口的共享缓存（已有新鲜快照会复用）：
+
+```bash
+cd /root/mtv2/deploy
+docker compose run --rm --no-deps api /app/mtv2ctl init-stats
+```
+
+该命令只确保评论时间索引并生成 Redis 统计快照，不修改评论、不创建账号。

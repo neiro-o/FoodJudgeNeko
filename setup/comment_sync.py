@@ -72,6 +72,7 @@ def ensure_comments_indexes(db, config):
         ([("problemId", ASCENDING)], {}),
         ([("commentId", ASCENDING)], {}),
         ([("userName", ASCENDING)], {}),
+        ([("createTime", ASCENDING)], {}),
     ]
     
     try:

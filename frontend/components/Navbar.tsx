@@ -57,6 +57,7 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
               <button onClick={() => navigate('/problems')}>搜索题目</button>
               <button onClick={() => navigate('/user_stats')}>查询用户</button>
               <button onClick={() => navigate('/points')}>积分榜</button>
+              <button onClick={() => navigate('/stats')}>{t('nav.stats')}</button>
               <button onClick={() => navigate('/user')}>用户中心</button>
             </div>
           )}

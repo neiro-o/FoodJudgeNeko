@@ -20,4 +20,6 @@
 !models/**
 !utils/
 !utils/**
+!stats/
+!stats/**
 **/*_test.go

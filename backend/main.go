@@ -160,6 +160,10 @@ func main() {
 		// Weekly score ranking (any authenticated account)
 		protected.GET("/weekly_scores/ranking", handlers.GetWeeklyScoreRanking)
 
+		// Comment statistics (any authenticated account; no search quota)
+		protected.GET("/stats/wordcloud", handlers.GetWordCloud)
+		protected.GET("/stats/wordcloud/comments", handlers.GetWordCloudComments)
+
 		// Points leaderboard (any authenticated account)
 		protected.GET("/points/leaderboard", handlers.GetPointsLeaderboard)
 	}

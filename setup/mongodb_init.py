@@ -113,6 +113,11 @@ def create_indexes(db, config):
             ([("created_at", DESCENDING)], {}),
             ([("timestamp", DESCENDING)], {}),
         ],
+        'comments': [
+            ([("userId", ASCENDING)], {}),
+            ([("problemId", ASCENDING)], {}),
+            ([("createTime", ASCENDING)], {}),
+        ],
         'notes': [
             # ([("created_at", DESCENDING)], {}),
         ],

@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if len(os.Args) != 2 {
-		log.Fatal("usage: mtv2ctl init-mongo | init-es | admin | check-config")
+		log.Fatal("usage: mtv2ctl init-mongo | init-es | init-stats | admin | check-config")
 	}
 	if err := config.LoadConfig(config.Path()); err != nil {
 		log.Fatal("Cannot load configuration")
@@ -27,6 +27,8 @@ func main() {
 	case "check-config":
 	case "init-mongo":
 		err = bootstrap.InitMongo(ctx)
+	case "init-stats":
+		err = bootstrap.InitStats(ctx)
 	case "init-es":
 		err = bootstrap.InitES(ctx)
 	case "admin":

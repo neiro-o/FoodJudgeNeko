@@ -50,7 +50,7 @@ func InitMongo(ctx context.Context) error {
 		cfg.Collections.Invitations:     {unique(bson.D{{Key: "invite_code", Value: 1}}), {Keys: bson.D{{Key: "created_by", Value: 1}}}},
 		cfg.Collections.ProcessedList:   {unique(bson.D{{Key: "user_id", Value: 1}, {Key: "task_id", Value: 1}}), {Keys: bson.D{{Key: "task_id", Value: 1}}}},
 		cfg.Collections.Problems:        {unique(bson.D{{Key: "userId", Value: 1}, {Key: "taskId", Value: 1}}), {Keys: bson.D{{Key: "taskId", Value: 1}}}, {Keys: bson.D{{Key: "timestamp", Value: -1}}}, {Keys: bson.D{{Key: "uploader", Value: 1}}}},
-		cfg.Collections.Comments:        {{Keys: bson.D{{Key: "userId", Value: 1}}}, {Keys: bson.D{{Key: "problemId", Value: 1}}}},
+		cfg.Collections.Comments:        {{Keys: bson.D{{Key: "userId", Value: 1}}}, {Keys: bson.D{{Key: "problemId", Value: 1}}}, {Keys: bson.D{{Key: "createTime", Value: 1}}}},
 		cfg.Collections.AIUserSummaries: {unique(bson.D{{Key: "userId", Value: 1}})},
 		cfg.Collections.WeeklyScores:    {unique(bson.D{{Key: "userId", Value: 1}, {Key: "year", Value: 1}, {Key: "weekId", Value: 1}}), {Keys: bson.D{{Key: "year", Value: 1}, {Key: "weekId", Value: 1}, {Key: "score", Value: -1}}}},
 	}
