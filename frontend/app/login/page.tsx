@@ -3,8 +3,8 @@
 import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { useRouter, useSearchParams } from '@/lib/navigation';
+import Link from '@/components/PageLink';
 import Image from '@/components/PreferenceImage';
 import InterfaceSettings from '@/components/InterfaceSettings';
 import BrandLogo from '@/components/BrandLogo';

@@ -5,7 +5,7 @@ import { getAuthToken } from '@/lib/auth-storage';
 import { PreferenceImg } from '@/components/PreferenceImage';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from '@/lib/navigation';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import { useLanguage } from '@/contexts/LanguageContext';

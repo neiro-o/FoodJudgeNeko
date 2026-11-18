@@ -7,7 +7,7 @@ import InterfaceSettings from '@/components/InterfaceSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import PageTitle from '@/components/PageTitle';
 import AssetPreloader from '@/components/AssetPreloader';
-import Link from 'next/link';
+import Link from '@/components/PageLink';
 
 const mascots = ['classic', 'reader', 'computer', 'yellow-dress', 'black-dress', 'summer'];
 

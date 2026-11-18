@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
 import { authAPI, restoreAutomaticLogin } from '@/lib/api';
 import { AUTH_CHANGED_EVENT, clearAuth, getStoredAuth, LoginOptions, startLogin, tokenIsExpired } from '@/lib/auth-storage';
 

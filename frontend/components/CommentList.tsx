@@ -5,7 +5,7 @@ import { getAuthToken } from '@/lib/auth-storage';
 import { PreferenceImg } from '@/components/PreferenceImage';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { mediaAPI } from '@/lib/api';
 import type { ProblemComment } from '@/lib/api';

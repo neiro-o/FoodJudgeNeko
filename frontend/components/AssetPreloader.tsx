@@ -3,12 +3,10 @@
 import { ReactNode, useEffect, useState } from 'react';
 import InterfaceSettings from '@/components/InterfaceSettings';
 import { useDisplayMode } from '@/contexts/DisplayModeContext';
-import { useRouter } from 'next/navigation';
 
 type Manifest = { version: string; assets: { url: string; bytes: number }[] };
 
 export default function AssetPreloader({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const { ready: preferencesReady, isEnergySaving } = useDisplayMode();
   const [attempt, setAttempt] = useState(0);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -99,9 +97,6 @@ export default function AssetPreloader({ children }: { children: ReactNode }) {
             }
           } catch { setPersistent(false); }
         }
-        // Route data stays in Next's router cache, never in the public asset cache.
-        router.prefetch('/problems');
-        router.prefetch('/login');
         if (!cancelled) {
           setReady(true);
           // Non-blocking font retry after the visitor has entered the page.
@@ -118,7 +113,7 @@ export default function AssetPreloader({ children }: { children: ReactNode }) {
     }
     void load();
     return () => { cancelled = true; abort.abort(); clearTimeout(fontRetryTimer); };
-  }, [attempt, router, preferencesReady, isEnergySaving]);
+  }, [attempt, preferencesReady, isEnergySaving]);
 
   if (ready || (preferencesReady && isEnergySaving)) return <>{children}</>;
   const percent = progress.total ? Math.floor(progress.done / progress.total * 100) : 0;

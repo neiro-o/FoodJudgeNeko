@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import { useAuth } from '@/contexts/AuthContext';

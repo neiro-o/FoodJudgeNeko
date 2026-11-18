@@ -247,6 +247,10 @@ export const problemAPI = {
     });
   },
 
+  link: async (mongoId: string): Promise<string> => {
+    return apiRequest<string>(`/problem/link/${encodeURIComponent(mongoId)}`, { cache: 'no-store' });
+  },
+
   refreshComments: async (mongoId: string): Promise<ProblemUploadResponse> => {
     return apiRequest<ProblemUploadResponse>(`/problem/refresh-comments/${encodeURIComponent(mongoId)}`, {
       method: 'POST',

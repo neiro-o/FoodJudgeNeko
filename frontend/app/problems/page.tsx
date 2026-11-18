@@ -1,10 +1,11 @@
 'use client';
+import { withPageTimestamp } from '@/lib/page-url';
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getLoginUrl } from '@/lib/auth-redirect';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from '@/lib/navigation';
 import { problemAPI, searchAPI, SearchResult, NotesSearchItem, ApiError, SearchQuotaStatus, SearchQuotaWindow, CODE_INSUFFICIENT_POINTS, CODE_SEARCH_QUOTA_EXCEEDED } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
@@ -156,7 +157,7 @@ export default function ProblemsPage() {
       setResultViewMode(savedViewMode);
     }
   }, []);
-  const returnToSearch = () => window.location.assign('/problems');
+  const returnToSearch = () => window.location.assign(withPageTimestamp('/problems'));
   const [resultLimit, setResultLimit] = useState(15);
   const [blockMaliciousComment, setBlockMaliciousComment] = useState(true);
   const [draftResultLimit, setDraftResultLimit] = useState(15);

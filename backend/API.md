@@ -296,6 +296,17 @@ least two hours old and must not already be waiting in the Redis problem queue.
 }
 ```
 
+### Original Problem Link
+
+**GET** `/api/problem/link/:id` (authentication required)
+
+Looks up `mtv2.problems` by MongoDB ObjectId and returns the original problem
+URL as a string in the standard `{code, message, data}` response. The URL uses
+`detail.taskInfo.voteTaskNo` and the first
+`comment[0].pageContent[0].commentId`. A missing first reply produces an empty
+`targetReplyId` parameter. Invalid IDs or a missing/empty task number return
+code `400`; missing documents return `404`. Responses use `Cache-Control: no-store`.
+
 ### Search Problems
 
 **GET** `/api/problem/search?keyword=search_term&limit=10`

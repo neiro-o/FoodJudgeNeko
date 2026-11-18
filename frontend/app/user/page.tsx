@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getLoginUrl } from '@/lib/auth-redirect';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
 import { authAPI, invitationAPI, Invitation } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';

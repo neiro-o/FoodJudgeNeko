@@ -1,7 +1,8 @@
 'use client';
+import { withPageTimestamp } from '@/lib/page-url';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import InterfaceSettings from '@/components/InterfaceSettings';
@@ -32,7 +33,7 @@ export default function Navbar({ title, showBackButton = false, backHref = '/pro
   const navigate = (path: string) => {
     setOpenMenu(null);
     if (path === '/problems') {
-      window.location.assign('/problems');
+      window.location.assign(withPageTimestamp('/problems'));
       return;
     }
     router.push(path);

@@ -136,6 +136,7 @@ func main() {
 		protected.GET("/problem/by-esid/:id", middleware.ProblemRateLimit("/api/problem/by-esid/:id", 1), handlers.SearchByESID)
 		protected.GET("/problem/by-mongoid/:id", middleware.ProblemRateLimit("/api/problem/by-mongoid/:id", 1), handlers.SearchByMongoID)
 		protected.GET("/problem/uploaders/:id", handlers.GetProblemUploaders)
+		protected.GET("/problem/link/:id", handlers.GetProblemLink)
 		protected.GET("/problem/comments/:problemId", handlers.GetProblemComments)
 		protected.POST("/media/hash", handlers.GenerateMediaHash)
 

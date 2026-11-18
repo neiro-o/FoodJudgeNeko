@@ -5,7 +5,7 @@ import { getAuthToken } from '@/lib/auth-storage';
 import { PreferenceImg } from '@/components/PreferenceImage';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from '@/lib/navigation';
 import Navbar from '@/components/Navbar';
 import ImageModal from '@/components/ImageModal';
 import { useDisplayMode } from '@/contexts/DisplayModeContext';

@@ -3,9 +3,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
 import { authAPI } from '@/lib/api';
-import Link from 'next/link';
+import Link from '@/components/PageLink';
 import Image from '@/components/PreferenceImage';
 import InterfaceSettings from '@/components/InterfaceSettings';
 import BrandLogo from '@/components/BrandLogo';

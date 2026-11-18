@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/lib/navigation';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
 import StatsWordCloud from '@/components/StatsWordCloud';

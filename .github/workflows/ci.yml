@@ -39,7 +39,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
-      - run: npm run build && node scripts/test-assets.mjs
+      - run: npm run build && node scripts/test-assets.mjs && node --test scripts/test-page-links.mjs scripts/test-auth.mjs
         working-directory: frontend
         env:
           NEXT_PUBLIC_API_URL: /api

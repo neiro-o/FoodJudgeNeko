@@ -1,3 +1,5 @@
+import { withPageTimestamp } from './page-url';
+
 export function getSafeRedirectPath(value: string | null): string {
   if (!value) return '/problems';
   try {
@@ -14,5 +16,5 @@ export function getLoginUrl(expired = false): string {
   if (pathname === '/login') return `${pathname}${search}${hash}`;
   const params = new URLSearchParams({ redirect: `${pathname}${search}${hash}` });
   if (expired) params.set('expired', 'true');
-  return `/login?${params.toString()}`;
+  return withPageTimestamp(`/login?${params.toString()}`);
 }

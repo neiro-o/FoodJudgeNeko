@@ -37,6 +37,9 @@ const handwritingSC = localFont({
   adjustFontFallback: false,
 })
 
+// Always render page documents with no-store; hashed assets remain cacheable.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: '掉心心',
   description: '选择与结果不一致，掉小心心了！',

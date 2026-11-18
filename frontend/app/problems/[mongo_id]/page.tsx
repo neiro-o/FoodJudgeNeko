@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { buildProblemAppLink } from '@/lib/problem-link';
 import { getLoginUrl } from '@/lib/auth-redirect';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams } from '@/lib/navigation';
 import { problemAPI, searchAPI, ProblemComment } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import PageTitle from '@/components/PageTitle';
@@ -144,6 +145,7 @@ export default function ProblemDetailPage() {
   const [loadingProblem, setLoadingProblem] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<{ type: string; success: boolean } | null>(null);
+  const [openingOriginal, setOpeningOriginal] = useState(false);
   const [refreshingComments, setRefreshingComments] = useState(false);
 
   // Copy to clipboard helper
@@ -177,6 +179,19 @@ export default function ProblemDetailPage() {
     const yamlStr = jsonToYaml(problem);
     copyToClipboard(yamlStr, 'yaml');
   }, [problem, copyToClipboard]);
+
+  const handleOpenOriginal = useCallback(async () => {
+    if (!mongoId || openingOriginal) return;
+    setOpeningOriginal(true);
+    try {
+      const link = await problemAPI.link(mongoId);
+      window.location.assign(buildProblemAppLink(link));
+    } catch (err: any) {
+      window.alert(err?.message || t('problemOps.openOriginalFailed'));
+    } finally {
+      setOpeningOriginal(false);
+    }
+  }, [mongoId, openingOriginal, t]);
 
   const handleRefreshComments = useCallback(async () => {
     if (!mongoId || refreshingComments) return;
@@ -400,6 +415,13 @@ export default function ProblemDetailPage() {
                           ? t('problemOps.copySuccess')
                           : t('problemOps.copyFailed')
                         : t('problemOps.copyYaml')}
+                    </button>
+                    <button
+                      onClick={handleOpenOriginal}
+                      disabled={openingOriginal}
+                      className="px-4 py-2 rounded-lg text-sm font-medium transition bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {openingOriginal ? t('problemOps.openingOriginal') : t('problemOps.openOriginal')}
                     </button>
                     <button
                       onClick={handleRefreshComments}
