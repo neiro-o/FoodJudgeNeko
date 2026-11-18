@@ -10,7 +10,7 @@ function load(path, imports = {}) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8');
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(`(function(require, module, exports) {${output}\n})`, { URL, Date, atob })(name => imports[name], module, module.exports);
+  vm.runInNewContext(`(function(require, module, exports) {${output}\n})`, { URL, Date, atob, process: { env: { NODE_ENV: 'production' } } })(name => imports[name], module, module.exports);
   return module.exports;
 }
 const { withPageTimestamp } = load('../lib/page-url.ts');
@@ -56,13 +56,25 @@ const { middleware } = load('../middleware.ts', { 'next/server': {
 } });
 
 test('direct page visits redirect once with no-store and retain search parameters', () => {
-  const response = middleware({ nextUrl: new MockURL('https://test.invalid/login?redirect=%2Fproblems%3Fq%3Dabc') });
+  const headers = new Map([['host', 'test.invalid']]);
+  const response = middleware({ nextUrl: new MockURL('https://test.invalid/login?redirect=%2Fproblems%3Fq%3Dabc'), headers });
   assert.equal(response.status, 307);
   assert.match(response.url.searchParams.get('_t'), /^\d{13,}$/);
   assert.equal(response.url.searchParams.get('redirect'), '/problems?q=abc');
   assert.match(response.headers.get('Cache-Control'), /no-store/);
   assert.equal(response.headers.get('CDN-Cache-Control'), 'no-store');
-  const next = middleware({ nextUrl: response.url });
+  const next = middleware({ nextUrl: response.url, headers });
   assert.equal(next.status, 200);
   assert.match(next.headers.get('Cache-Control'), /no-store/);
+});
+
+test('proxy redirects retain the public HTTPS host and work on local ports', () => {
+  for (const [host, origin] of [['test.invalid', 'https://test.invalid'], ['127.0.0.1:18000', 'http://127.0.0.1:18000']]) {
+    const response = middleware({
+      nextUrl: new MockURL('http://localhost:13000/login?redirect=%2Fproblems'),
+      headers: new Map([['host', host], ['x-forwarded-proto', 'http']]),
+    });
+    assert.equal(response.url.origin, origin);
+    assert.equal(response.url.searchParams.get('redirect'), '/problems');
+  }
 });
